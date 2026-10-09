@@ -1,0 +1,22 @@
+{
+  "chapters": [
+    {
+      "id": "overview",
+      "title": "Conocer MediClaro",
+      "narration": "Bienvenido a MediClaro. Hemos creado esta aplicación para algo muy sencillo: que entender tus medicamentos no sea complicado. Muchas veces una caja, un prospecto o una indicación médica contienen palabras difíciles, letras pequeñas o información que cuesta recordar. MediClaro te ayuda a tener esa información más clara y accesible, en un solo lugar. Puedes hacer una foto de la caja de un medicamento para intentar identificarlo y consultar información oficial explicada con palabras sencillas. También puedes preguntar al asistente sobre tus medicamentos, escuchar la información en voz alta si leer te resulta incómodo, guardar tus medicamentos para tenerlos siempre a mano y preparar tus datos de emergencia y tu ubicación para cuando realmente hagan falta. Está pensado especialmente para personas mayores, para quienes toman varios medicamentos y también para familiares o cuidadores que quieren ayudar. MediClaro no sustituye a tu médico, a tu farmacéutico ni a los servicios de emergencia. Su objetivo es ayudarte a comprender mejor la información y a sentirte más acompañado en el día a día. Las funciones inteligentes forman parte de MediClaro Premium. Antes de contratarlo puedes conocer tranquilamente cómo funciona la aplicación, y después del pago podrás completar tu acceso con tu número de teléfono."
+    }
+  ],
+  "scenes": [
+    {"id": "welcome", "chapter": "overview", "anchor": null, "caption": "Bienvenido a MediClaro", "detail": "Entender tus medicamentos no tiene por qué ser complicado."},
+    {"id": "problem", "chapter": "overview", "anchor": "Muchas veces", "caption": "Letra pequeña y palabras difíciles", "detail": "Cajas, prospectos e indicaciones que cuesta entender y recordar."},
+    {"id": "together", "chapter": "overview", "anchor": "MediClaro te ayuda", "caption": "Todo más claro, en un solo lugar", "detail": "La información de tus medicamentos, fácil de consultar."},
+    {"id": "featurePhoto", "chapter": "overview", "anchor": "Puedes hacer una foto", "caption": "Haz una foto de la caja", "detail": "Para identificarlo y ver su información oficial."},
+    {"id": "featureAsk", "chapter": "overview", "anchor": "También puedes preguntar", "caption": "Pregunta al asistente", "detail": "Resuelve tus dudas sobre tus medicamentos."},
+    {"id": "featureListen", "chapter": "overview", "anchor": "escuchar la información", "caption": "Escúchalo en voz alta", "detail": "Si leer te resulta incómodo."},
+    {"id": "featureSave", "chapter": "overview", "anchor": "guardar tus medicamentos", "caption": "Guarda tus medicamentos", "detail": "Para tenerlos siempre a mano."},
+    {"id": "featureReady", "chapter": "overview", "anchor": "preparar tus datos", "caption": "Tus datos de emergencia", "detail": "Y tu ubicación, para cuando de verdad hagan falta."},
+    {"id": "people", "chapter": "overview", "anchor": "Está pensado", "caption": "Pensado para ti y los tuyos", "detail": "Personas mayores, quienes toman varios medicamentos, familiares y cuidadores."},
+    {"id": "trust", "chapter": "overview", "anchor": "MediClaro no sustituye a tu médico", "caption": "Una ayuda, no un sustituto", "detail": "No sustituye a tu médico, a tu farmacéutico ni a los servicios de emergencia."},
+    {"id": "premium", "chapter": "overview", "anchor": "Las funciones inteligentes", "caption": "Funciones inteligentes con Premium", "detail": "Conócelas antes de contratar. Después del pago, completas tu acceso con tu teléfono."}
+  ]
+}

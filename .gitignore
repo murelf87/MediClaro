@@ -1,0 +1,25 @@
+node_modules/
+.expo/
+dist/
+.env
+.env.*
+!.env.example
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Local RC audit outputs and recoverable dependency backups
+dist-rc-audit/
+*.pre-rc-deps.bak
+supabase/.temp/
+
+/dist-rc-caregiver/
+
+/dist-ui-qa/
+/qa-ui-rc/
+/.tmp-ui-work.txt
+/dist-rc-owner/

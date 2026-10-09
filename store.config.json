@@ -1,0 +1,79 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "version": "1.0.1",
+    "release": {
+      "automaticRelease": true
+    },
+    "categories": [
+      "MEDICAL",
+      "HEALTH_AND_FITNESS"
+    ],
+    "info": {
+      "es-ES": {
+        "title": "MediClaro",
+        "subtitle": "Tus medicamentos, más claros",
+        "description": "MediClaro te ayuda a entender mejor la información de tus medicamentos con un diseño sencillo y accesible. Puedes identificar un medicamento a partir de una fotografía de su caja, consultar información oficial de la AEMPS, guardar tus medicamentos y hacer preguntas al asistente de inteligencia artificial con explicaciones en lenguaje claro. También incluye lectura en voz alta, ajustes de accesibilidad y herramientas de emergencia y ubicación.\n\nMediClaro está especialmente pensado para personas mayores, familiares y cualquier persona que necesite consultar la información de sus medicamentos de una forma más fácil de leer y comprender.\n\nLa información médica procede de fuentes oficiales cuando están disponibles. Las explicaciones generadas con inteligencia artificial pueden contener errores y no sustituyen a tu médico ni a tu farmacéutico. Ante una urgencia en España, llama al 112.",
+        "keywords": [
+          "medicamentos",
+          "AEMPS",
+          "prospecto",
+          "farmacia",
+          "salud",
+          "mayores",
+          "accesibilidad",
+          "medicación"
+        ],
+        "promoText": "Información de tus medicamentos explicada de forma sencilla, accesible y con fuentes oficiales.",
+        "supportUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=support",
+        "privacyPolicyUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+      },
+      "en-US": {
+        "title": "MediClaro",
+        "subtitle": "Understand your medicines",
+        "description": "MediClaro helps you understand medicine information through a simple and accessible experience. Identify medicines from a photo of their packaging, consult official Spanish AEMPS information, save your medicines, ask the AI assistant for plain-language explanations, and use read-aloud, accessibility, emergency and location tools.\n\nMediClaro is designed especially for older adults, families and anyone who needs medicine information that is easier to read and understand.\n\nAI-generated explanations may contain errors and do not replace a doctor or pharmacist. In an emergency in Spain, call 112.",
+        "keywords": [
+          "medicine",
+          "medication",
+          "AEMPS",
+          "health",
+          "pharmacy",
+          "seniors",
+          "accessibility"
+        ],
+        "promoText": "Medicine information made clearer and easier to understand.",
+        "supportUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=support",
+        "privacyPolicyUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+      }
+    },
+    "advisory": {
+      "ageRatingOverride": "NONE",
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "koreaAgeRatingOverride": "NONE",
+      "lootBox": false,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "FREQUENT_OR_INTENSE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "advertising": false,
+      "ageAssurance": false,
+      "ageRatingOverrideV2": "NONE",
+      "developerAgeRatingInfoUrl": null,
+      "gunsOrOtherWeapons": "NONE",
+      "healthOrWellnessTopics": true,
+      "messagingAndChat": true,
+      "parentalControls": false,
+      "userGeneratedContent": false
+    }
+  }
+}

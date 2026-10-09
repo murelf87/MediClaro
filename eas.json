@@ -1,0 +1,54 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DEMO_ACCESS": "on",
+        "EXPO_PUBLIC_PAYMENTS_MODE": "store,stripe"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_DEMO_ACCESS": "on",
+        "EXPO_PUBLIC_PAYMENTS_MODE": "store,stripe",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ldonnvkysjalpmystoeq.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf"
+      },
+      "environment": "preview"
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DEMO_ACCESS": "off",
+        "EXPO_PUBLIC_PAYMENTS_MODE": "store",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ldonnvkysjalpmystoeq.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf",
+        "EXPO_PUBLIC_APP_STORE_ID": "6817669616",
+        "EXPO_PUBLIC_OTP_TTL_SECONDS": "300",
+        "EXPO_PUBLIC_PRIVACY_URL": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+      }
+    },
+    "rc": {
+      "extends": "production",
+      "distribution": "internal",
+      "environment": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6817669616"
+      }
+    }
+  }
+}

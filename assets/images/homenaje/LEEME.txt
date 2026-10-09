@@ -1,0 +1,7 @@
+Fotos de homenaje de la entrada de MediClaro.
+
+Pon aquí las fotos (JPG, mejor horizontales, 1600 px de ancho como mucho) y añádelas en
+src/content/homenaje.ts. Las instrucciones completas están en ese archivo.
+
+Puesta: isabel-y-jose.jpg (Isabel y José), 1600 x 1073 px, sale arriba en la entrada fundida con el fondo, encima
+del logo de MediClaro.

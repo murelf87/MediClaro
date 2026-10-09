@@ -1,0 +1,60 @@
+project_id = "mediclaro"
+
+[auth]
+site_url = "mediclaro://"
+additional_redirect_urls = ["mediclaro://", "exp://*"]
+
+[auth.email]
+enable_signup = true
+otp_length = 6
+otp_expiry = 900
+
+[auth.rate_limit]
+email_sent = 10
+
+# Stripe llama al webhook sin JWT de usuario: la seguridad es la firma HMAC.
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.identify-medicine]
+verify_jwt = true
+
+[functions.chat]
+verify_jwt = true
+
+# TTS Premium requiere sesión; la vista previa pública usa una función separada y textos fijos.
+[functions.tts]
+verify_jwt = true
+
+[functions.tts-preview]
+verify_jwt = false
+
+[functions.public-info]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.customer-portal]
+verify_jwt = true
+
+[functions.iap-verify]
+verify_jwt = true
+
+# Apple/Google llaman a estas funciones sin JWT de usuario. La función revalida
+# el estado directamente contra la API oficial de la tienda y puede exigir token secreto en la URL.
+[functions.apple-store-notifications]
+verify_jwt = false
+
+[functions.google-play-notifications]
+verify_jwt = false
+
+[functions.cleanup-anonymous]
+verify_jwt = false
+
+# Internal worker authenticates with its Vault secret, never a client JWT.
+[functions.caregiver-dispatch]
+verify_jwt = false
+
+[functions.caregiver-rtc-config]
+verify_jwt = false

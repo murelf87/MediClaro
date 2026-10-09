@@ -1,0 +1,13 @@
+{
+  "name": "mediclaro-backend-patches-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pruebas de las migraciones propuestas sobre PostgreSQL en memoria (PGlite). No se conecta a ningún proyecto de Supabase.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-reporter=spec migrations.test.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}

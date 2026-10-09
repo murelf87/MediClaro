@@ -1,0 +1,17 @@
+﻿ M app.json
+ M src/hooks/__tests__/naturalSpeech.test.ts
+ M src/hooks/index.ts
+ M src/hooks/useSpeech.ts
+ M src/screens/assistant/AssistantScreen.tsx
+ M src/screens/identify/VoiceScreen.tsx
+ M src/services/SpeechService.ts
+ M supabase/functions/tts/index.ts
+?? plugins/withRequiredIosPrivacy.js
+?? scripts/CONFIGURAR_TELEFONIA_MEDICLARO.ps1
+?? scripts/debug-ui-rc.cjs
+?? scripts/e2e-ai-voice-temp.mjs
+?? scripts/generate-tour-consistent-rc.mjs
+?? supabase/functions/courtesy-access/
+HEAD=aa69d84b3671098e7dec166e4d5f61f48e10a0f6
+DATE=2026-10-08
+PACKAGE=mediclaro 1.0.1
