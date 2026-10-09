@@ -5,13 +5,16 @@
  *    (src/content/homenaje.ts), fundida con el fondo. Sin fotos, en la versión de las tiendas no sale.
  *  - Después, la guía saludando y lo que hace la app.
  *  - «Conocer MediClaro» → explicación con voz y ejemplos, SIN registrarse.
- *  - «Ya soy Premium» → entrar con el teléfono (SMS). «Restaurar compra» → compras de la tienda de este teléfono.
+ *  - «Entrar con mi teléfono» → cuenta con SMS (quien ya tenía Premium lo recupera al entrar; «Restaurar compra»
+ *    sigue en Premium y en el pago). «Soy cuidador/a · gratis» → entrada de cuidador/a sin teléfono.
  *  - Siempre visible: acceso a emergencias (112), que nunca requiere pagar ni registrarse.
+ *  - Sin accesos de prueba ni perfiles de revisión: la misma entrada en todas las compilaciones (09/10, 21:08).
  *  - «Aa»: tamaño de letra al momento, antes de tener cuenta (personas mayores).
  * Sin compras en la app (EXPO_PUBLIC_PAYMENTS_MODE=none) se comporta como la bienvenida de la 1.1.
  */
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import {
   AppText,
   Icon,
@@ -28,8 +31,8 @@ import { GuideIllustration } from '../../components/Guide';
 import { useAppTheme, useEntitlement, usePreferences, useSession } from '../../hooks';
 import { FONT_SIZE_LABELS, type FontSizePreference } from '../../theme';
 import { BrandSplash } from '../auth/BrandSplash';
+import { CAREGIVER_ENTRY_ERROR, openCaregiverEntry } from '../../components/ProfileChoice';
 import { usePurchase } from './usePurchase';
-import { ProfileChoice } from '../../components/ProfileChoice';
 import { TributePhoto, hasTributePhoto } from '../../components/TributePhoto';
 
 const FEATURES: { icon: IconName; color: string; bg: string; label: string }[] = [
@@ -77,8 +80,25 @@ export default function WelcomeScreen() {
   const { status } = useSession();
   const { ready } = usePreferences();
   const purchase = usePurchase();
-  // «Ya soy Premium» y «Restaurar compra» solo si se puede contratar Premium dentro de la app.
   const sell = useEntitlement().canSell;
+  // «Soy cuidador/a · gratis»: cuenta sin teléfono → perfil → Cuidador y avisos.
+  const caregiverRunning = useRef(false);
+  const [caregiverBusy, setCaregiverBusy] = useState(false);
+  const [caregiverError, setCaregiverError] = useState('');
+  const enterAsCaregiver = async () => {
+    if (caregiverRunning.current) return;
+    caregiverRunning.current = true;
+    setCaregiverBusy(true);
+    setCaregiverError('');
+    try {
+      await openCaregiverEntry(router);
+    } catch {
+      setCaregiverError(CAREGIVER_ENTRY_ERROR);
+    } finally {
+      caregiverRunning.current = false;
+      setCaregiverBusy(false);
+    }
+  };
 
   if (status === 'loading' || !ready) return <BrandSplash />;
 
@@ -108,8 +128,6 @@ export default function WelcomeScreen() {
           <TributePhoto height={photoHeight} />
         </FadeIn>
       ) : null}
-
-      <View style={{marginTop:theme.spacing.md}}><ProfileChoice review /></View>
 
       <FadeIn from="scale" delay={120} style={[styles.center, { marginVertical: theme.spacing.sm }]}>
         <GuideIllustration size={guideSize} />
@@ -146,26 +164,28 @@ export default function WelcomeScreen() {
       </FadeIn>
 
       <View style={{ marginTop: theme.spacing.md, gap: theme.spacing.xs }}>
-        <SecondaryButton label="Entrar sin Premium" variant="outline" onPress={() => router.push('/(tabs)')} testID="welcome-free" accessibilityHint="Abre el inicio sin teléfono. La IA y la identificación requieren Premium." />
         {purchase.notice ? (
           <InfoBanner tone={purchase.notice.tone} title={purchase.notice.title} message={purchase.notice.message} action={purchase.notice.action} />
         ) : null}
         <SecondaryButton
-          label="Ya tengo cuenta · entrar con mi teléfono"
+          label="Entrar con mi teléfono"
           variant="outline"
-          icon={sell ? 'ribbon-outline' : 'call-outline'}
+          icon="call-outline"
           onPress={() => router.push('/login')}
-          accessibilityHint="Entra con tu número de teléfono"
+          accessibilityHint={sell ? 'Entra con tu número de teléfono. Si ya tenías Premium, lo recuperas al entrar.' : 'Entra con tu número de teléfono'}
           testID="welcome-premium"
         />
-        {sell ? (
-          <TextButton
-            label={purchase.busy === 'restore' ? 'Comprobando…' : 'Restaurar compra'}
-            onPress={() => void purchase.restore()}
-            disabled={purchase.busy === 'restore'}
-            testID="welcome-restore"
-          />
-        ) : null}
+        <SecondaryButton
+          label="Soy cuidador/a · gratis"
+          variant="outline"
+          icon="people-outline"
+          onPress={() => void enterAsCaregiver()}
+          loading={caregiverBusy}
+          disabled={caregiverBusy}
+          accessibilityHint="Entra como cuidador o cuidadora, sin teléfono ni SMS, para recibir los avisos de la persona a la que cuidas"
+          testID="welcome-caregiver"
+        />
+        {caregiverError ? <InfoBanner tone="danger" message={caregiverError} /> : null}
         <TextButton
           label="¿Es una urgencia? Pulsa aquí"
           tone="danger"
