@@ -82,7 +82,8 @@ Deno.serve(handler({ bucket: 'checkout', maxPerMinute: 5 }, async (_req, user, b
       ? [{ price: PRICE_BASE, quantity: 1 }] // domiciliación / PayPal: solo la cuota mensual
       : [
           { price: PRICE_BASE, quantity: 1 },  // cuota mensual
-          { price: PRICE_METERED },            // pago por uso (fotos extra)
+          // Premium es ilimitado: el pago por uso solo se añade si el propietario define STRIPE_PRICE_METERED.
+          ...(PRICE_METERED ? [{ price: PRICE_METERED }] : []),
         ],
     ...(alternative ? { payment_method_types: [alternative] } : {}),
     subscription_data: { metadata: { supabase_user_id: user.id, ...(alternative ? { payment_method: method } : {}) } },
