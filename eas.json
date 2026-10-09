@@ -36,18 +36,28 @@
         "EXPO_PUBLIC_APP_STORE_ID": "6817669616",
         "EXPO_PUBLIC_OTP_TTL_SECONDS": "300",
         "EXPO_PUBLIC_PRIVACY_URL": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     },
     "rc": {
       "extends": "production",
       "distribution": "internal",
-      "environment": "production"
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
     "production": {
       "ios": {
         "ascAppId": "6817669616"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
       }
     }
   }
