@@ -4,6 +4,14 @@ Nada de esto lo puede hacer Claude: son claves secretas y cuentas tuyas. Las cla
 solo en *Supabase → Edge Functions → Secrets*.
 
 ## A. Stripe (tarjeta, Bizum, SEPA, PayPal)
+**Ya creado el 09/10/2026 (cuenta «Notengoweb»):** producto `prod_VPaPybWo7kiRCE` «MediClaro Premium» con tres precios en EUR
+(identificadores públicos, no son secretos):
+- `STRIPE_PRICE_BASE` (4,99 €/mes) = `price_1UOlEEFo4eWa13AiO1O0ZYsb`
+- `STRIPE_PRICE_QUARTERLY` (12,99 €/3 meses) = `price_1UOlEEFo4eWa13AijNrXlOFt`
+- `STRIPE_PRICE_ANNUAL` (39,99 €/año) = `price_1UOlEEFo4eWa13AiKNe1V7Rn`
+Pendiente en Stripe: el IVA sale a 0 € porque no hay «registro de impuestos» activo (Impuestos → Registros); actívalo antes de cobrar
+y pon `STRIPE_AUTOMATIC_TAX=true`. Los pasos 2-6 siguen siendo tuyos (webhook, claves y despliegue).
+(El paso 1 de abajo ya está hecho.)
 1. En Stripe (modo **real**) crea el producto «MediClaro Premium» con tres precios recurrentes en EUR, IVA incluido:
    mensual 4,99 €, trimestral 12,99 € (cada 3 meses) y anual 39,99 €. Copia los tres `price_…`.
    El precio por uso **no hace falta**: Premium es ilimitado.
