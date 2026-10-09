@@ -68,7 +68,7 @@ export class ExpoSpeechEmergencyVoiceService implements EmergencyVoiceProvider {
         return;
       }
 
-      const player = createAudioPlayer(audio.uri, { downloadFirst: true, updateInterval: 200 });
+      const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
       player.playbackRate = this.playbackRate();
       player.shouldCorrectPitch = true;
       this.player = player;

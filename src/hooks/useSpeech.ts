@@ -233,7 +233,7 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
       const audio = await SpeechService.synthesizeContinuous(cleanParts, voiceRef.current);
       if (my !== token.current) { audio.cleanup(); return; }
 
-      const player = createAudioPlayer(audio.uri, { downloadFirst: true, updateInterval: 200 });
+      const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
       player.playbackRate = playbackRate(rateRef.current);
       player.shouldCorrectPitch = true;
       const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
@@ -413,7 +413,7 @@ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number, 
         return;
       }
       pendingCleanup = audio.cleanup;
-      const player = createAudioPlayer(audio.uri, { downloadFirst: true, updateInterval: 200 });
+      const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
       playerRef.current = { player, subscription: { remove: () => undefined }, cleanupFile: audio.cleanup };
       pendingCleanup = undefined;
       player.playbackRate = playbackRate(rateRef.current);
@@ -516,7 +516,7 @@ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number, 
 /**
  * ¿Se puede leer sola (al llegar) esta respuesta del asistente? Sin cuenta (Modo demostración) solo suenan con voz natural
  * los textos de ejemplo permitidos: las demás respuestas no se leen solas, para no mostrar un aviso tras cada una
- * (su botón «Escuchar» explica por qué no suenan).
+ * (un aviso aparece solo al pedirlo).
  */
 export function canAutoSpeak(text: string): boolean {
   return !inDemoMode() || isVoicePreviewText(text);
@@ -590,7 +590,7 @@ export function useGeminiSimpleSpeech() {
         }
         pendingCleanup = cleanup;
         clearPreparation();
-        const player = createAudioPlayer(source, { downloadFirst: true, updateInterval: 200 });
+        const player = createAudioPlayer(source, { updateInterval: 200 });
         playerRef.current = { player, subscription: { remove: () => undefined }, cleanupFile: cleanup };
         pendingCleanup = undefined;
         player.playbackRate = playbackRate(rate);

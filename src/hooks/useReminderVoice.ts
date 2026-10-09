@@ -90,7 +90,7 @@ export function useReminderVoice() {
           audio.cleanup();
           return;
         }
-        const p = createAudioPlayer(audio.uri, { downloadFirst: true, updateInterval: 250 });
+        const p = createAudioPlayer(audio.uri, { updateInterval: 250 });
         p.playbackRate = naturalPlaybackRate(rate);
         p.shouldCorrectPitch = true;
         player.current = p;

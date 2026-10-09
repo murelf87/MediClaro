@@ -176,8 +176,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   const [draft, setDraft] = useState('');
   const [focused, setFocused] = useState(false);
 
-  // Si la pregunta se hizo manteniendo pulsado el micrófono, la primera respuesta
-  // nueva se reproduce automáticamente con la voz natural elegida.
+  // Cada respuesta nueva del asistente se reproduce sola con la voz natural elegida (no hay botón «Escuchar»;
+  // mientras suena aparece «Detener»).
   useEffect(() => {
     const after = autoSpeakAfterRef.current;
     if (after === null) return;
@@ -705,12 +705,9 @@ function AssistantBubble({
         </AppText>
       </Pressable>
       <View style={styles.actions}>
-        <TextButton
-          label={speaking ? 'Detener' : 'Escuchar'}
-          icon={speaking ? 'stop-circle-outline' : 'volume-high'}
-          onPress={onToggleSpeak}
-          align="flex-start"
-        />
+        {speaking ? (
+          <TextButton label="Detener" icon="stop-circle-outline" onPress={onToggleSpeak} align="flex-start" />
+        ) : null}
         {onOpenSource ? (
           <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={onOpenSource} align="flex-start" />
         ) : null}

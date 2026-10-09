@@ -25,7 +25,7 @@ export async function gemini(opts: {
     const isGemma = model.startsWith('gemma-');
     if (isGemma && !textOnly) continue;
     const controller = new AbortController();
-    const timeoutMs = model === 'gemini-3.8-flash' ? 30_000 : model === 'gemini-3.6-flash' ? 15_000 : 12_000;
+    const timeoutMs = model === 'gemini-3.8-flash' ? 14_000 : model === 'gemini-3.6-flash' ? 15_000 : 12_000;
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const conversation = opts.contents
@@ -42,7 +42,7 @@ export async function gemini(opts: {
             generationConfig: {
               temperature: 0.2,
               maxOutputTokens: opts.maxTokens ?? 800,
-              ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ['gemini-3.8-flash', 'gemini-3.7-flash'].includes(model) ? 'low' : 'minimal' } } : {}),
+              ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: 'minimal' } } : {}),
               ...(opts.json ? { responseMimeType: 'application/json' } : {}),
             },
             safetySettings: [{ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }],
