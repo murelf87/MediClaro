@@ -5,8 +5,9 @@
  *    (src/content/homenaje.ts), fundida con el fondo. Sin fotos, en la versión de las tiendas no sale.
  *  - Después, la guía saludando y lo que hace la app.
  *  - «Conocer MediClaro» → explicación con voz y ejemplos, SIN registrarse.
- *  - «Entrar con mi teléfono» → cuenta con SMS (quien ya tenía Premium lo recupera al entrar; «Restaurar compra»
- *    sigue en Premium y en el pago). «Soy cuidador/a · gratis» → entrada de cuidador/a sin teléfono.
+ *  - «Empezar gratis · Básico» y «Soy cuidador/a · gratis» → cuenta sin teléfono ni SMS. El teléfono NO se pide en la
+ *    entrada: solo después de pagar Premium (así quien no paga no gasta verificaciones). «Restaurar compra» sigue
+ *    en Premium y en el pago.
  *  - Siempre visible: acceso a emergencias (112), que nunca requiere pagar ni registrarse.
  *  - Sin accesos de prueba ni perfiles de revisión: la misma entrada en todas las compilaciones (09/10, 21:08).
  *  - «Aa»: tamaño de letra al momento, antes de tener cuenta (personas mayores).
@@ -31,6 +32,7 @@ import { GuideIllustration } from '../../components/Guide';
 import { useAppTheme, useEntitlement, usePreferences, useSession } from '../../hooks';
 import { FONT_SIZE_LABELS, type FontSizePreference } from '../../theme';
 import { BrandSplash } from '../auth/BrandSplash';
+import { AuthService } from '../../services/AuthService';
 import { CAREGIVER_ENTRY_ERROR, openCaregiverEntry } from '../../components/ProfileChoice';
 import { usePurchase } from './usePurchase';
 import { TributePhoto, hasTributePhoto } from '../../components/TributePhoto';
@@ -80,7 +82,6 @@ export default function WelcomeScreen() {
   const { status } = useSession();
   const { ready } = usePreferences();
   const purchase = usePurchase();
-  const sell = useEntitlement().canSell;
   // «Soy cuidador/a · gratis»: cuenta sin teléfono → perfil → Cuidador y avisos.
   const caregiverRunning = useRef(false);
   const [caregiverBusy, setCaregiverBusy] = useState(false);
@@ -97,6 +98,26 @@ export default function WelcomeScreen() {
     } finally {
       caregiverRunning.current = false;
       setCaregiverBusy(false);
+    }
+  };
+
+  // «Empezar gratis · Básico»: cuenta sin teléfono → inicio. El teléfono se pide solo al hacerse Premium.
+  const freeRunning = useRef(false);
+  const [freeBusy, setFreeBusy] = useState(false);
+  const [freeError, setFreeError] = useState('');
+  const enterFree = async () => {
+    if (freeRunning.current) return;
+    freeRunning.current = true;
+    setFreeBusy(true);
+    setFreeError('');
+    try {
+      await AuthService.ensureAccount();
+      router.replace('/(tabs)');
+    } catch {
+      setFreeError('No se ha podido abrir MediClaro. Comprueba la conexión y vuelve a intentarlo.');
+    } finally {
+      freeRunning.current = false;
+      setFreeBusy(false);
     }
   };
 
@@ -168,13 +189,16 @@ export default function WelcomeScreen() {
           <InfoBanner tone={purchase.notice.tone} title={purchase.notice.title} message={purchase.notice.message} action={purchase.notice.action} />
         ) : null}
         <SecondaryButton
-          label="Entrar con mi teléfono"
+          label="Empezar gratis · Básico"
           variant="outline"
-          icon="call-outline"
-          onPress={() => router.push('/login')}
-          accessibilityHint={sell ? 'Entra con tu número de teléfono. Si ya tenías Premium, lo recuperas al entrar.' : 'Entra con tu número de teléfono'}
-          testID="welcome-premium"
+          icon="happy-outline"
+          onPress={() => void enterFree()}
+          loading={freeBusy}
+          disabled={freeBusy}
+          accessibilityHint="Usa MediClaro gratis, sin teléfono ni registro. El teléfono solo se pide si te haces Premium."
+          testID="welcome-free"
         />
+        {freeError ? <InfoBanner tone="danger" message={freeError} /> : null}
         <SecondaryButton
           label="Soy cuidador/a · gratis"
           variant="outline"
