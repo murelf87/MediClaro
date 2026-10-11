@@ -3,15 +3,16 @@ import { AppState, Platform } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
-import { useSession } from '../providers/SessionProvider';
+import { useRealSession } from '../providers/SessionProvider';
 import { CaregiverService, incidentActive } from '../services/CaregiverService';
 import { enableCaregiverNotifications } from '../services/CaregiverNotifications';
 import { CareChatService } from '../services/CareChatService';
 import { CareCallService } from '../services/CareCallService';
+import { BackgroundLocation } from '../services/BackgroundLocation';
 /** Avisos que abre este anfitrión: los de familiares (avisos y vinculación), el chat y las llamadas con el cuidador/a. */
 const CARE_ROUTES = new Set(['/caregiver', '/caregiver-chat', '/caregiver-call']);
 export function CaregiverHost(){
- const {session}=useSession(); const router=useRouter();
+ const {session}=useRealSession(); const router=useRouter();
  const uid=session?.userId;
  useEffect(()=>{
   if(!uid||session?.mode==='demo'||Platform.OS==='web')return;
@@ -45,10 +46,14 @@ export function CaregiverHost(){
     const snapshot=await CaregiverService.snapshot();
     if(stopped)return;
     const own=snapshot.incidents.filter(i=>i.patient_id===uid&&incidentActive(i)).sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
-    if(!own||!own.shareLocation){stopWatch();return;}
+    if(!own||!own.shareLocation){stopWatch();void BackgroundLocation.stop();return;}
     if(tracked===own.id)return;
     stopWatch();
     if((await Location.getForegroundPermissionsAsync()).status!=='granted'||stopped)return;
+    // Con la build nueva: sigue enviando la ubicación aunque se bloquee la pantalla, mientras dure el aviso.
+    // (En Expo Go o si no se puede, solo con la app abierta, como antes.)
+    if(await BackgroundLocation.start(own.id,own.expires_at)){if(!stopped)tracked=own.id;return;}
+    if(stopped)return;
     tracked=own.id;
     const subscription=await Location.watchPositionAsync({accuracy:Location.Accuracy.High,timeInterval:10000,distanceInterval:10},position=>{
      if(stopped||tracked!==own.id)return;

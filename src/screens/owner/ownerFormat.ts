@@ -179,6 +179,10 @@ export function describeAudit(row: OwnerAuditRow): { icon: IconName; color: Tile
       return { icon: 'download-outline', color: 'blue', title: 'Una persona descargó sus datos', detail: row.actor ?? '' };
     case 'subscription_changed':
       return { icon: 'card-outline', color: 'purple', title: 'Suscripción cambiada', detail: row.actor ?? '' };
+    case 'owner_report_resolved':
+      return { icon: 'checkmark-done-outline', color: 'green', title: 'Error notificado resuelto', detail: str('ref') ?? '' };
+    case 'owner_report_reopened':
+      return { icon: 'refresh-outline', color: 'amber', title: 'Error notificado reabierto', detail: str('ref') ?? '' };
     case 'admin_config_changed':
       return { icon: 'settings-outline', color: 'teal', title: 'Configuración cambiada', detail: '' };
     default:

@@ -10,7 +10,8 @@
       "env": {
         "EXPO_PUBLIC_DEMO_ACCESS": "on",
         "EXPO_PUBLIC_PAYMENTS_MODE": "store,stripe"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -24,7 +25,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ldonnvkysjalpmystoeq.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf"
       },
-      "environment": "preview"
+      "environment": "preview",
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
@@ -39,7 +41,8 @@
       },
       "android": {
         "buildType": "app-bundle"
-      }
+      },
+      "channel": "production"
     },
     "rc": {
       "extends": "production",

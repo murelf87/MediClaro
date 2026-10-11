@@ -1,6 +1,7 @@
 import React from 'react';
 import {act,create} from 'react-test-renderer';
-import {EntitlementProvider,useEntitlement} from '../EntitlementProvider';
+import {EntitlementProvider,useEntitlement,useRealEntitlement} from '../EntitlementProvider';
+import {OwnerPreview} from '../../services/OwnerPreview';
 let mockSession:any={status:'signedOut',session:null};
 let mockTestAccess=false;
 const mockGetSubscription=jest.fn();
@@ -10,7 +11,7 @@ jest.mock('../../services/TestAccess',()=>({TestAccess:{
  isActive:()=>mockTestAccess,
  subscribe:(listener:()=>void)=>{mockTestAccessListeners.add(listener);return()=>mockTestAccessListeners.delete(listener);}
 }}));
-jest.mock('../SessionProvider',()=>({useSession:()=>mockSession}));
+jest.mock('../SessionProvider',()=>({useSession:()=>mockSession,useRealSession:()=>mockSession}));
 jest.mock('../../config/app',()=>({CARD_PAYMENTS_ENABLED:false,DEMO_ACCESS_ENABLED:true,PREMIUM_REQUIRED:true,PURCHASES_ENABLED:true}));
 jest.mock('../../services/SubscriptionService',()=>({SubscriptionService:{getPlans:async()=>({storeVerification:false}),getSubscription:(...args:any[])=>mockGetSubscription(...args)}}));
 jest.mock('../../services/PurchaseService',()=>({PurchaseService:{reconcile:async()=>false,onEntitlementChange:()=>()=>{}}}));
@@ -37,4 +38,17 @@ it('confirmed Premium unlocks before linking a phone',async()=>{
 it('internal QA Premium unlocks immediately after server grant',async()=>{
  mockSession={status:'signedIn',session:{userId:'qa-test',phone:null}};mockGetSubscription.mockResolvedValue({isPremium:false});mockTestAccess=true;
  await mount();expect(value.unlocked).toBe(true);expect(value.isPremium).toBe(true);
+});
+it('owner preview («Ver la app como…») changes only what screens see, never the real Premium',async()=>{
+ mockSession={status:'signedIn',session:{userId:'owner',phone:'+34680127015'}};mockGetSubscription.mockResolvedValue({isPremium:true});
+ let real:ReturnType<typeof useRealEntitlement>|undefined;
+ function RealProbe(){real=useRealEntitlement();return null;}
+ await act(async()=>{tree=create(React.createElement(EntitlementProvider,null,React.createElement(Probe),React.createElement(RealProbe)));});
+ expect(value.isPremium).toBe(true);
+ await act(async()=>{OwnerPreview.set('free');});
+ expect(value).toMatchObject({isPremium:false,unlocked:false,subscription:null});
+ expect(real).toMatchObject({isPremium:true,unlocked:true});
+ await act(async()=>{OwnerPreview.clear();});
+ expect(value.isPremium).toBe(true);
+ expect(mockGetSubscription).toHaveBeenCalledTimes(1); // la vista previa no vuelve a pedir la suscripción
 });

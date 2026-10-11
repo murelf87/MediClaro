@@ -30,6 +30,7 @@ module.exports = {
     // expo-secure-store y expo-constants no disponibles en Node
     '^expo-secure-store$': '<rootDir>/src/services/emergency/__mocks__/expo-secure-store.ts',
     '^expo-constants$': '<rootDir>/src/services/emergency/__mocks__/expo-constants.ts',
+    '^expo-application$': '<rootDir>/src/services/emergency/__mocks__/expo-application.ts',
     // «Mis pastillas»: módulos nativos sin versión para Node
     '^expo-crypto$': '<rootDir>/src/services/emergency/__mocks__/expo-crypto.ts',
     '^expo-notifications$': '<rootDir>/src/services/emergency/__mocks__/expo-notifications.ts',

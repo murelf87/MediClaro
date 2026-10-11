@@ -8,14 +8,14 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { useSession } from '../providers/SessionProvider';
+import { useRealSession } from '../providers/SessionProvider';
 import { CareCallService } from '../services/CareCallService';
 import { CareChatService } from '../services/CareChatService';
 
 const POLL_MS = 4000;
 
 export function CareCallHost() {
-  const { status, session } = useSession();
+  const { status, session } = useRealSession();
   const router = useRouter();
   const uid = session?.userId;
   useEffect(() => {

@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { buildTheme, defaultTheme, type AppTheme } from '../theme';
 import { PreferencesService, DEFAULT_LOCAL_PREFERENCES, type GeminiVoice, type LocalPreferences } from '../services/PreferencesService';
 import { ProfileService } from '../services/ProfileService';
-import { useSession } from './SessionProvider';
+import { useRealSession } from './SessionProvider';
 import type { FontSizePreference } from '../types';
 
 interface PreferencesContextValue {
@@ -41,7 +41,7 @@ const PreferencesContext = createContext<PreferencesContextValue>({
 });
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const { status } = useSession();
+  const { status } = useRealSession();
   const [prefs, setPrefs] = useState<LocalPreferences>(DEFAULT_LOCAL_PREFERENCES);
   const [ready, setReady] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);

@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useEntitlement } from '../../hooks';
 import { PurchaseService, isAppError } from '../../services';
+import { OwnerPreview } from '../../services/OwnerPreview';
 import { showAlert } from '../../utils/dialogs';
 import type { PaymentChannelId, PurchaseOutcome } from '../../types';
 
@@ -17,6 +18,12 @@ export interface PurchaseNotice {
 }
 
 export type PurchaseBusy = PaymentChannelId | 'restore' | null;
+
+const PREVIEW_NOTICE: PurchaseNotice = {
+  tone: 'info',
+  title: 'Vista previa del propietario',
+  message: 'Aquí la persona pagaría o restauraría su compra. En la vista previa no se cobra nada ni se abre ningún pago.',
+};
 
 export function usePurchase() {
   const router = useRouter();
@@ -53,6 +60,11 @@ export function usePurchase() {
   const pay = useCallback(
     async (channel: PaymentChannelId, planId: string) => {
       if (running.current) return;
+      if (OwnerPreview.isActive()) {
+        // Vista previa del propietario: se ve el recorrido, pero nunca se cobra ni se abre un pago real.
+        setNotice(PREVIEW_NOTICE);
+        return;
+      }
       running.current = true;
       setBusy(channel);
       setNotice(null);
@@ -88,6 +100,10 @@ export function usePurchase() {
 
   const restore = useCallback(async () => {
     if (running.current) return;
+    if (OwnerPreview.isActive()) {
+      setNotice(PREVIEW_NOTICE);
+      return;
+    }
     running.current = true;
     setBusy('restore');
     setNotice(null);

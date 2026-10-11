@@ -35,6 +35,7 @@ import type {
   StorePlatform,
   Subscription,
 } from '../types';
+import { OwnerPreview } from './OwnerPreview';
 
 interface LoadedOffer {
   offer: PurchaseOffer;
@@ -137,6 +138,7 @@ const METHOD_NAME: Record<HostedPaymentMethod, string> = {
 };
 
 async function hostedPurchase(planId: string, method: HostedPaymentMethod): Promise<PurchaseOutcome> {
+  blockInOwnerPreview();
   if (!CARD_PAYMENTS_ENABLED) {
     throw new AppError('not_available', `El pago ${METHOD_NAME[method]} no está disponible en esta versión.`);
   }
@@ -183,6 +185,13 @@ async function hostedPurchase(planId: string, method: HostedPaymentMethod): Prom
   return outcome.status === 'pending' ? { status: 'pending', reason: 'confirming' } : outcome;
 }
 
+/** Vista previa del propietario: nunca se cobra, ni se abre un pago, ni se crea un enlace para un familiar. */
+function blockInOwnerPreview(): void {
+  if (OwnerPreview.isActive()) {
+    throw new AppError('not_available', 'Vista previa del propietario: aquí la persona pagaría. En la vista previa no se cobra nada.');
+  }
+}
+
 // ─── Servicio ────────────────────────────────────────────────────────────────
 
 export const PurchaseService = {
@@ -193,6 +202,7 @@ export const PurchaseService = {
 
   /** Compra integrada (Apple / Google Play). */
   async purchaseWithStore(planId: string): Promise<PurchaseOutcome> {
+    blockInOwnerPreview();
     if (!STORE_PAYMENTS_ENABLED) throw new AppError('not_available', 'La compra con la tienda no está disponible en esta versión.');
     const { offer, products } = await loadOffer();
     const entry = offer.plans.find((p) => p.plan.id === planId && p.channels.includes('store'));
@@ -248,6 +258,7 @@ export const PurchaseService = {
    * Premium se activa cuando el familiar paga.
    */
   async createFamilyInvite(planId: string): Promise<FamilyInvite> {
+    blockInOwnerPreview();
     if (!CARD_PAYMENTS_ENABLED) throw new AppError('not_available', 'Esta forma de pago no está disponible en esta versión.');
     const { offer } = await loadOffer();
     const entry = offer.plans.find((p) => p.plan.id === planId && p.channels.includes('family'));
@@ -277,6 +288,7 @@ export const PurchaseService = {
    *  2) después, lo que diga el servidor de esta cuenta (p. ej. pagada con tarjeta).
    */
   async restore(): Promise<RestoreOutcome> {
+    blockInOwnerPreview();
     const store = Billing.store();
     if (STORE_PAYMENTS_ENABLED && store.platform()) {
       const catalog = await SubscriptionService.getPlans().catch(() => null);

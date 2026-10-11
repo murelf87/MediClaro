@@ -15,7 +15,9 @@ import { CARD_PAYMENTS_ENABLED, DEMO_ACCESS_ENABLED, PREMIUM_REQUIRED, PURCHASES
 import { PurchaseService } from '../services/PurchaseService';
 import { SubscriptionService } from '../services/SubscriptionService';
 import { TestAccess } from '../services/TestAccess';
-import { useSession } from './SessionProvider';
+import { useRealSession } from './SessionProvider';
+import { previewEntitlement } from '../services/OwnerPreview';
+import { useOwnerPreview } from '../hooks/useOwnerPreview';
 import type { Subscription } from '../types';
 
 export type EntitlementStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -49,7 +51,8 @@ const NEEDS_SERVER_CHECK = PREMIUM_REQUIRED && !CARD_PAYMENTS_ENABLED;
 const FOREGROUND_REFRESH_MS = 60_000;
 
 export function EntitlementProvider({ children }: { children: ReactNode }) {
-  const { status: sessionStatus, session } = useSession();
+  // Siempre la sesión real: la vista previa del propietario no debe recargar ni vaciar su suscripción.
+  const { status: sessionStatus, session } = useRealSession();
   const userId = sessionStatus === 'signedIn' ? session?.userId ?? null : null;
   const [status, setStatus] = useState<EntitlementStatus>('idle');
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -156,6 +159,17 @@ export function EntitlementProvider({ children }: { children: ReactNode }) {
   return createElement(EntitlementContext.Provider, {value}, children);
 }
 
+/**
+ * Premium tal como lo ven las PANTALLAS (con la vista previa del propietario, si está activa).
+ * El servidor sigue aplicando siempre los permisos reales de la cuenta.
+ */
 export function useEntitlement(): EntitlementValue {
+  const real = useContext(EntitlementContext);
+  const preview = useOwnerPreview();
+  return useMemo(() => previewEntitlement(real, preview), [real, preview]);
+}
+
+/** Premium real, sin vista previa: para los procesos de fondo (p. ej. los avisos de pastillas). */
+export function useRealEntitlement(): EntitlementValue {
   return useContext(EntitlementContext);
 }

@@ -36,6 +36,8 @@ import { AuthService } from '../../services/AuthService';
 import { CAREGIVER_ENTRY_ERROR, openCaregiverEntry } from '../../components/ProfileChoice';
 import { usePurchase } from './usePurchase';
 import { TributePhoto, hasTributePhoto } from '../../components/TributePhoto';
+import { OwnerPreview } from '../../services/OwnerPreview';
+import { PostAuthRoute } from '../../services/PostAuthRoute';
 
 const FEATURES: { icon: IconName; color: string; bg: string; label: string }[] = [
   { icon: 'camera', color: '#2563EB', bg: '#DBEAFE', label: 'Identifica tus medicamentos' },
@@ -88,6 +90,13 @@ export default function WelcomeScreen() {
   const [caregiverError, setCaregiverError] = useState('');
   const enterAsCaregiver = async () => {
     if (caregiverRunning.current) return;
+    if (OwnerPreview.get() === 'visitor') {
+      // Vista previa del propietario: se pasa a «cuidador/a» sin crear cuentas ni cambiar nada en el servidor.
+      PostAuthRoute.set('/caregiver');
+      OwnerPreview.set('caregiver');
+      router.replace('/caregiver');
+      return;
+    }
     caregiverRunning.current = true;
     setCaregiverBusy(true);
     setCaregiverError('');
@@ -107,6 +116,12 @@ export default function WelcomeScreen() {
   const [freeError, setFreeError] = useState('');
   const enterFree = async () => {
     if (freeRunning.current) return;
+    if (OwnerPreview.get() === 'visitor') {
+      // Vista previa del propietario: se pasa a «Básico» sin crear cuentas.
+      OwnerPreview.set('free');
+      router.replace('/(tabs)');
+      return;
+    }
     freeRunning.current = true;
     setFreeBusy(true);
     setFreeError('');

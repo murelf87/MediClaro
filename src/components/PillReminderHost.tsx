@@ -12,16 +12,16 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { useSession } from '../providers/SessionProvider';
-import { useEntitlement } from '../providers/EntitlementProvider';
+import { useRealSession } from '../providers/SessionProvider';
+import { useRealEntitlement } from '../providers/EntitlementProvider';
 import { MedicationPlanService, PillReminders } from '../services/MedicationPlanService';
 import { doseDataOf, presentedDoseNotifications, type DoseNotificationData } from '../services/pills/notifications';
 
 const logged = new Set<string>();
 
 export function PillReminderHost() {
-  const { session } = useSession();
-  const entitlement = useEntitlement();
+  const { session } = useRealSession();
+  const entitlement = useRealEntitlement();
   const router = useRouter();
   const uid = session?.userId ?? null;
   const unlocked = entitlement.unlocked;

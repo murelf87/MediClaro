@@ -24,6 +24,7 @@ import {
 import { useReduceMotion } from '../../components/Motion';
 import { useAppTheme, useCountdown } from '../../hooks';
 import { AuthService, DemoMode, AppError } from '../../services';
+import { OwnerPreview } from '../../services/OwnerPreview';
 import { OTP_CONFIG } from '../../config/app';
 import { formatDuration, formatPhoneForDisplay } from '../../utils/format';
 import { showAlert } from '../../utils/dialogs';
@@ -82,6 +83,7 @@ export default function VerifyScreen() {
       try {
         if (linking) {
           await AuthService.verifyPhoneLink(phone, value);
+          OwnerPreview.clear();
           busy.current = false;
           setVerifying(false);
           // Registro Premium completo: ahora se le da su código MediClaro para entrar en otro móvil sin SMS.
@@ -89,6 +91,8 @@ export default function VerifyScreen() {
           return;
         }
         await AuthService.verifyOtp(phone, value);
+        // Una entrada real termina la vista previa del propietario.
+        OwnerPreview.clear();
         // Mantenemos "cargando" hasta que aparece el Inicio.
         enterApp();
       } catch (e) {

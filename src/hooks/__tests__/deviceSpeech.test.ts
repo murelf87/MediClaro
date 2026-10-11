@@ -1,5 +1,5 @@
 import * as Speech from 'expo-speech';
-import { speakOnDevice } from '../../utils/deviceSpeech';
+import { deviceVoiceQuality, pickDeviceVoice, speakOnDevice } from '../../utils/deviceSpeech';
 const voice=(identifier:string,language:string,quality='Default')=>({identifier,name:identifier,language,quality:quality as Speech.VoiceQuality});
 beforeEach(()=>jest.spyOn(Speech,'speak').mockImplementation(()=>undefined as any));
 afterEach(()=>jest.restoreAllMocks());
@@ -34,4 +34,14 @@ test('only robotic voices installed: lets the system choose its default Spanish 
  jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([voice('com.apple.eloquence.es-ES.Eddy','es-ES')]);
  await speakOnDevice('hola',0.85,()=>true,{});
  expect((Speech.speak as jest.Mock).mock.calls[0][1].voice).toBeUndefined();
+});
+
+test('panel «Revisar la app»: qué voz del teléfono se usaría y con qué calidad',()=>{
+ const voices=[voice('com.apple.voice.compact.es-ES.Jorge','es-ES'),voice('com.apple.voice.premium.es-ES.Marisol','es-ES'),voice('com.apple.voice.enhanced.es-MX.Paulina','es-MX','Enhanced')];
+ const best=pickDeviceVoice(voices);
+ expect(best?.identifier).toBe('com.apple.voice.premium.es-ES.Marisol');
+ expect(deviceVoiceQuality(best!)).toBe('Premium');
+ expect(deviceVoiceQuality(voices[2])).toBe('Mejorada');
+ expect(deviceVoiceQuality(voices[0])).toBe('Normal');
+ expect(pickDeviceVoice([voice('com.apple.eloquence.es-ES.Eddy','es-ES'),voice('en','en-US','Enhanced')])).toBeUndefined();
 });

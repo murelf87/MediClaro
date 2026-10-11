@@ -512,11 +512,13 @@ export function createDemoBackend(opts: DemoBackendOptions = {}) {
       if (name === 'delete_my_assistant_history') return { data: null, error: null };
       // Solo en el escenario «propietario» la cuenta de demostración es la del propietario.
       if (name === 'owner_access') return { data: { owner: ownerDemo && signedIn }, error: null };
-      if (name === 'owner_admin') {
+      if (name === 'owner_admin' || name === 'owner_reports') {
         if (!signedIn) return { data: null, error: { message: 'AUTH_REQUIRED' } };
         if (!ownerDemo) return { data: null, error: { message: 'OWNER_REQUIRED' } };
         return owner.rpc(name, _args);
       }
+      // «Notifícanos un error» (Ayuda): con y sin cuenta; llega a la bandeja del panel de la demostración.
+      if (name === 'report_problem') return owner.submitReport(signedIn ? DEMO_USER_ID : null, _args);
       // Aviso general (lo pone el propietario desde su panel).
       if (name === 'app_notice') return { data: owner.notice(), error: null };
       return { data: null, error: { message: 'unknown rpc' } };

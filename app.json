@@ -98,13 +98,13 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Durante un aviso activo, MediClaro comparte tu ubicación con tu cuidador vinculado si lo autorizas. Se muestra la hora de la última actualización.",
+          "locationWhenInUsePermission": "Durante un aviso a tu cuidador/a, MediClaro comparte tu ubicación con él o ella si lo autorizas, también con la pantalla bloqueada mientras dure el aviso. Se muestra la hora de la última actualización.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
           "motionUsagePermission": "MediClaro puede acceder a los sensores de movimiento del dispositivo cuando una función de seguridad o asistencia lo requiera, siempre con tu permiso.",
-          "isIosBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": false,
-          "isAndroidForegroundServiceEnabled": false
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [
@@ -147,7 +147,8 @@
       ],
       "@config-plugins/react-native-webrtc",
       "expo-asset",
-      "./plugins/withRequiredIosPrivacy"
+      "./plugins/withRequiredIosPrivacy",
+      "./plugins/withoutBackgroundFetch"
     ],
     "extra": {
       "supabaseUrl": "https://TU-PROYECTO.supabase.co",
@@ -165,6 +166,14 @@
       "ios",
       "android"
     ],
-    "owner": "antoniom87"
+    "owner": "antoniom87",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/fefacac9-9dc6-42fe-972e-15b3b62f4286",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

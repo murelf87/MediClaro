@@ -12,6 +12,17 @@ import { ProfileService, PurchaseService } from '../../services';
 import { confirmAsync, showAlert } from '../../utils/dialogs';
 import { shareOrDownloadText } from '../../utils/device';
 import { errorMessage } from '../premium/parts';
+import { OwnerPreview } from '../../services/OwnerPreview';
+
+/** Vista previa del propietario: borrar la cuenta o cerrar sesión afectaría a la cuenta REAL del propietario. */
+async function blockedByOwnerPreview(): Promise<boolean> {
+  if (!OwnerPreview.isActive()) return false;
+  await showAlert(
+    'Vista previa del propietario',
+    'Aquí la persona cerraría su sesión o borraría su cuenta. En la vista previa no se hace: afectaría a tu cuenta real. Sal de la vista previa con «Salir» arriba.',
+  );
+  return true;
+}
 
 export const EXPORT_FILENAME = 'mediclaro-mis-datos.json';
 
@@ -55,6 +66,7 @@ export function useAccountActions() {
 
   const deleteMyAccount = useCallback(async () => {
     if (busy.current) return;
+    if (await blockedByOwnerPreview()) return;
     busy.current = true;
     try {
       // Una suscripción de Apple o Google Play NO se cancela al borrar la cuenta: la tienda sigue cobrando hasta que la
@@ -112,6 +124,7 @@ export function useAccountActions() {
 
   const confirmSignOut = useCallback(async () => {
     if (busy.current) return;
+    if (await blockedByOwnerPreview()) return;
     busy.current = true;
     try {
       const mode = session?.mode ?? 'verified';

@@ -20,6 +20,7 @@ import {
 } from '../../components';
 import { useAppTheme } from '../../hooks';
 import { AccessCodeService, PostAuthRoute, formatAccessCodeInput, normalizeAccessCode, AppError } from '../../services';
+import { OwnerPreview } from '../../services/OwnerPreview';
 import { AuthErrorBanner, asAppError } from './parts';
 
 export default function AccessCodeScreen() {
@@ -36,6 +37,8 @@ export default function AccessCodeScreen() {
     setError(null);
     try {
       const { premium } = await AccessCodeService.login(code);
+      // Una entrada real termina la vista previa del propietario (si estaba probando «Ya soy Premium»).
+      OwnerPreview.clear();
       // Premium caducado o cancelado: a las suscripciones para renovarlo (con su cuenta ya abierta).
       router.replace(premium ? '/(tabs)' : '/premium');
     } catch (e) {

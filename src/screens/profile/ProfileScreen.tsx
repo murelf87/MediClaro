@@ -18,7 +18,7 @@ import {
   SettingRow,
   Skeleton,
 } from '../../components';
-import { useAppTheme, useAsync, useEntitlement, usePreferences, useRefreshOnFocus, useSession } from '../../hooks';
+import { useAppTheme, useAsync, useEntitlement, useOwnerPreview, usePreferences, useRefreshOnFocus, useSession } from '../../hooks';
 import { AssistantMemoryService, ProfileService, TestAccess } from '../../services';
 import { CaregiverService } from '../../services/CaregiverService';
 import { OwnerService } from '../../services/OwnerService';
@@ -51,8 +51,10 @@ export default function ProfileScreen() {
   useRefreshOnFocus(entitlement.refresh);
 
   const mode = session?.mode ?? 'verified';
-  const phone = profile.data?.phone ?? session?.phone ?? null;
-  const caregiverProfile = careState.data?.role === 'caregiver';
+  // Vista previa del propietario: Básico y cuidador/a se enseñan sin teléfono (como de verdad, hasta pagar Premium).
+  const preview = useOwnerPreview();
+  const phone = preview && preview !== 'premium' ? null : profile.data?.phone ?? session?.phone ?? null;
+  const caregiverProfile = preview ? preview === 'caregiver' : careState.data?.role === 'caregiver';
   const isPremium = entitlement.isPremium;
   // Perfil de emergencia, número privado y qué compartir: funciones de Premium (el 112 sigue siempre en Emergencia).
   const emergencyExtras = entitlement.unlocked;

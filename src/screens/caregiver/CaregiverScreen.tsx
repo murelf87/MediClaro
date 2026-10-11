@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Share, StyleSheet, TextInput, View, useWindowDimensions, type ScrollView } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { AppHeader, AppText, Avatar, Badge, Card, Icon, InfoBanner, PrimaryButton, SecondaryButton, Screen, TextButton } from '../../components';
-import { useSession, useAppTheme, useEntitlement } from '../../hooks';
+import { useSession, useAppTheme, useEntitlement, useOwnerPreview } from '../../hooks';
 import {useRouter,useLocalSearchParams} from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import {ProfileChoice} from '../../components/ProfileChoice';
@@ -98,7 +98,9 @@ export default function CaregiverScreen(){
   autoCalled.current=incident.id;
   router.push({pathname:'/caregiver-call',params:{link:incidentCalls[0].linkId}});
  },[incident?.id,caregiver,autoCall,requestedIncident,incidentCalls.length]);
- const caregiverProfile=data?.role==='caregiver';
+ // Vista previa del propietario («Ver la app como… cuidador/a»): solo cambia lo que se enseña.
+ const preview=useOwnerPreview();
+ const caregiverProfile=preview?preview==='caregiver':data?.role==='caregiver';
  const linkedPatients=(data?.links??[]).filter(l=>l.accepted&&l.caregiverId===uid).map(l=>l.patientName).filter(Boolean);
  const patientLabel=linkedPatients.length===1?linkedPatients[0]:linkedPatients.length>1?linkedPatients.join(', '):'';
  const canCreatePatientQr=entitlement.isPremium;

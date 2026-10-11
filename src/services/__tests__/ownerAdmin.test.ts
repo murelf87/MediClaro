@@ -12,6 +12,7 @@ jest.mock('../../lib/supabase', () => ({
 jest.mock('../../api/functions', () => ({ assertBackendConfigured: () => undefined, invokeFunction: jest.fn() }));
 
 import { OwnerAdminService, OWNER_NOT_DEPLOYED, ownerError, toCsv } from '../OwnerAdminService';
+import { OwnerPreview } from '../OwnerPreview';
 import { createDemoOwner } from '../../mocks/demoOwner';
 import { __emitAppState } from '../emergency/__mocks__/react-native';
 import { __reset as resetSecureStore, __setBiometrics, getItemAsync, setItemAsync } from '../emergency/__mocks__/expo-secure-store';
@@ -136,4 +137,55 @@ test('errores claros y CSV para Excel', () => {
   expect(csv.startsWith('﻿')).toBe(true);
   expect(csv).toContain('"Ana; López";"dice ""hola"""');
   expect(csv).toContain('\r\n;3\r\n');
+});
+
+test('errores notificados: contar, leer, resolver y reabrir (con el panel abierto)', async () => {
+  await expect(OwnerAdminService.reportCounts()).rejects.toMatchObject({ code: 'OWNER_LOCKED' });
+  await OwnerAdminService.setupPin('482913', false);
+  // Llega un mensaje nuevo desde «Ayuda → Notifícanos un error» (sin cuenta).
+  expect(owner.submitReport(null, { p_message: 'No me salen los planes', p_contact: '600 123 456', p_context: { platform: 'ios', area: 'Pagos o Premium' } })).toMatchObject({
+    data: { ok: true, ref: expect.stringMatching(/^E-[0-9A-Z]{5}$/) },
+  });
+  expect(owner.submitReport(null, { p_message: 'no' })).toMatchObject({ error: { message: 'MESSAGE_TOO_SHORT' } });
+  const before = await OwnerAdminService.reportCounts();
+  expect(before.new).toBe(2);
+  const open = await OwnerAdminService.reports('open');
+  expect(open.items.map((r) => r.status)).not.toContain('resolved');
+  const mine = open.items.find((r) => r.message === 'No me salen los planes');
+  expect(mine).toMatchObject({ status: 'new', contact: '600 123 456', user: null, context: { platform: 'ios' } });
+  const sent = mockRpc.mock.calls.at(-1) as [string, { p_action: string; p_payload: { session: string; filter: string } }];
+  expect(sent[0]).toBe('owner_reports');
+  expect(sent[1].p_action).toBe('list');
+  expect(sent[1].p_payload.session).toMatch(/^[0-9a-f]{64}$/);
+  // Al abrirlo queda leído y se ven todos los datos técnicos.
+  const full = await OwnerAdminService.report(mine!.id);
+  expect(full).toMatchObject({ status: 'read', context: { area: 'Pagos o Premium' } });
+  expect((await OwnerAdminService.reportCounts()).new).toBe(1);
+  const done = await OwnerAdminService.setReportStatus(mine!.id, 'resolved', '  Faltaba activar Stripe  ');
+  expect(done).toMatchObject({ status: 'resolved', note: 'Faltaba activar Stripe', resolvedAt: expect.any(String) });
+  expect((await OwnerAdminService.reports('resolved')).items.map((r) => r.id)).toContain(mine!.id);
+  expect((await OwnerAdminService.setReportStatus(mine!.id, 'read')).resolvedAt).toBeNull();
+  const audit = await OwnerAdminService.audit('activity');
+  expect(audit.rows.map((r) => r.action)).toEqual(expect.arrayContaining(['owner_report_resolved', 'owner_report_reopened']));
+  await expect(OwnerAdminService.report('00000000-0000-4000-a000-000000000000')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+});
+
+test('bandeja de errores sin activar en el servidor: se dice exactamente qué falta', async () => {
+  await OwnerAdminService.setupPin('482913', false);
+  mockRpc.mockImplementation(async (name: string, args: unknown) =>
+    name === 'owner_reports' ? { data: null, error: { code: 'PGRST202', message: 'Could not find the function public.owner_reports' } } : owner.rpc(name, args),
+  );
+  await expect(OwnerAdminService.reportCounts()).rejects.toMatchObject({ kind: 'not_configured', message: expect.stringMatching(/bandeja de errores/) });
+  // El resto del panel sigue abierto.
+  expect(OwnerAdminService.isUnlocked()).toBe(true);
+});
+
+test('cerrar el panel termina también la vista previa «Ver la app como…»', async () => {
+  await OwnerAdminService.setupPin('482913', false);
+  OwnerPreview.set('free');
+  await OwnerAdminService.lock();
+  expect(OwnerPreview.isActive()).toBe(false);
+  OwnerPreview.set('caregiver');
+  OwnerAdminService.clear(); // al cerrar sesión: el panel ya estaba cerrado, pero la vista previa también se va
+  expect(OwnerPreview.isActive()).toBe(false);
 });

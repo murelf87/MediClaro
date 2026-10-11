@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase';
 import { requireUserId } from '../api';
 import { AppError, toAppError } from '../api/errors';
 import { AppNoticeService } from './AppNoticeService';
+import { OwnerPreview } from './OwnerPreview';
 
 export type OwnerPlan = 'owner' | 'paid' | 'courtesy' | 'free';
 
@@ -209,6 +210,28 @@ export interface OwnerDevice {
   current: boolean;
 }
 
+export type OwnerReportStatus = 'new' | 'read' | 'resolved';
+
+/** «Notifícanos un error»: mensaje de una persona (bandeja «Errores notificados» del panel). */
+export interface OwnerReport {
+  id: string;
+  ref: string;
+  status: OwnerReportStatus;
+  createdAt: string;
+  readAt: string | null;
+  resolvedAt: string | null;
+  message: string;
+  contact: string | null;
+  note: string | null;
+  context: Record<string, unknown>;
+  user: OwnerUser | null;
+}
+
+export interface OwnerReportCounts {
+  open: number;
+  new: number;
+}
+
 export interface Paged<T> {
   total: number;
   page: number;
@@ -275,6 +298,8 @@ function emit(): void {
 
 function setPanel(next: typeof panel): void {
   panel = next;
+  // Al cerrarse el panel (bloqueo, 2 min en segundo plano, cerrar sesión) termina también la vista previa.
+  if (!next) OwnerPreview.clear();
   emit();
 }
 
@@ -291,21 +316,32 @@ function watchAppState(): void {
   });
 }
 
-async function rpc<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
-  const { data, error } = await supabase.rpc('owner_admin', { p_action: action, p_payload: payload });
-  if (error) throw ownerError(error);
+type OwnerFunction = 'owner_admin' | 'owner_reports';
+
+async function rpc<T>(action: string, payload: Record<string, unknown> = {}, fn: OwnerFunction = 'owner_admin'): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, { p_action: action, p_payload: payload });
+  if (error) {
+    const mapped = ownerError(error);
+    // La bandeja de errores llegó después que el panel: si falta su migración, se dice exactamente eso.
+    if (fn === 'owner_reports' && mapped.code === OWNER_NOT_DEPLOYED) {
+      throw new AppError('not_configured', 'La bandeja de errores todavía no está activada en el servidor (falta aplicar su migración).', {
+        code: OWNER_NOT_DEPLOYED,
+      });
+    }
+    throw mapped;
+  }
   return data as T;
 }
 
 /** Acciones con el panel abierto: añade la sesión, la alarga y, si el servidor la ha cerrado, la olvida. */
-async function call<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
+async function call<T>(action: string, payload: Record<string, unknown> = {}, fn: OwnerFunction = 'owner_admin'): Promise<T> {
   const current = panel;
   if (!current || Date.now() >= current.expiresAt) {
     if (current) setPanel(null);
     throw new AppError('permission_denied', SERVER_CODES.OWNER_LOCKED.message, { code: OWNER_LOCKED });
   }
   try {
-    const result = await rpc<T>(action, { ...payload, session: current.token });
+    const result = await rpc<T>(action, { ...payload, session: current.token }, fn);
     if (panel && panel.token === current.token) panel = { ...panel, expiresAt: Date.now() + IDLE_MS };
     return result;
   } catch (e) {
@@ -376,6 +412,7 @@ export const OwnerAdminService = {
   /** Al cerrar sesión o borrar la cuenta. */
   clear(): void {
     if (panel) setPanel(null);
+    OwnerPreview.clear();
   },
 
   // ── Abrir y cerrar ──
@@ -516,6 +553,17 @@ export const OwnerAdminService = {
   },
   deviceRevoke: (deviceId: string) => call<{ ok: true }>('device_revoke', { deviceId }),
   changePin: (currentPin: string, newPin: string) => call<UnlockResult>('change_pin', { currentPin, newPin }),
+
+  // ── Errores notificados («Ayuda → Notifícanos un error») ──
+  reportCounts: () => call<OwnerReportCounts>('count', {}, 'owner_reports'),
+  async reports(filter: 'open' | 'resolved' | 'all' = 'open'): Promise<OwnerReportCounts & { items: OwnerReport[] }> {
+    const r = await call<OwnerReportCounts & { reports: OwnerReport[] }>('list', { filter, limit: 100 }, 'owner_reports');
+    return { open: r.open ?? 0, new: r.new ?? 0, items: r.reports ?? [] };
+  },
+  /** Abre un mensaje (si era nuevo, queda como leído). */
+  report: (id: string) => call<OwnerReport>('get', { id }, 'owner_reports'),
+  setReportStatus: (id: string, status: 'read' | 'resolved', note?: string) =>
+    call<OwnerReport>('set_status', note === undefined ? { id, status } : { id, status, note }, 'owner_reports'),
 };
 
 /** CSV para Excel/Números (separador «;», comillas y BOM para los acentos). */

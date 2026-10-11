@@ -118,6 +118,72 @@ export function createDemoOwner(opts: { ownerId: string; ownerName: () => string
   const unlocks: { at: number; via: string }[] = [];
   let notice: Row | null = null;
 
+  // «Errores notificados» (Ayuda → Notifícanos un error): mismos campos que mediclaro_private.problem_reports.
+  type DemoReport = { id: string; ref: string; userId: string | null; message: string; contact: string | null; context: Row; status: 'new' | 'read' | 'resolved'; note: string | null; createdAt: number; readAt: number | null; resolvedAt: number | null };
+  const reports: DemoReport[] = [
+    { id: uuid(), ref: 'E-7K2PX', userId: byName('Carmen García').id, message: 'Al pulsar «Escuchar» en el prospecto no se oye nada. Tengo el volumen alto.', contact: '612 345 678', context: { platform: 'ios', osVersion: '18.1', appVersion: '1.0.0', build: '34', runtime: 'app', account: 'verified', premium: true, area: 'Voz', screens: '/ → /medication/[id] → /help', fontSize: 'grande', readingVoice: 'Sulafat', assistantVoice: 'Sulafat', payments: 'store,card' }, status: 'new', note: null, createdAt: t0 - 2 * 3600_000, readAt: null, resolvedAt: null },
+    { id: uuid(), ref: 'E-Q4M9T', userId: null, message: 'No me salen los planes para pagar.', contact: null, context: { platform: 'android', osVersion: '34', appVersion: '1.0.0', runtime: 'expo-go', account: 'none', premium: false, area: 'Pagos o Premium', screens: '/welcome → /premium → /help', fontSize: 'normal', payments: 'store' }, status: 'read', note: null, createdAt: t0 - DAY, readAt: t0 - 20 * 3600_000, resolvedAt: null },
+    { id: uuid(), ref: 'E-H3W8C', userId: byName('Luis Martínez').id, message: 'La foto del medicamento sale como un dibujo, no como la caja de verdad.', contact: null, context: { platform: 'ios', osVersion: '17.6', appVersion: '1.0.0', build: '33', runtime: 'app', account: 'verified', premium: false, area: 'Identificar medicamento' }, status: 'resolved', note: 'Arreglado: ahora se ve la foto oficial grande de la caja.', createdAt: t0 - 3 * DAY, readAt: t0 - 3 * DAY, resolvedAt: t0 - 2 * DAY },
+  ];
+  const reportJson = (r: DemoReport, full: boolean): Row => {
+    const u = r.userId ? users.find((x) => x.id === r.userId) : undefined;
+    const c = r.context;
+    return {
+      id: r.id,
+      ref: r.ref,
+      status: r.status,
+      createdAt: iso(r.createdAt),
+      readAt: iso(r.readAt),
+      resolvedAt: iso(r.resolvedAt),
+      message: full ? r.message : r.message.slice(0, 240),
+      contact: r.contact,
+      note: r.note,
+      context: full ? { ...c } : Object.fromEntries(Object.entries({ platform: c.platform, appVersion: c.appVersion, runtime: c.runtime, screen: c.screen }).filter(([, v]) => v !== undefined)),
+      user: u ? userJson(u) : null,
+    };
+  };
+  const reportCounts = () => ({ open: reports.filter((r) => r.status !== 'resolved').length, new: reports.filter((r) => r.status === 'new').length });
+
+  function reportsAction(name: string, p: Row): Result {
+    const s = typeof p.session === 'string' ? sessions.get(p.session) : undefined;
+    if (!s || s.expiresAt <= now()) return fail('OWNER_LOCKED');
+    s.expiresAt = now() + 15 * 60_000;
+    switch (name) {
+      case 'count':
+        return ok(reportCounts());
+      case 'list': {
+        const filter = ['open', 'resolved', 'all'].includes(String(p.filter)) ? String(p.filter) : 'open';
+        const list = reports
+          .filter((r) => filter === 'all' || (filter === 'open' ? r.status !== 'resolved' : r.status === 'resolved'))
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .map((r) => reportJson(r, false));
+        return ok({ reports: list, ...reportCounts() });
+      }
+      case 'get': {
+        const r = reports.find((x) => x.id === p.id);
+        if (!r) return fail('NOT_FOUND');
+        if (r.status === 'new') {
+          r.status = 'read';
+          r.readAt = now();
+        }
+        return ok(reportJson(r, true));
+      }
+      case 'set_status': {
+        const r = reports.find((x) => x.id === p.id);
+        if (p.status !== 'read' && p.status !== 'resolved') return fail('INVALID_REQUEST');
+        if (!r) return fail('NOT_FOUND');
+        r.status = p.status;
+        r.readAt = r.readAt ?? now();
+        r.resolvedAt = p.status === 'resolved' ? now() : null;
+        if (typeof p.note === 'string') r.note = p.note.trim().slice(0, 1000) || null;
+        log(p.status === 'resolved' ? 'owner_report_resolved' : 'owner_report_reopened', null, { ref: r.ref });
+        return ok(reportJson(r, true));
+      }
+      default:
+        return fail('INVALID_ACTION');
+    }
+  }
+
   const courtesy = (u: DemoUser) => {
     const g = u.phone ? grants.get(u.phone) : undefined;
     return g && g.revokedAt === null && (g.expiresAt === null || g.expiresAt > now()) ? g : null;
@@ -588,7 +654,22 @@ export function createDemoOwner(opts: { ownerId: string; ownerName: () => string
     rpc(_name: string, args: unknown): Result {
       const a = (args ?? {}) as { p_action?: unknown; p_payload?: unknown };
       const payload = a.p_payload && typeof a.p_payload === 'object' && !Array.isArray(a.p_payload) ? (a.p_payload as Row) : {};
+      if (_name === 'owner_reports') return reportsAction(String(a.p_action ?? '').toLowerCase(), payload);
       return action(String(a.p_action ?? '').toLowerCase(), payload);
+    },
+    /** «Notifícanos un error» (report_problem): mismas comprobaciones que el servidor. */
+    submitReport(userId: string | null, args: unknown): Result {
+      const a = (args ?? {}) as { p_message?: unknown; p_contact?: unknown; p_context?: unknown };
+      const message = String(a.p_message ?? '').trim();
+      if (message.length < 3) return fail('MESSAGE_TOO_SHORT');
+      if (message.length > 2000) return fail('MESSAGE_TOO_LONG');
+      const contact = typeof a.p_contact === 'string' && a.p_contact.trim() ? a.p_contact.trim() : null;
+      if (contact && contact.length > 120) return fail('CONTACT_TOO_LONG');
+      if (reports.filter((r) => r.userId === userId && r.createdAt > now() - 3600_000).length >= (userId ? 5 : 3)) return fail('RATE_LIMIT');
+      const ref = `E-${rid(5).toUpperCase().replace(/[01IOL]/g, '7')}`;
+      const context = a.p_context && typeof a.p_context === 'object' && !Array.isArray(a.p_context) ? (a.p_context as Row) : {};
+      reports.push({ id: uuid(), ref, userId, message, contact, context, status: 'new', note: null, createdAt: now(), readAt: null, resolvedAt: null });
+      return ok({ ok: true, ref });
     },
     /** Lo que ve cualquier persona en Inicio (app_notice). */
     notice(): Row | null {

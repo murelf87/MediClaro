@@ -24,12 +24,14 @@ import { AiConsentHost } from '../src/components/AiConsentHost';
 import { CaregiverHost } from '../src/components/CaregiverHost';
 import { CareCallHost } from '../src/components/CareCallHost';
 import { PillReminderHost } from '../src/components/PillReminderHost';
+import { OwnerPreviewBanner } from '../src/components/OwnerPreviewBanner';
 import { DemoPaymentSheetsHost } from '../src/mocks/demoPayments';
 import { configureAudioForSpeech } from '../src/utils/audio';
 import { PREMIUM_REQUIRED } from '../src/config/app';
 import { PostAuthRoute } from '../src/services/PostAuthRoute';
 import { TestAccess } from '../src/services/TestAccess';
 import { AUTH_FLOW, PAYMENT_FLOW, routeTarget } from '../src/navigation/routeGuard';
+import { RecentScreens } from '../src/services/RecentScreens';
 
 function RootNavigator() {
   const { status, session } = useSession();
@@ -73,6 +75,12 @@ function RootNavigator() {
     if (status === 'signedIn' && !AUTH_FLOW.has(first) && PostAuthRoute.peek()) PostAuthRoute.consume();
   }, [status, first]);
 
+  // «Notifícanos un error»: por qué pantallas iba la persona (solo el nombre de la ruta).
+  const routeKey = segments.join('/');
+  useEffect(() => {
+    RecentScreens.note(`/${routeKey}`);
+  }, [routeKey]);
+
   return (
     <View style={styles.flex}>
       <Stack
@@ -102,6 +110,7 @@ function RootNavigator() {
       <CareCallHost />
       <PillReminderHost />
       <DemoPaymentSheetsHost />
+      <OwnerPreviewBanner />
       {needsRedirect ? (
         // Tapa la transiciÃ³n (carga de sesiÃ³n o redirecciÃ³n) para que nunca se vea
         // una pantalla privada sin sesiÃ³n ni un parpadeo.

@@ -1,8 +1,9 @@
 /**
  * /owner/dashboard — Dashboard (pantalla 2 del diseño del propietario).
  * Cabecera con el logo, campana con los avisos del panel y la foto/iniciales (→ Mi cuenta); «Dashboard · Panel de
- * administración»; seis fichas (Usuarios, Bonos Premium, Suscripciones, Configuración, Estadísticas, Registro y
- * auditoría) y la tarjeta «Cuenta de propietario · Premium vitalicio · Todas las funciones desbloqueadas».
+ * administración»; ocho fichas (Usuarios, Bonos Premium, Suscripciones, Configuración, Estadísticas, Registro y
+ * auditoría, Errores notificados y Revisar la app) y la tarjeta «Cuenta de propietario · Premium vitalicio · Todas las
+ * funciones desbloqueadas». La campana suma también los errores notificados nuevos.
  */
 import { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -18,22 +19,27 @@ export default function OwnerHomeScreen() {
   const narrow = useNarrow();
   const photo = useOwnerPhoto();
   const data = useAsync(() => OwnerAdminService.overview(), []);
+  // «Errores notificados» (Ayuda → Notifícanos un error). Si su migración aún no está aplicada, la ficha lo dice al abrirla.
+  const reports = useAsync(() => OwnerAdminService.reportCounts(), []);
   useFocusEffect(
     useCallback(() => {
       if (data.status !== 'loading') void data.refresh();
+      if (reports.status !== 'loading') void reports.refresh();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+  const newReports = reports.data?.new ?? 0;
+  const openReports = reports.data?.open ?? 0;
   const go = (path: string) => router.push(path as Href);
   const o = data.data;
   const name = o?.owner.name ?? 'Propietario';
   // Campana: pagos pendientes, avisos de ayuda activos y errores de las últimas 24 h.
-  const alerts = o ? o.counts.pastDue + o.counts.activeIncidents + (o.counts.errors24h > 0 ? 1 : 0) : 0;
+  const alerts = (o ? o.counts.pastDue + o.counts.activeIncidents + (o.counts.errors24h > 0 ? 1 : 0) : 0) + newReports;
 
   const headerRight = (
     <View style={styles.headerRight}>
       <Pressable
-        onPress={() => go(o && o.counts.pastDue > 0 ? '/owner/subscriptions' : '/owner/system')}
+        onPress={() => go(newReports > 0 ? '/owner/reports' : o && o.counts.pastDue > 0 ? '/owner/subscriptions' : '/owner/system')}
         accessibilityRole="button"
         accessibilityLabel={alerts ? `Avisos del panel: ${alerts}` : 'Avisos del panel: ninguno'}
         hitSlop={8}
@@ -74,6 +80,15 @@ export default function OwnerHomeScreen() {
             <ODashTile icon="settings" title="Configuración" subtitle="Ajustes generales de la plataforma" onPress={() => go('/owner/settings')} wide={narrow} testID="owner-tile-settings" />
             <ODashTile icon="stats-chart" title="Estadísticas" subtitle="Uso y rendimiento" onPress={() => go('/owner/stats')} wide={narrow} testID="owner-tile-stats" />
             <ODashTile icon="cog" title="Registro y auditoría" subtitle="Actividad y eventos" onPress={() => go('/owner/audit')} wide={narrow} testID="owner-tile-audit" />
+            <ODashTile
+              icon="chatbox-ellipses"
+              title="Errores notificados"
+              subtitle={reports.data ? (openReports ? `${openReports} sin resolver${newReports ? ` · ${newReports} nuevos` : ''}` : 'Ninguno pendiente') : 'Lo que escriben desde Ayuda'}
+              onPress={() => go('/owner/reports')}
+              wide={narrow}
+              testID="owner-tile-reports"
+            />
+            <ODashTile icon="phone-portrait" title="Revisar la app" subtitle="Verla como cada persona y probar este móvil" onPress={() => go('/owner/review')} wide={narrow} testID="owner-tile-review" />
           </Grid>
 
           <OCard

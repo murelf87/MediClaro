@@ -24,6 +24,8 @@ export const PUBLIC_ROUTES = new Set([
   'premium-login',
   'legal',
   'help',
+  // «Notifícanos un error» (desde Ayuda): también sin cuenta.
+  'report-problem',
   'premium',
   'payment',
   'payment-card',

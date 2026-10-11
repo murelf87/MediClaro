@@ -12,6 +12,9 @@ import { MedicationPlanService, PillReminders } from '../services/MedicationPlan
 import { MedicinePhotoService } from '../services/MedicinePhotoService';
 import { CareChatService } from '../services/CareChatService';
 import { OwnerAdminService } from '../services/OwnerAdminService';
+import { OwnerPreview, previewSession } from '../services/OwnerPreview';
+import { BackgroundLocation } from '../services/BackgroundLocation';
+import { useOwnerPreview } from '../hooks/useOwnerPreview';
 import type { AuthSession } from '../types';
 
 export type SessionStatus = 'loading' | 'signedIn' | 'signedOut';
@@ -62,6 +65,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await EmergencyService.beforeSignOut().catch(() => undefined);
+    // Ubicación con la pantalla bloqueada: nunca sigue después de cerrar la sesión.
+    await BackgroundLocation.stop().catch(() => undefined);
     // «Mis pastillas»: fuera los avisos programados, la copia de la pauta y las fotos propias de este teléfono
     // (se vuelven a descargar y programar al entrar de nuevo).
     const uid = session?.userId;
@@ -75,6 +80,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Chat con el cuidador/a: nada de la conversación queda en memoria.
     CareChatService.clear();
     OwnerAdminService.clear();
+    OwnerPreview.clear();
     await EmergencySession.finish();
     setSession(null);
     setStatus('signedOut');
@@ -84,6 +90,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
+/**
+ * Sesión tal como la ven las PANTALLAS. Durante la vista previa del propietario («Ver la app como…») enseña la de
+ * un visitante, una cuenta Básica o un cuidador/a; sin vista previa es la sesión real.
+ */
 export function useSession(): SessionContextValue {
+  const real = useContext(SessionContext);
+  const preview = useOwnerPreview();
+  return useMemo(() => previewSession(real, preview), [real, preview]);
+}
+
+/** Sesión real, sin vista previa: para los procesos de fondo (avisos, cuidador, llamadas, preferencias). */
+export function useRealSession(): SessionContextValue {
   return useContext(SessionContext);
 }

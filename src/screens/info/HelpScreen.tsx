@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Screen, AppHeader, AppText, ListGroup, SecondaryButton, SectionHeader, SettingRow } from '../../components';
+import { Screen, AppHeader, AppText, Card, Icon, ListGroup, PrimaryButton, SecondaryButton, SectionHeader, SettingRow } from '../../components';
 import { useAppTheme } from '../../hooks';
 import { PURCHASES_ENABLED, SUPPORT_EMAIL } from '../../config/app';
 import { composeEmail } from '../../utils/device';
@@ -126,6 +126,26 @@ export default function HelpScreen() {
       <AppText variant="body" color="textSecondary" style={{ marginTop: theme.spacing.xxs, marginBottom: theme.spacing.md }}>
         Toca una pregunta para ver la respuesta.
       </AppText>
+
+      {/* «Notifícanos un error»: arriba y bien visible; llega a la bandeja del panel del propietario. */}
+      <Card style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md }} testID="help-report-card">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+          <Icon name="chatbubble-ellipses" size={28} color={theme.colors.primary} />
+          <AppText variant="subheading" color="heading" style={{ flex: 1 }}>
+            ¿Algo no funciona bien?
+          </AppText>
+        </View>
+        <AppText variant="body" color="textSecondary">
+          Escríbenos qué ha pasado y lo revisaremos para solucionarlo.
+        </AppText>
+        <PrimaryButton
+          label="Notifícanos un error"
+          icon="create-outline"
+          onPress={() => router.push('/report-problem')}
+          accessibilityHint="Abre un formulario para contarnos el problema"
+          testID="help-report"
+        />
+      </Card>
 
       <View style={{ gap: theme.spacing.sm }}>
         {FAQS.map((faq) => (
