@@ -24,6 +24,7 @@ async function offlineMedicationReply(question: string): Promise<string | null> 
 import { recordRecentUserMessage } from './emergency/EmergencyReportService';
 import { AiConsentService } from './AiConsentService';
 import { AssistantMemoryService } from './AssistantMemoryService';
+import { AssistantThreads } from './AssistantThreads';
 import type { AssistantContext, AssistantMessage, EmergencyResource } from '../types';
 
 type RawChat =
@@ -94,7 +95,7 @@ export function normalizeAssistantText(value: string): string {
 
 export const AssistantService = {
   conversationKey(ctx?: AssistantContext): string {
-    return ctx?.medicationId ? `med:${ctx.medicationId}` : 'general';
+    return ctx?.medicationId ? `med:${ctx.medicationId}` : AssistantThreads.activeKey();
   },
 
   getConversation(key: string): AssistantMessage[] {
@@ -132,6 +133,7 @@ export const AssistantService = {
     await requireUserId();
     const { error } = await supabase.rpc('delete_my_assistant_history');
     if (error) throw toAppError(error);
+    AssistantThreads.clearAll();
     conversations.clear();
     loadedKeys.clear();
     for (const key of listeners.keys()) emit(key);
@@ -166,6 +168,7 @@ export const AssistantService = {
       status: 'sending',
     };
     update(key, (list) => [...list, userMsg]);
+    if (!key.startsWith('med:')) AssistantThreads.touch(key, clean);
     void recordRecentUserMessage(clean);
     await AssistantService.deliver(key, userMsg.id, ctx);
   },

@@ -1,9 +1,12 @@
 /**
  * Velocidad de reproducción de una voz natural ya grabada a partir de la preferencia de lectura.
  * 0,85 era la velocidad «Normal» de la voz del sistema: con voz natural, «Normal» es su velocidad real (1×).
- * Se evita estirar mucho el audio (sonaría metálico): solo 0,9× (más lento) o 1,12× (más rápido).
+ * Se evita estirar mucho el audio (sonaría metálico): solo 0,9× (más lento) o 1,12× (más rápido); el «muy muy lento»
+ * del chat de IA baja a 0,75×.
  */
 export function naturalPlaybackRate(rate: number): number {
+  // «Muy muy lento» (caracol del chat de IA): más despacio, siempre con el tono corregido.
+  if (rate <= 0.62) return 0.75;
   if (rate <= 0.77) return 0.9;
   if (rate >= 0.93) return 1.12;
   return 1;

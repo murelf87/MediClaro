@@ -17,7 +17,7 @@
 import { currentEmergencyMessage } from '../../services/AssistantService';
 import { currentCaregiverSignal } from '../../services/CaregiverAlert';
 import { CaregiverService } from '../../services/CaregiverService';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -66,6 +66,9 @@ import {
   shortMedicationName,
   useKeyboardVisible,
 } from './parts';
+import { ConversationsSheet } from './ConversationsSheet';
+import { AssistantSpeed, ASSISTANT_SPEEDS, assistantRate, type AssistantSpeedKey } from '../../services/AssistantSpeed';
+import { AssistantThreads, type AssistantThread } from '../../services/AssistantThreads';
 
 export type AssistantMode = 'tab' | 'stack';
 
@@ -153,6 +156,22 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
 
   const { messages, sending, send, retry } = useAssistantConversation(ctx);
   const { speakingId, loadingId, speak, stop } = useGeminiSimpleSpeech();
+  // Velocidad de lectura de las respuestas (caracol, tortuga, conejo): se recuerda y se usa también al leerlas solas.
+  const speed = useSyncExternalStore(AssistantSpeed.subscribe, AssistantSpeed.get, AssistantSpeed.get);
+  useEffect(() => AssistantSpeed.load(), []);
+  const rate = assistantRate(speed);
+  // Conversaciones: abrir una nueva (las anteriores se conservan) o volver a una anterior. Solo en el chat general.
+  const [chatsOpen, setChatsOpen] = useState(false);
+  const [threads, setThreads] = useState<AssistantThread[]>(() => AssistantThreads.list());
+  const [activeThread, setActiveThread] = useState(() => AssistantThreads.activeKey());
+  useEffect(() => {
+    const sync = () => {
+      setThreads(AssistantThreads.list());
+      setActiveThread(AssistantThreads.activeKey());
+    };
+    sync();
+    return AssistantThreads.subscribe(sync);
+  }, []);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [recordingVoice, setRecordingVoice] = useState(false);
   const [processingVoice, setProcessingVoice] = useState(false);
@@ -186,8 +205,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
       .find((m) => m.role === 'assistant' && !m.emergency && Date.parse(m.createdAt) >= after - 1000);
     if (!latest) return;
     autoSpeakAfterRef.current = null;
-    if (latest.text && canAutoSpeak(latest.text)) speak(latest.id, latest.text, prefs.speechRate, prefs.assistantVoice, 'assistant');
-  }, [messages, speak, prefs.speechRate, prefs.assistantVoice]);
+    if (latest.text && canAutoSpeak(latest.text)) speak(latest.id, latest.text, rate, prefs.assistantVoice, 'assistant');
+  }, [messages, speak, rate, prefs.assistantVoice]);
 
   // La voz y cualquier grabación se detienen al salir de la pantalla.
   useFocusEffect(useCallback(() => () => {
@@ -233,10 +252,22 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   const scrollToEnd = useCallback((animated = true) => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
   }, []);
+  // Al abrir el chat (o cambiar de conversación) se va SIEMPRE a lo último que se habló. El historial llega después de
+  // abrir la pantalla y la lista crece por partes: durante un momento se fuerza el final sin dejar que esos
+  // crecimientos hagan creer que la persona se ha desplazado hacia arriba.
+  const forceBottomUntil = useRef(0);
+  const goToLatest = useCallback(() => {
+    forceBottomUntil.current = Date.now() + 2500;
+    stickToBottom.current = true;
+    scrollToEnd(false);
+  }, [scrollToEnd]);
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (Date.now() < forceBottomUntil.current) return;
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     stickToBottom.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 120;
   }, []);
+  useFocusEffect(useCallback(() => { goToLatest(); }, [goToLatest]));
+  useEffect(() => { goToLatest(); }, [activeThread, goToLatest]);
 
   const suggestions = useMemo(
     () =>
@@ -356,9 +387,32 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   const toggleSpeak = useCallback(
     (message: AssistantMessage) => {
       if (speakingId === message.id || loadingId === message.id) stop();
-      else speak(message.id, message.text, prefs.speechRate, prefs.assistantVoice, 'assistant');
+      else speak(message.id, message.text, rate, prefs.assistantVoice, 'assistant');
     },
-    [speakingId, loadingId, speak, stop, prefs.speechRate, prefs.assistantVoice],
+    [speakingId, loadingId, speak, stop, rate, prefs.assistantVoice],
+  );
+  // Un animal: se queda encendido y la respuesta se lee otra vez a esa velocidad.
+  const readAtSpeed = useCallback(
+    (message: AssistantMessage, next: AssistantSpeedKey) => {
+      AssistantSpeed.set(next);
+      stop();
+      speak(message.id, message.text, assistantRate(next), prefs.assistantVoice, 'assistant');
+    },
+    [speak, stop, prefs.assistantVoice],
+  );
+
+  const startNewChat = useCallback(() => {
+    stop();
+    AssistantThreads.start();
+    setChatsOpen(false);
+  }, [stop]);
+  const openChat = useCallback(
+    (key: string) => {
+      stop();
+      AssistantThreads.select(key);
+      setChatsOpen(false);
+    },
+    [stop],
   );
 
   const notifyCaregiver = useCallback(async () => {
@@ -406,7 +460,9 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
             message={item.message}
             animate={animate}
             speaking={speakingId === item.message.id || loadingId === item.message.id}
+            speed={speed}
             onToggleSpeak={() => toggleSpeak(item.message)}
+            onSelectSpeed={(next) => readAtSpeed(item.message, next)}
             onOpenSource={item.message.sourceUrl ? () => void openSource(item.message.sourceUrl as string) : undefined}
           />
         );
@@ -416,6 +472,9 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
 
   const listHeader = (
     <View style={{ gap: theme.spacing.md }}>
+      {!medicationId && messages.length > 0 ? (
+        <TextButton label="Nueva conversación" icon="add-circle-outline" onPress={startNewChat} align="flex-start" testID="assistant-new-chat-inline" />
+      ) : null}
       {messages.length === 0 ? (
         <View style={styles.welcomeRow}>
           <AssistantAvatar size={theme.easyMode ? 60 : 54} />
@@ -471,11 +530,37 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
     <AssistantHeader
       title="Asistente de MediClaro"
       showBack={mode === 'stack'}
+      right={
+        medicationId ? undefined : (
+          <Pressable
+            onPress={() => setChatsOpen(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Conversaciones"
+            accessibilityHint="Abre una conversación nueva o vuelve a una anterior"
+            testID="assistant-chats"
+            style={({ pressed }) => ({ minHeight: theme.touchTargets.min, minWidth: theme.touchTargets.min, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}
+          >
+            <Icon name="chatbubbles-outline" size={28} color={theme.colors.heading} />
+          </Pressable>
+        )
+      }
     />
   );
 
   return (
     <Screen edges={['top']} scroll={false} padded={false} header={header}>
+      {!medicationId ? (
+        <ConversationsSheet
+          visible={chatsOpen}
+          threads={threads}
+          activeKey={activeThread}
+          canStartNew={messages.length > 0}
+          onNew={startNewChat}
+          onSelect={openChat}
+          onClose={() => setChatsOpen(false)}
+        />
+      ) : null}
       <View ref={wrapRef} style={styles.flex} onLayout={measureWrap} collapsable={false}>
         <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
           {medicationName ? (
@@ -509,10 +594,11 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
             onScroll={onScroll}
             scrollEventThrottle={100}
             onContentSizeChange={() => {
-              if (stickToBottom.current) scrollToEnd();
+              if (Date.now() < forceBottomUntil.current) scrollToEnd(false);
+              else if (stickToBottom.current) scrollToEnd();
             }}
             onLayout={() => {
-              if (stickToBottom.current) scrollToEnd(false);
+              if (stickToBottom.current || Date.now() < forceBottomUntil.current) scrollToEnd(false);
             }}
             showsVerticalScrollIndicator={false}
             accessibilityLabel="Conversación con el asistente"
@@ -655,13 +741,17 @@ function AssistantBubble({
   message,
   animate,
   speaking,
+  speed,
   onToggleSpeak,
+  onSelectSpeed,
   onOpenSource,
 }: {
   message: AssistantMessage;
   animate: boolean;
   speaking: boolean;
+  speed: AssistantSpeedKey;
   onToggleSpeak: () => void;
+  onSelectSpeed: (speed: AssistantSpeedKey) => void;
   onOpenSource?: () => void;
 }) {
   const theme = useAppTheme();
@@ -703,6 +793,36 @@ function AssistantBubble({
           {done ? message.text : message.text.slice(0, visible)}
           {done ? null : <AppText variant="body" style={{ color: c.primary }}>{' ▍'}</AppText>}
         </AppText>
+        {done && message.text.trim() ? (
+          <View style={styles.speedRow} accessibilityRole="radiogroup" accessibilityLabel="Velocidad de lectura">
+            {ASSISTANT_SPEEDS.map((o) => {
+              const on = o.key === speed;
+              return (
+                <Pressable
+                  key={o.key}
+                  onPress={() => onSelectSpeed(o.key)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={o.spoken}
+                  accessibilityState={{ selected: on }}
+                  testID={`assistant-speed-${o.key}`}
+                  style={({ pressed }) => [
+                    styles.speedBtn,
+                    {
+                      minHeight: Math.max(64, theme.touchTargets.min + 12),
+                      borderColor: on ? c.primary : c.primarySoft,
+                      backgroundColor: on ? c.primary : pressed ? c.primaryTint : c.surface,
+                    },
+                  ]}
+                >
+                  <AppText style={styles.speedEmoji} accessible={false}>{o.emoji}</AppText>
+                  <AppText variant="small" style={{ color: on ? c.onPrimary : c.primary, fontWeight: '700' }} accessible={false}>
+                    {o.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </Pressable>
       <View style={styles.actions}>
         {speaking ? (
@@ -875,6 +995,9 @@ function EmergencyReply({
 }
 
 const styles = StyleSheet.create({
+  speedRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  speedBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, gap: 2 },
+  speedEmoji: { fontSize: 32, lineHeight: 38 },
   // Aviso legal discreto: letra pequeña y sin negrita (sigue siendo legible y lo lee el lector de pantalla).
   disclaimer: { fontWeight: '400' },
   flex: { flex: 1 },

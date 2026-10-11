@@ -1,12 +1,16 @@
 /**
  * Conversación con el asistente IA (se conserva al cambiar de pantalla).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { AssistantThreads } from '../services/AssistantThreads';
 import { AssistantService } from '../services/AssistantService';
 import type { AssistantContext, AssistantMessage } from '../types';
 
 export function useAssistantConversation(ctx?: AssistantContext) {
-  const key = useMemo(() => AssistantService.conversationKey(ctx), [ctx?.medicationId]);
+  // Sin medicamento, la conversación es la que la persona tenga abierta (puede abrir otra nueva o volver a una anterior).
+  const generalKey = useSyncExternalStore(AssistantThreads.subscribe, AssistantThreads.activeKey, AssistantThreads.activeKey);
+  const key = ctx?.medicationId ? AssistantService.conversationKey(ctx) : generalKey;
+  useEffect(() => { void AssistantThreads.load(); }, []);
   const [messages, setMessages] = useState<AssistantMessage[]>(() => AssistantService.getConversation(key));
 
   useEffect(() => {
