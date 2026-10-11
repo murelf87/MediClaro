@@ -17,6 +17,7 @@ import {
   InfoBanner,
   MedicationImage,
   Screen,
+  SecondaryButton,
   SegmentedControl,
   Skeleton,
   Waveform,
@@ -179,6 +180,9 @@ export default function VoiceScreen() {
                 onPress={() => speech.replay()}
                 accessibilityRole="button"
                 accessibilityLabel="Repetir explicación desde el principio"
+                // Atajo visual junto al botón de reproducir; el botón grande «Repetir explicación» de abajo es el que lee el lector de pantalla.
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
                 testID="voice-replay"
                 style={({ pressed }) => [
                   styles.sideControl,
@@ -250,6 +254,18 @@ export default function VoiceScreen() {
               </View>
             </View>
           </Card>
+
+          <SecondaryButton
+            label="Repetir explicación"
+            icon="refresh"
+            variant="outline"
+            size="lg"
+            fullWidth
+            onPress={() => speech.replay()}
+            accessibilityHint="Vuelve a leer la explicación completa desde el principio"
+            style={{ marginTop: theme.spacing.md }}
+            testID="voice-replay-big"
+          />
 
           {speech.status === 'error' ? (
             <InfoBanner tone="warning" icon="volume-mute" message={errorText} style={{ marginTop: theme.spacing.sm }} />

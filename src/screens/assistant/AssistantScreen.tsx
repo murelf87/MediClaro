@@ -818,70 +818,89 @@ function AssistantBubble({
   const done = visible >= total;
   return (
     <View style={styles.assistantColumn}>
-      <Pressable
-        onPress={done ? undefined : () => setVisible(total)}
-        accessible
-        accessibilityLabel={message.text}
-        accessibilityHint={done ? undefined : 'Toca para ver la respuesta completa'}
+      <View
         style={[
           styles.bubble,
           styles.assistantBubble,
           { backgroundColor: c.primaryTint, borderColor: c.primarySoft, borderRadius: theme.radius.lg },
         ]}
-        testID={done ? 'assistant-reply' : 'assistant-reply-typing'}
       >
-        <AppText variant="body" color="text" selectable={done}>
-          {done ? message.text : message.text.slice(0, visible)}
-          {done ? null : <AppText variant="body" style={{ color: c.primary }}>{' ▍'}</AppText>}
-        </AppText>
+        {/* Solo el texto es «un elemento» para el lector de pantalla: así los botones de debajo se pueden usar uno a uno. */}
+        <Pressable
+          onPress={done ? undefined : () => setVisible(total)}
+          accessible
+          accessibilityLabel={message.text}
+          accessibilityHint={done ? undefined : 'Toca para ver la respuesta completa'}
+          testID={done ? 'assistant-reply' : 'assistant-reply-typing'}
+        >
+          <AppText variant="body" color="text" selectable={done}>
+            {done ? message.text : message.text.slice(0, visible)}
+            {done ? null : <AppText variant="body" style={{ color: c.primary }}>{' ▍'}</AppText>}
+          </AppText>
+        </Pressable>
         {done && message.text.trim() ? (
-          <View style={styles.speedRow} accessibilityRole="radiogroup" accessibilityLabel="Velocidad de lectura">
-            {ASSISTANT_SPEEDS.map((o) => {
-              const on = o.key === speed;
-              return (
-                <Pressable
-                  key={o.key}
-                  onPress={() => onSelectSpeed(o.key)}
-                  accessibilityRole="radio"
-                  accessibilityLabel={o.spoken}
-                  accessibilityState={{ selected: on }}
-                  testID={`assistant-speed-${o.key}`}
-                  style={({ pressed }) => [
-                    styles.speedBtn,
-                    {
-                      minHeight: Math.max(64, theme.touchTargets.min + 12),
-                      borderColor: on ? c.primary : c.primarySoft,
-                      backgroundColor: on ? c.primary : pressed ? c.primaryTint : c.surface,
-                    },
-                  ]}
-                >
-                  <AppText style={styles.speedEmoji} accessible={false}>{o.emoji}</AppText>
-                  <AppText variant="small" style={{ color: on ? c.onPrimary : c.primary, fontWeight: '700' }} accessible={false}>
-                    {o.label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
-      </Pressable>
-      <View style={styles.actions}>
-        {speaking ? (
-          <TextButton label="Detener" icon="stop-circle-outline" onPress={onToggleSpeak} align="flex-start" testID="assistant-stop" />
-        ) : done && message.text.trim() ? (
-          <TextButton
-            label="Repetir explicación"
-            icon="refresh"
-            onPress={onToggleSpeak}
-            align="flex-start"
-            testID="assistant-repeat"
-            accessibilityHint="Vuelve a leer la respuesta en voz alta"
-          />
-        ) : null}
-        {onOpenSource ? (
-          <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={onOpenSource} align="flex-start" />
+          <>
+            <View style={styles.speedRow} accessibilityRole="radiogroup" accessibilityLabel="Velocidad de lectura">
+              {ASSISTANT_SPEEDS.map((o) => {
+                const on = o.key === speed;
+                return (
+                  <Pressable
+                    key={o.key}
+                    onPress={() => onSelectSpeed(o.key)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={o.spoken}
+                    accessibilityState={{ selected: on }}
+                    testID={`assistant-speed-${o.key}`}
+                    style={({ pressed }) => [
+                      styles.speedBtn,
+                      {
+                        minHeight: Math.max(64, theme.touchTargets.min + 12),
+                        borderColor: on ? c.primary : c.primarySoft,
+                        backgroundColor: on ? c.primary : pressed ? c.primaryTint : c.surface,
+                      },
+                    ]}
+                  >
+                    <AppText style={styles.speedEmoji} accessible={false}>{o.emoji}</AppText>
+                    <AppText variant="small" style={{ color: on ? c.onPrimary : c.primary, fontWeight: '700' }} accessible={false}>
+                      {o.label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {/* Botón grande y siempre visible: mientras suena es «Detener»; cuando acaba (o si no sonó), «Repetir explicación». */}
+            {speaking ? (
+              <SecondaryButton
+                label="Detener"
+                icon="stop-circle-outline"
+                variant="tonal"
+                size="lg"
+                fullWidth
+                onPress={onToggleSpeak}
+                style={styles.repeatBtn}
+                testID="assistant-stop"
+              />
+            ) : (
+              <SecondaryButton
+                label="Repetir explicación"
+                icon="refresh"
+                variant="outline"
+                size="lg"
+                fullWidth
+                onPress={onToggleSpeak}
+                style={styles.repeatBtn}
+                accessibilityHint="Vuelve a leer esta respuesta en voz alta, a la velocidad elegida"
+                testID="assistant-repeat"
+              />
+            )}
+          </>
         ) : null}
       </View>
+      {onOpenSource ? (
+        <View style={styles.actions}>
+          <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={onOpenSource} align="flex-start" />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1037,6 +1056,7 @@ function EmergencyReply({
 
 const styles = StyleSheet.create({
   speedRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  repeatBtn: { marginTop: 10 },
   speedBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, gap: 2 },
   speedEmoji: { fontSize: 32, lineHeight: 38 },
   // Aviso legal discreto: letra pequeña y sin negrita (sigue siendo legible y lo lee el lector de pantalla).
