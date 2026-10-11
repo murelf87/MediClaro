@@ -227,7 +227,7 @@ function HistoryRow({ entry, onPress }: { entry: Entry; onPress: () => void }) {
             ) : null}
           </View>
         ) : (
-          <AppText variant="caption" color="dangerText">
+          <AppText variant="caption" color={entry.event?.kind === 'extra' ? 'dangerText' : 'textSecondary'}>
             {entry.event?.kind === 'extra' ? 'Toma adicional' : 'Toma registrada'}
           </AppText>
         )}

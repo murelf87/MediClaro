@@ -229,7 +229,7 @@ export function parseTreatment(v: unknown): Treatment {
     strength: str(t.strength),
     doseAmount: num(t.doseAmount, 1),
     doseUnit: (str(t.doseUnit) ?? 'unidad') as DoseUnit,
-    frequency: (t.frequency === 'weekly' || t.frequency === 'interval' ? t.frequency : 'daily') as Frequency,
+    frequency: (t.frequency === 'weekly' || t.frequency === 'interval' || t.frequency === 'as_needed' ? t.frequency : 'daily') as Frequency,
     daysOfWeek: Array.isArray(t.daysOfWeek) ? t.daysOfWeek.map(Number) : null,
     intervalDays: t.intervalDays == null ? null : Number(t.intervalDays),
     times: normalizeTimes(Array.isArray(t.times) ? t.times.map(String) : []),
@@ -569,7 +569,8 @@ export function createPlanService(deps: PlanDeps) {
         id,
         name: input.name.trim(),
         strength: input.strength?.trim() || null,
-        times: normalizeTimes(input.times),
+        times: input.frequency === 'as_needed' ? [] : normalizeTimes(input.times),
+        remindersEnabled: input.frequency === 'as_needed' ? false : input.remindersEnabled,
         daysOfWeek: input.frequency === 'weekly' ? [...new Set(input.daysOfWeek ?? [])].sort() : null,
         intervalDays: input.frequency === 'interval' ? input.intervalDays : null,
         timezone: deps.zone().name,
@@ -577,7 +578,7 @@ export function createPlanService(deps: PlanDeps) {
         expectedVersion: current ? current.version : null,
       };
       if (!input.prescriptionConfirmed) throw planError({ message: 'PRESCRIPTION_NOT_CONFIRMED' });
-      if (!payload.name || (payload.times as string[]).length === 0) throw planError({ message: 'INVALID_TIMES' });
+      if (!payload.name || (payload.times as string[]).length === 0 && input.frequency !== 'as_needed') throw planError({ message: 'INVALID_TIMES' });
       await enqueue({ type: 'save_treatment', id: String(payload.mutationId), at: deps.now().toISOString(), payload });
       const saved = state?.treatments.find((t) => t.id === id);
       if (!saved) throw new AppError('unknown');

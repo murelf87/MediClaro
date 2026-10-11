@@ -51,7 +51,7 @@ interface TreatmentRow {
   strength: string | null;
   doseAmount: number;
   doseUnit: DoseUnit;
-  frequency: 'daily' | 'weekly' | 'interval';
+  frequency: 'daily' | 'weekly' | 'interval' | 'as_needed';
   daysOfWeek: number[] | null;
   intervalDays: number | null;
   times: string[];
@@ -245,8 +245,8 @@ export function createDemoMedication(opts: DemoMedicationOptions) {
     if (current && p.expectedVersion != null && Number(p.expectedVersion) !== current.version) return ok({ conflict: true, treatment: treatmentJson(current) });
     if (p.prescriptionConfirmed !== true) return fail('PRESCRIPTION_NOT_CONFIRMED');
     const times = normalizeTimes(Array.isArray(p.times) ? p.times.map(String) : []);
-    if (times.length === 0 || times.length > 8) return fail('INVALID_TIMES');
-    const frequency = p.frequency === 'weekly' || p.frequency === 'interval' ? p.frequency : 'daily';
+    const frequency = p.frequency === 'weekly' || p.frequency === 'interval' || p.frequency === 'as_needed' ? p.frequency : 'daily';
+    if ((times.length === 0 && frequency !== 'as_needed') || times.length > 8) return fail('INVALID_TIMES');
     if (frequency === 'weekly' && (!Array.isArray(p.daysOfWeek) || p.daysOfWeek.length === 0)) return fail('INVALID_DAYS');
     const archived = p.archived === true;
     const row: TreatmentRow = {

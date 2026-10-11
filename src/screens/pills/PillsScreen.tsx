@@ -36,10 +36,9 @@ import {
   addDays,
   doseViews,
   formatDose,
-  frequencyLabel,
+  scheduleSummary,
   medicineLabel,
   nextDose,
-  normalizeTimes,
   occurrencesForDate,
   type DoseView,
 } from '../../domain/medication';
@@ -56,6 +55,22 @@ function PillsScreen() {
   const [selected, setSelected] = useState(today);
   const [permission, setPermission] = useState<ReminderPermission>(remindersSupported ? 'undetermined' : 'unsupported');
   const [pulling, setPulling] = useState(false);
+  const [noting, setNoting] = useState<string | null>(null);
+  const [noteMsg, setNoteMsg] = useState<{ id: string; text: string } | null>(null);
+  // «Cuando lo necesite»: la persona anota la toma en el momento (nada se marca solo).
+  const noteNow = async (treatmentId: string) => {
+    if (noting) return;
+    setNoting(treatmentId);
+    setNoteMsg(null);
+    try {
+      await MedicationPlanService.recordDose({ treatmentId, occurrenceDate: null, scheduledTime: null, kind: 'taken', source: 'app' });
+      setNoteMsg({ id: treatmentId, text: 'Anotado. Si no recuerdas la hora de tu última toma, mira el historial.' });
+    } catch {
+      setNoteMsg({ id: treatmentId, text: 'No se ha podido anotar. Inténtalo de nuevo.' });
+    } finally {
+      setNoting(null);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -283,15 +298,31 @@ function PillsScreen() {
                       {medicineLabel(t)}
                     </AppText>
                     <AppText variant="caption" color="textSecondary">
-                      {`${formatDose(t.doseAmount, t.doseUnit)} · ${frequencyLabel(t)} a las ${normalizeTimes(t.times).join(', ')}${t.endDate ? ` · hasta el ${t.endDate.split('-').reverse().join('/')}` : ''}`}
+                      {`${formatDose(t.doseAmount, t.doseUnit)} · ${scheduleSummary(t)}${t.endDate ? ` · hasta el ${t.endDate.split('-').reverse().join('/')}` : ''}`}
                     </AppText>
-                    {!t.remindersEnabled ? (
+                    {!t.remindersEnabled && t.frequency !== 'as_needed' ? (
                       <AppText variant="small" color="textMuted">
                         Sin avisos
                       </AppText>
                     ) : null}
                   </View>
                 </View>
+                {t.frequency === 'as_needed' ? (
+                  <View style={{ gap: 6, marginBottom: theme.spacing.xs }}>
+                    <PrimaryButton label="La he tomado ahora" icon="checkmark-circle" size="md" loading={noting === t.id} onPress={() => void noteNow(t.id)} testID={`pills-note-${t.id}`} />
+                    {(() => {
+                      const last = (state?.events ?? [])
+                        .filter((e) => e.treatmentId === t.id && e.status === 'active' && e.kind !== 'skipped' && e.takenAt)
+                        .sort((a, b) => String(b.takenAt).localeCompare(String(a.takenAt)))[0];
+                      const msg = noteMsg?.id === t.id ? noteMsg.text : last?.takenAt ? `Última toma anotada: ${new Date(last.takenAt).toLocaleString('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}` : 'Todavía no has anotado ninguna toma.';
+                      return (
+                        <AppText variant="caption" color="textSecondary" testID={`pills-last-${t.id}`}>
+                          {msg}
+                        </AppText>
+                      );
+                    })()}
+                  </View>
+                ) : null}
                 <SecondaryButton label="Cambiar la pauta" icon="create-outline" size="md" onPress={() => router.push({ pathname: '/pills/edit', params: { id: t.id } })} testID={`pills-edit-${t.id}`} />
               </Card>
             ))}

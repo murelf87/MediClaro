@@ -32,7 +32,7 @@ export const DOSE_UNITS = [
 ] as const;
 export type DoseUnit = (typeof DOSE_UNITS)[number];
 
-export type Frequency = 'daily' | 'weekly' | 'interval';
+export type Frequency = 'daily' | 'weekly' | 'interval' | 'as_needed';
 
 export interface Treatment {
   id: string;
@@ -305,6 +305,8 @@ export function occurrenceKey(treatmentId: string, date: string, time: string): 
 export function isScheduledOn(t: Treatment, date: string): boolean {
   if (!t.active || !isIsoDate(t.startDate) || date < t.startDate) return false;
   if (t.endDate && date > t.endDate) return false;
+  // «Cuando lo necesite»: no hay tomas programadas ni avisos; la persona anota cada toma cuando la hace.
+  if (t.frequency === 'as_needed') return false;
   if (t.frequency === 'weekly') return (t.daysOfWeek ?? []).includes(isoWeekday(date));
   if (t.frequency === 'interval') {
     const every = Math.max(1, Math.floor(t.intervalDays ?? 1));
@@ -504,8 +506,15 @@ export function weekdayName(isoDay: number): string {
   return WEEKDAYS[(isoDay - 1 + 7) % 7];
 }
 
+/** Resumen de cuándo se toma: «todos los días a las 08:00, 20:00» o «cuando lo necesites (sin avisos)». */
+export function scheduleSummary(t: Pick<Treatment, 'frequency' | 'daysOfWeek' | 'intervalDays' | 'times'>): string {
+  if (t.frequency === 'as_needed') return 'cuando lo necesites (sin avisos)';
+  return `${frequencyLabel(t)} a las ${normalizeTimes(t.times).join(', ')}`;
+}
+
 /** «todos los días», «lunes, miércoles y viernes», «cada 2 días». */
 export function frequencyLabel(t: Pick<Treatment, 'frequency' | 'daysOfWeek' | 'intervalDays'>): string {
+  if (t.frequency === 'as_needed') return 'cuando lo necesites';
   if (t.frequency === 'weekly') {
     const days = [...new Set(t.daysOfWeek ?? [])].sort().map(weekdayName);
     if (days.length === 0) return 'ningún día';
@@ -744,7 +753,7 @@ export function planContextLines(treatments: Treatment[]): string[] {
   return treatments
     .filter((t) => t.active)
     .slice(0, 15)
-    .map((t) => `- ${doseLabel(t)}: ${frequencyLabel(t)} a las ${normalizeTimes(t.times).join(', ')}${t.endDate ? ` (hasta el ${t.endDate})` : ''}`);
+    .map((t) => `- ${doseLabel(t)}: ${scheduleSummary(t)}${t.endDate ? ` (hasta el ${t.endDate})` : ''}`);
 }
 
 export function wantsPlanContext(text: string): boolean {

@@ -257,4 +257,27 @@ describe('Mis pastillas · datos en el teléfono y en el servidor', () => {
     net.online = false;
     await expect(service.exportForAccount()).rejects.toBeTruthy();
   });
+
+  it('«cuando lo necesite»: sin horas ni avisos; la persona anota cada toma y queda en el historial', async () => {
+    const { makeDeps, server } = setup({ seed: 'empty' });
+    const service = createPlanService(makeDeps());
+    await service.refresh();
+    const t = await service.saveTreatment({
+      medicineId: null, name: 'Paracetamol', strength: '1 g', doseAmount: 1, doseUnit: 'comprimido', frequency: 'as_needed', daysOfWeek: null,
+      intervalDays: null, times: ['09:00'], startDate: TODAY, endDate: null, instructions: null, notes: null, remindersEnabled: true,
+      prescriptionConfirmed: true, source: 'manual',
+    });
+    await service.sync();
+    const saved = service.getState()!.treatments.find((x) => x.id === t.id)!;
+    expect(saved.frequency).toBe('as_needed');
+    expect(saved.times).toEqual([]);
+    expect(saved.remindersEnabled).toBe(false);
+    const event = await service.recordDose({ treatmentId: t.id, occurrenceDate: null, scheduledTime: null, kind: 'taken', source: 'app' });
+    await service.sync();
+    expect(event.kind).toBe('taken');
+    expect(await serverEvents(server)).toBe(1);
+    const stored = service.getState()!.events.find((e) => e.treatmentId === t.id)!;
+    expect(stored.occurrenceDate).toBeNull();
+    expect(stored.possibleDuplicate).toBe(false);
+  });
 });

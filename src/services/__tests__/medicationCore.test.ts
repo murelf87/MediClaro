@@ -22,6 +22,7 @@ import {
   occurrencesBetween,
   occurrencesForDate,
   planContextLines,
+  scheduleSummary,
   wantsPlanContext,
   type DoseEvent,
   type Treatment,
@@ -349,5 +350,19 @@ describe('cada X horas', () => {
     expect(timesEveryHours(5, '08:00')).toEqual([]);
     expect(timesEveryHours(8, '25:00')).toEqual([]);
     expect(timesEveryHours(0, '08:00')).toEqual([]);
+  });
+});
+
+describe('cuando lo necesite', () => {
+  const prn = treatment({ frequency: 'as_needed', times: [], remindersEnabled: false });
+  test('no programa tomas ni avisos y se describe con claridad', () => {
+    expect(isScheduledOn(prn, '2026-10-12')).toBe(false);
+    expect(occurrencesForDate([prn], '2026-10-12', MADRID)).toEqual([]);
+    expect(frequencyLabel(prn)).toBe('cuando lo necesites');
+    expect(scheduleSummary(prn)).toBe('cuando lo necesites (sin avisos)');
+    expect(planContextLines([prn])[0]).toContain('cuando lo necesites (sin avisos)');
+  });
+  test('las demás pautas siguen igual', () => {
+    expect(scheduleSummary(treatment({ times: ['08:00', '20:00'] }))).toBe('todos los días a las 08:00, 20:00');
   });
 });

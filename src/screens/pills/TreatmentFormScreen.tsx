@@ -109,8 +109,10 @@ function TreatmentFormScreen() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = 'Escribe el nombre del medicamento.';
-    if (sortedTimes.length === 0) e.times = 'Añade al menos una hora.';
-    if (sortedTimes.length !== times.length) e.times = 'Hay dos horas iguales: cambia o quita una.';
+    if (frequency !== 'as_needed') {
+      if (sortedTimes.length === 0) e.times = 'Añade al menos una hora.';
+      if (sortedTimes.length !== times.length) e.times = 'Hay dos horas iguales: cambia o quita una.';
+    }
     if (frequency === 'weekly' && days.length === 0) e.days = 'Elige al menos un día.';
     if (!confirmed) e.confirmed = 'Confirma que es la pauta que te indicó tu médico o farmacéutico.';
     setErrors(e);
@@ -132,12 +134,12 @@ function TreatmentFormScreen() {
         frequency,
         daysOfWeek: frequency === 'weekly' ? days : null,
         intervalDays: frequency === 'interval' ? every : null,
-        times: sortedTimes,
+        times: frequency === 'as_needed' ? [] : sortedTimes,
         startDate,
         endDate,
         instructions: instructions.trim() || null,
         notes: notes.trim() || null,
-        remindersEnabled: reminders,
+        remindersEnabled: frequency === 'as_needed' ? false : reminders,
         prescriptionConfirmed: confirmed,
         source: existing ? 'manual' : fromBox ? (param(params.source) as 'photo' | 'saved') : 'manual',
       });
@@ -146,7 +148,7 @@ function TreatmentFormScreen() {
         await MedicinePhotoService.save(`pill:${savedTreatment.id}`, photo.base64 ? { base64: photo.base64 } : { uri: photo.uri }).catch(() => undefined);
       }
       if (photo.kind === 'remove') await MedicinePhotoService.remove(`pill:${savedTreatment.id}`).catch(() => undefined);
-      if (reminders) {
+      if (reminders && frequency !== 'as_needed') {
         // Al guardar la primera pauta se piden los avisos (se puede cambiar en Ajustes).
         const permission = await requestReminderPermission().catch(() => 'unsupported' as const);
         if (permission === 'granted') await PillReminders.reschedule();
@@ -220,6 +222,7 @@ function TreatmentFormScreen() {
             { value: 'daily', label: 'Todos los días' },
             { value: 'weekly', label: 'Algunos días' },
             { value: 'interval', label: 'Cada X días' },
+            { value: 'as_needed', label: 'Cuando lo necesite' },
           ]}
           value={frequency}
           onChange={setFrequency}
@@ -244,6 +247,13 @@ function TreatmentFormScreen() {
         ) : null}
       </FormSection>
 
+      {frequency === 'as_needed' ? (
+        <FormSection title="Sin horas ni avisos" testID="pills-form-as-needed">
+          <AppText variant="body" color="textSecondary">
+            Lo tomas solo cuando lo necesitas. No sonará ninguna alarma: cuando te lo tomes, abre Mis pastillas y pulsa «La he tomado ahora» para que quede anotado.
+          </AppText>
+        </FormSection>
+      ) : (
       <FormSection title="¿A qué horas?" hint="Elige «Cada X horas» o pon tú las horas. Cada medicamento tiene sus propios avisos." testID="pills-form-times">
         <AppText variant="bodyStrong" color="heading">Calcular las horas por mí</AppText>
         <View style={styles.chips} testID="pills-form-hourly">
@@ -276,6 +286,7 @@ function TreatmentFormScreen() {
           ))}
         </View>
       </FormSection>
+      )}
 
       <FormSection title="¿Desde cuándo y hasta cuándo?">
         <View style={styles.chips}>
@@ -316,6 +327,7 @@ function TreatmentFormScreen() {
         <TextField label="Notas" optional value={notes} onChangeText={setNotes} maxLength={500} placeholder="Por ejemplo, me la recetó la Dra. Pérez" testID="pills-form-notes" />
       </FormSection>
 
+      {frequency !== 'as_needed' ? (
       <FormSection title="Avisos">
         <View style={[styles.switchRow, { borderColor: c.border, borderRadius: theme.radius.lg }]}>
           <Icon name="notifications" size={24} color={c.primary} />
@@ -325,6 +337,7 @@ function TreatmentFormScreen() {
           <Switch value={reminders} onValueChange={setReminders} accessibilityLabel="Avisarme a estas horas" testID="pills-form-reminders" />
         </View>
       </FormSection>
+      ) : null}
 
       <Pressable
         onPress={() => setConfirmed(!confirmed)}
