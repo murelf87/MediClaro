@@ -317,7 +317,7 @@ function watchAppState(): void {
   });
 }
 
-type OwnerFunction = 'owner_admin' | 'owner_reports' | 'owner_settings';
+type OwnerFunction = 'owner_admin' | 'owner_reports' | 'owner_settings' | 'owner_ai_usage';
 
 async function rpc<T>(action: string, payload: Record<string, unknown> = {}, fn: OwnerFunction = 'owner_admin'): Promise<T> {
   const { data, error } = await supabase.rpc(fn, { p_action: action, p_payload: payload });
@@ -326,6 +326,11 @@ async function rpc<T>(action: string, payload: Record<string, unknown> = {}, fn:
     // La bandeja de errores llegó después que el panel: si falta su migración, se dice exactamente eso.
     if (fn === 'owner_reports' && mapped.code === OWNER_NOT_DEPLOYED) {
       throw new AppError('not_configured', 'La bandeja de errores todavía no está activada en el servidor (falta aplicar su migración).', {
+        code: OWNER_NOT_DEPLOYED,
+      });
+    }
+    if (fn === 'owner_ai_usage' && mapped.code === OWNER_NOT_DEPLOYED) {
+      throw new AppError('not_configured', 'El contador de IA todavía no está activado en el servidor (falta aplicar su migración).', {
         code: OWNER_NOT_DEPLOYED,
       });
     }
@@ -593,7 +598,50 @@ export const OwnerAdminService = {
   async setVoiceBudget(limitUsd: number): Promise<VoiceBudget> {
     return parseVoiceBudget(await call<unknown>('budget_set', { limitUsd }, 'owner_settings'));
   },
+
+  // ─── «IA este mes» (cuánto se usa y cuánto cuesta, aproximado) ─────────────────────────────────────────
+  async aiUsage(): Promise<AiUsage> {
+    return parseAiUsage(await call<unknown>('month', {}, 'owner_ai_usage'));
+  },
 };
+
+export interface AiUsage {
+  month: string;
+  /** Preguntas al chat de IA este mes. */
+  chats: number;
+  /** Personas distintas que preguntaron. */
+  chatPeople: number;
+  /** Fotos de medicamentos analizadas. */
+  scans: number;
+  /** Coste estimado de la IA (texto y fotos) en euros. */
+  aiCostEur: number;
+  voiceChars: number;
+  voiceBlocked: number;
+  voiceUsd: number;
+  voiceLimitUsd: number;
+  /** Preguntas de las 5 personas que más preguntaron (sin nombres). */
+  topChats: number[];
+}
+
+export function parseAiUsage(value: unknown): AiUsage {
+  const v = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const num = (x: unknown) => {
+    const n = typeof x === 'string' ? Number(x) : x;
+    return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0;
+  };
+  return {
+    month: typeof v.month === 'string' ? v.month : '',
+    chats: Math.round(num(v.chats)),
+    chatPeople: Math.round(num(v.chatPeople)),
+    scans: Math.round(num(v.scans)),
+    aiCostEur: num(v.aiCostEur),
+    voiceChars: Math.round(num(v.voiceChars)),
+    voiceBlocked: Math.round(num(v.voiceBlocked)),
+    voiceUsd: num(v.voiceUsd),
+    voiceLimitUsd: num(v.voiceLimitUsd),
+    topChats: Array.isArray(v.topChats) ? v.topChats.slice(0, 5).map((n) => Math.round(num(n))) : [],
+  };
+}
 
 export interface VoiceBudget {
   /** Tope mensual en dólares. */

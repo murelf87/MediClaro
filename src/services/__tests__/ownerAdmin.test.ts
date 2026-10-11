@@ -11,7 +11,7 @@ jest.mock('../../lib/supabase', () => ({
 }));
 jest.mock('../../api/functions', () => ({ assertBackendConfigured: () => undefined, invokeFunction: jest.fn() }));
 
-import { OwnerAdminService, OWNER_NOT_DEPLOYED, ownerError, parseVoiceBudget, toCsv } from '../OwnerAdminService';
+import { OwnerAdminService, OWNER_NOT_DEPLOYED, ownerError, parseVoiceBudget, parseAiUsage, toCsv } from '../OwnerAdminService';
 import { OwnerPreview } from '../OwnerPreview';
 import { VoiceSettings } from '../VoiceSettings';
 import { createDemoOwner } from '../../mocks/demoOwner';
@@ -232,4 +232,26 @@ test('tope de la voz natural: se lee y se cambia con el panel abierto, con valor
   expect(limit).toBe(30);
   expect(parseVoiceBudget(null)).toEqual({ limitUsd: 25, spentUsd: 0, chars: 0, blocked: 0, month: '' });
   expect(parseVoiceBudget({ limitUsd: -5, spentUsd: 'x' }).limitUsd).toBe(25);
+});
+
+test('«IA este mes»: se lee con el panel abierto y se corrigen valores raros', async () => {
+  mockRpc.mockImplementation(async (name: string, args: { p_action: string; p_payload: Record<string, unknown> }) => {
+    if (name !== 'owner_ai_usage') return owner.rpc(name, args);
+    expect(args.p_action).toBe('month');
+    expect(String(args.p_payload.session)).toMatch(/^[0-9a-f]{64}$/);
+    return { data: { month: '2026-10', chats: 4, chatPeople: 2, scans: '2', aiCostEur: 0.0014, voiceChars: 100000, voiceBlocked: 0, voiceUsd: 3, voiceLimitUsd: 25, topChats: [3, 1] }, error: null };
+  });
+  await expect(OwnerAdminService.aiUsage()).rejects.toMatchObject({ code: 'OWNER_LOCKED' });
+  await OwnerAdminService.setupPin('482913', false);
+  expect(await OwnerAdminService.aiUsage()).toEqual({ month: '2026-10', chats: 4, chatPeople: 2, scans: 2, aiCostEur: 0.0014, voiceChars: 100000, voiceBlocked: 0, voiceUsd: 3, voiceLimitUsd: 25, topChats: [3, 1] });
+  expect(parseAiUsage(null)).toMatchObject({ chats: 0, aiCostEur: 0, topChats: [] });
+  expect(parseAiUsage({ chats: -3, topChats: 'x' })).toMatchObject({ chats: 0, topChats: [] });
+});
+
+test('«IA este mes» sin migración: se dice qué falta', async () => {
+  await OwnerAdminService.setupPin('482913', false);
+  mockRpc.mockImplementation(async (name: string, args: unknown) =>
+    name === 'owner_ai_usage' ? { data: null, error: { code: 'PGRST202', message: 'Could not find the function public.owner_ai_usage' } } : owner.rpc(name, args),
+  );
+  await expect(OwnerAdminService.aiUsage()).rejects.toMatchObject({ kind: 'not_configured', message: expect.stringMatching(/contador de IA/) });
 });

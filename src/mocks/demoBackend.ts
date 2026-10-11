@@ -517,6 +517,14 @@ export function createDemoBackend(opts: DemoBackendOptions = {}) {
         if (!ownerDemo) return { data: null, error: { message: 'OWNER_REQUIRED' } };
         return owner.rpc(name, _args);
       }
+      if (name === 'owner_ai_usage') {
+        if (!signedIn) return { data: null, error: { message: 'AUTH_REQUIRED' } };
+        if (!ownerDemo) return { data: null, error: { message: 'OWNER_REQUIRED' } };
+        return {
+          data: { month: '2026-10', chats: 128, chatPeople: 9, scans: 41, aiCostEur: 0.0412, voiceChars: 0, voiceBlocked: 0, voiceUsd: 0, voiceLimitUsd: 25, topChats: [34, 22, 17, 9, 6] },
+          error: null,
+        };
+      }
       // Voz de la app (panel › Configuración): se guarda en el app_config de la demostración.
       if (name === 'owner_settings') {
         if (!signedIn) return { data: null, error: { message: 'AUTH_REQUIRED' } };

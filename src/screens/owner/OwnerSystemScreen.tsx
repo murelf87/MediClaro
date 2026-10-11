@@ -18,6 +18,8 @@ export default function OwnerSystemScreen() {
   const narrow = useNarrow();
   const data = useAsync(() => OwnerAdminService.system(), []);
   const s = data.data;
+  const ai = useAsync(() => OwnerAdminService.aiUsage(), []);
+  const eur = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2 });
   const failed = s?.queues.reduce((n, q) => n + q.failed24h, 0) ?? 0;
   const issues = !!s && (failed > 0 || s.errors24h > 0);
   return (
@@ -52,6 +54,29 @@ export default function OwnerSystemScreen() {
             <OKpi icon="alert-circle" label="Avisos de ayuda activos" value={s.activeIncidents} wide={narrow} />
             <OKpi icon="megaphone" label="Aviso en la app" value={s.notice ? 'Activo' : 'Apagado'} wide={narrow} />
           </Grid>
+
+          <OSection title="IA este mes" />
+          {ai.data ? (
+            <>
+              <Grid>
+                <OKpi icon="chatbubbles" label="Preguntas al chat" value={ai.data.chats} hint={`${ai.data.chatPeople} personas`} wide={narrow} />
+                <OKpi icon="camera" label="Fotos analizadas" value={ai.data.scans} wide={narrow} />
+                <OKpi icon="sparkles" label="Coste de IA (estimado)" value={eur(ai.data.aiCostEur)} hint="Texto y fotos" wide={narrow} />
+                <OKpi
+                  icon="volume-high"
+                  label="Voz natural"
+                  value={`${ai.data.voiceUsd.toLocaleString('es-ES', { maximumFractionDigits: 2 })} $ de ${ai.data.voiceLimitUsd.toLocaleString('es-ES')} $`}
+                  hint={ai.data.voiceBlocked ? `${ai.data.voiceBlocked} lecturas con la voz del teléfono` : 'Sin llegar al tope'}
+                  wide={narrow}
+                />
+              </Grid>
+              {ai.data.topChats.length ? (
+                <AppText style={OT.meta} color="textSecondary">{`Preguntas de quienes más usan el chat: ${ai.data.topChats.join(', ')}. Sirve para ver si el límite diario es justo.`}</AppText>
+              ) : null}
+            </>
+          ) : ai.error ? (
+            <ONote>{ai.error.message}</ONote>
+          ) : null}
 
           <OSection title="Funciones del servidor" />
           <OCard style={{ gap: 2, paddingVertical: 8 }}>
