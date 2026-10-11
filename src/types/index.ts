@@ -400,8 +400,12 @@ export interface Caregiver {
 export interface PrivateAssistanceService {
   name: string;
   phone: string;
-  /** 'user' = configurado por el usuario en este teléfono; 'mediclaro' = central de MediClaro. */
-  source: 'user' | 'mediclaro';
+  /**
+   * 'user' = el que eligió la persona en este teléfono (su teleasistencia, un familiar…).
+   * 'example' = número de ejemplo, SOLO en el Modo demostración (la llamada es simulada).
+   * MediClaro no tiene central propia: nunca hay un servicio «de MediClaro».
+   */
+  source: 'user' | 'example';
 }
 
 export interface EmergencySharingPermissions {

@@ -230,7 +230,7 @@ export type QuickSymptomId = typeof QUICK_SYMPTOMS[number]['id'];
 // El propietario de MediClaro la modifica desde el dashboard sin recompilar.
 
 export interface EmergencyConfig {
-  /** Nombre visible del servicio de asistencia principal (ej: "Central MediClaro") */
+  /** Nombre visible del servicio de asistencia (solo el de ejemplo del Modo demostración: MediClaro no tiene central). */
   primaryAssistanceName: string;
   /** Número al que se llama al pulsar el botón principal. Vacío = no configurado. */
   primaryAssistanceNumber: string;
@@ -238,13 +238,13 @@ export interface EmergencyConfig {
   countryEmergencyNumber: string;
   /**
    * Arquitectura futura: anulaciones por región, idioma, suscripción, horario.
-   * Ejemplo: { "PT": { primaryAssistanceName: "Central MediClaro Portugal", ... } }
+   * Ejemplo: { "PT": { countryEmergencyNumber: "112", ... } }
    */
   regionOverrides?: Record<string, Partial<EmergencyConfig>>;
 }
 
 export const DEFAULT_EMERGENCY_CONFIG: EmergencyConfig = {
-  primaryAssistanceName:  'Central MediClaro',
+  primaryAssistanceName:  'Servicio de asistencia',
   primaryAssistanceNumber: '',       // Sin configurar hasta que el propietario lo establezca
   countryEmergencyNumber: '112',
 };

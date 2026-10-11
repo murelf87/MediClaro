@@ -9,7 +9,7 @@
  * ┌─────────────────────────────────────────────────────────────────┐
  * │  Supabase: app_config (key='emergency')                        │
  * │  {                                                              │
- * │    "primaryAssistanceName": "Central MediClaro",               │
+ * │    "primaryAssistanceName": "Servicio de asistencia",          │
  * │    "primaryAssistanceNumber": "+34XXXXXXXXX",                  │
  * │    "countryEmergencyNumber": "112",                            │
  * │    "regionOverrides": {                                         │

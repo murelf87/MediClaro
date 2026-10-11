@@ -150,7 +150,7 @@ export default function PrivateAssistanceScreen() {
         </Card>
       );
     }
-    if (current?.source === 'mediclaro') {
+    if (current?.source === 'example') {
       return (
         <Card padding={theme.spacing.lg}>
           <AppText variant="captionStrong" color="textSecondary" style={styles.upper}>

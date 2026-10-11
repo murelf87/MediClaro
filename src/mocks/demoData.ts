@@ -326,7 +326,7 @@ export const demoPlanConfig = [
 ];
 
 export const demoEmergencyConfig = {
-  primaryAssistanceName: 'Central MediClaro (demo)',
+  primaryAssistanceName: 'Teleasistencia de ejemplo',
   primaryAssistanceNumber: '+34900000000',
   countryEmergencyNumber: '112',
   regionOverrides: {},

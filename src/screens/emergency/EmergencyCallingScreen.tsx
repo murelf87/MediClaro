@@ -240,7 +240,7 @@ export default function EmergencyCallingScreen() {
       </View>
 
       {assistance.simulated ? (
-        <DemoNotice message="Modo demostración: la llamada a la central de ejemplo es simulada." style={{ marginTop: theme.spacing.md }} />
+        <DemoNotice message="Modo demostración: la llamada a la teleasistencia de ejemplo es simulada." style={{ marginTop: theme.spacing.md }} />
       ) : null}
 
       <View style={[styles.checks, { gap: theme.spacing.xxs, marginTop: theme.spacing.lg }]}>

@@ -366,8 +366,9 @@ export const EmergencyService = {
   },
 
   /**
-   * Servicio privado de asistencia: primero el que eligió el usuario en este
-   * teléfono; si no hay, la central de MediClaro (si el propietario la configuró).
+   * Servicio privado de asistencia: el que eligió la persona en este teléfono (su teleasistencia, un familiar…).
+   * MediClaro NO tiene central propia ni atiende llamadas: nunca se ofrece un número «de MediClaro», aunque el
+   * servidor tenga uno configurado. Solo en el Modo demostración se usa uno de ejemplo (la llamada es simulada).
    */
   async getPrivateAssistanceNumber(): Promise<PrivateAssistanceService | null> {
     const extras = await readExtras();
@@ -378,9 +379,10 @@ export const EmergencyService = {
         source: 'user',
       };
     }
+    if (!DemoMode.isActive()) return null;
     const config = await withTimeout(emergencyConfigService.getConfig(), 2500, null);
     if (config?.primaryAssistanceNumber?.trim()) {
-      return { name: config.primaryAssistanceName, phone: config.primaryAssistanceNumber.trim(), source: 'mediclaro' };
+      return { name: config.primaryAssistanceName, phone: config.primaryAssistanceNumber.trim(), source: 'example' };
     }
     return null;
   },
@@ -455,7 +457,7 @@ export const EmergencyService = {
     const service = await EmergencyService.getPrivateAssistanceNumber();
     if (!service) return 'not_configured';
     // Modo demostración: se simula la llamada al servicio privado (el número es de ejemplo).
-    if (DemoMode.isActive() && service.source === 'mediclaro') return 'success';
+    if (DemoMode.isActive() && service.source === 'example') return 'success';
     const outcome = await callPrimaryAssistance({
       primaryAssistanceName: service.name,
       primaryAssistanceNumber: service.phone,
@@ -466,11 +468,11 @@ export const EmergencyService = {
     return 'failed';
   },
 
-  /** ¿La llamada al servicio privado es simulada? (modo demostración con la central de ejemplo) */
+  /** ¿La llamada al servicio privado es simulada? (Modo demostración con el número de ejemplo) */
   async isPrivateCallSimulated(): Promise<boolean> {
     if (!DemoMode.isActive()) return false;
     const service = await EmergencyService.getPrivateAssistanceNumber();
-    return service?.source === 'mediclaro';
+    return service?.source === 'example';
   },
 
   /** Llama al número oficial de emergencias. Siempre disponible (también en demostración). */
