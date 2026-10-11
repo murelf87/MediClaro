@@ -176,8 +176,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   const [draft, setDraft] = useState('');
   const [focused, setFocused] = useState(false);
 
-  // Cada respuesta nueva del asistente se reproduce sola con la voz natural elegida (no hay botón «Escuchar»;
-  // mientras suena aparece «Detener»).
+  // Cada respuesta nueva del asistente se reproduce sola con la voz elegida; mientras suena aparece «Detener» y,
+  // cuando acaba, «Repetir explicación» para volver a oírla.
   useEffect(() => {
     const after = autoSpeakAfterRef.current;
     if (after === null) return;
@@ -405,7 +405,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
           <AssistantBubble
             message={item.message}
             animate={animate}
-            speaking={speakingId === item.message.id}
+            speaking={speakingId === item.message.id || loadingId === item.message.id}
             onToggleSpeak={() => toggleSpeak(item.message)}
             onOpenSource={item.message.sourceUrl ? () => void openSource(item.message.sourceUrl as string) : undefined}
           />
@@ -706,7 +706,16 @@ function AssistantBubble({
       </Pressable>
       <View style={styles.actions}>
         {speaking ? (
-          <TextButton label="Detener" icon="stop-circle-outline" onPress={onToggleSpeak} align="flex-start" />
+          <TextButton label="Detener" icon="stop-circle-outline" onPress={onToggleSpeak} align="flex-start" testID="assistant-stop" />
+        ) : done && message.text.trim() ? (
+          <TextButton
+            label="Repetir explicación"
+            icon="refresh"
+            onPress={onToggleSpeak}
+            align="flex-start"
+            testID="assistant-repeat"
+            accessibilityHint="Vuelve a leer la respuesta en voz alta"
+          />
         ) : null}
         {onOpenSource ? (
           <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={onOpenSource} align="flex-start" />
