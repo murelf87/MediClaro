@@ -1,0 +1,34 @@
+name: Diagnóstico de la voz (servidor)
+
+# Pide una prueba de voz a la función pública tts-preview (la misma que «Probar» en Accesibilidad) y muestra qué
+# responde: si va bien, el modelo; si falla, el código que devuelve Google (TTS_UPSTREAM_429 = cuota agotada,
+# 403 = clave no válida, 404 = modelo retirado…). Solo valores PÚBLICOS. Ningún secreto. Se lanza a mano.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  voz:
+    name: Probar la voz natural en el servidor
+    steps:
+      - name: Llamar a tts-preview (Sulafat y Achird)
+        run: |
+          node -e '
+          const url = "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/tts-preview";
+          const key = "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf";
+          const text = "Hola. Soy la voz de MediClaro. Te acompañaré con una lectura clara, natural y tranquila.";
+          (async () => {
+            for (const voice of ["Sulafat", "Achird"]) {
+              const t0 = Date.now();
+              try {
+                const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", apikey: key }, body: JSON.stringify({ text, voice, purpose: "preview" }) });
+                const body = await r.json().catch(() => ({}));
+                const secs = ((Date.now() - t0) / 1000).toFixed(1);
+                if (body.audioBase64) console.log(`${voice}: BIEN · HTTP ${r.status} · ${secs} s · modelo ${body.model} · ${Math.round(body.audioBase64.length * 0.75 / 1024)} KB`);
+                else console.log(`${voice}: FALLA · HTTP ${r.status} · ${secs} s · ${JSON.stringify(body)}`);
+              } catch (e) {
+                console.log(`${voice}: SIN RESPUESTA · ${e.message}`);
+              }
+            }
+          })();
+          '
