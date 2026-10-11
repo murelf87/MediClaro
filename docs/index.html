@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MediClaro · MediClaro</title>
+<meta name="description" content="MediClaro de MediClaro, la app que explica tus medicamentos con palabras sencillas.">
+<style>
+:root{--bg:#f7fafc;--card:#ffffff;--text:#172033;--muted:#4b5565;--brand:#0f4c81;--line:#dce7f0;--accent:#0f6cbd}
+@media (prefers-color-scheme:dark){:root{--bg:#0d1520;--card:#142131;--text:#e8eef5;--muted:#a9b6c6;--brand:#8cc4ff;--line:#24364b;--accent:#8cc4ff}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:19px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+a{color:var(--accent)}
+header{background:var(--card);border-bottom:1px solid var(--line)}
+.wrap{max-width:760px;margin:0 auto;padding-left:18px;padding-right:18px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-top:16px;padding-bottom:16px}
+.brand{font-weight:800;font-size:1.25rem;color:var(--brand);text-decoration:none;margin-right:auto}
+nav a{text-decoration:none;font-weight:600;padding:6px 2px}
+nav a[aria-current="page"]{color:var(--text);border-bottom:3px solid var(--brand)}
+main{padding-top:28px;padding-bottom:40px}
+h1{font-size:1.9rem;line-height:1.25;color:var(--brand);margin:0 0 8px}
+h2{font-size:1.25rem;margin:30px 0 8px}
+p,li{max-width:70ch}
+ul{padding-left:1.2em}
+li{margin:6px 0}
+.note{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:18px 0}
+footer{border-top:1px solid var(--line);color:var(--muted);font-size:.9rem;padding-top:18px;padding-bottom:34px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <a class="brand" href="index.html">MediClaro</a>
+    <nav aria-label="Páginas">
+        <a href="privacidad.html">Privacidad</a>
+        <a href="condiciones.html">Condiciones</a>
+        <a href="aviso-legal.html">Aviso legal</a>
+        <a href="soporte.html">Ayuda</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+<h1>MediClaro</h1>
+
+<p>MediClaro ayuda a las personas mayores a saber qué medicamento tienen en la mano: con una foto de la caja, explica la información oficial del medicamento con palabras sencillas y en voz alta.</p>
+<ul>
+<li><a href="privacidad.html">Política de privacidad</a></li>
+<li><a href="condiciones.html">Condiciones de uso y de la suscripción</a></li>
+<li><a href="aviso-legal.html">Aviso legal</a></li>
+<li><a href="soporte.html">Ayuda y contacto</a></li>
+</ul>
+<div class="note">La información de los medicamentos procede del Centro de Información online de Medicamentos (CIMA) de la AEMPS. MediClaro no sustituye a tu médico ni a tu farmacéutico. En una emergencia, llama al 112.</div>
+
+</main>
+<footer class="wrap">
+  <p>Última actualización: 9 de octubre de 2026. Los mismos textos se pueden leer dentro de la app: Perfil › Información legal.</p>
+</footer>
+</body>
+</html>
