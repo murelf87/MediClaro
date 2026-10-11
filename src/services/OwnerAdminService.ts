@@ -16,6 +16,7 @@ import { requireUserId } from '../api';
 import { AppError, toAppError } from '../api/errors';
 import { AppNoticeService } from './AppNoticeService';
 import { OwnerPreview } from './OwnerPreview';
+import { VoiceSettings, parseVoiceMode, type VoiceMode } from './VoiceSettings';
 
 export type OwnerPlan = 'owner' | 'paid' | 'courtesy' | 'free';
 
@@ -316,7 +317,7 @@ function watchAppState(): void {
   });
 }
 
-type OwnerFunction = 'owner_admin' | 'owner_reports';
+type OwnerFunction = 'owner_admin' | 'owner_reports' | 'owner_settings';
 
 async function rpc<T>(action: string, payload: Record<string, unknown> = {}, fn: OwnerFunction = 'owner_admin'): Promise<T> {
   const { data, error } = await supabase.rpc(fn, { p_action: action, p_payload: payload });
@@ -325,6 +326,11 @@ async function rpc<T>(action: string, payload: Record<string, unknown> = {}, fn:
     // La bandeja de errores llegó después que el panel: si falta su migración, se dice exactamente eso.
     if (fn === 'owner_reports' && mapped.code === OWNER_NOT_DEPLOYED) {
       throw new AppError('not_configured', 'La bandeja de errores todavía no está activada en el servidor (falta aplicar su migración).', {
+        code: OWNER_NOT_DEPLOYED,
+      });
+    }
+    if (fn === 'owner_settings' && mapped.code === OWNER_NOT_DEPLOYED) {
+      throw new AppError('not_configured', 'La elección de la voz todavía no está activada en el servidor (falta aplicar su migración).', {
         code: OWNER_NOT_DEPLOYED,
       });
     }
@@ -564,6 +570,19 @@ export const OwnerAdminService = {
   report: (id: string) => call<OwnerReport>('get', { id }, 'owner_reports'),
   setReportStatus: (id: string, status: 'read' | 'resolved', note?: string) =>
     call<OwnerReport>('set_status', note === undefined ? { id, status } : { id, status, note }, 'owner_reports'),
+
+  // ─── Voz de la app (para todas las personas) ───────────────────────────────────────────────────────────
+  async voiceMode(): Promise<VoiceMode> {
+    const r = await call<{ mode?: unknown }>('voice_get', {}, 'owner_settings');
+    return parseVoiceMode(r);
+  },
+  /** Cambia la voz de toda la app. En este móvil se aplica al momento; en los demás, al abrir la app. */
+  async setVoiceMode(mode: VoiceMode): Promise<VoiceMode> {
+    const r = await call<{ mode?: unknown }>('voice_set', { mode }, 'owner_settings');
+    const saved = parseVoiceMode(r);
+    VoiceSettings.apply(saved);
+    return saved;
+  },
 };
 
 /** CSV para Excel/Números (separador «;», comillas y BOM para los acentos). */

@@ -6,7 +6,7 @@
  * Toda la explicación es UN único audio continuo con Sulafat (sin cortes entre apartados ni palabras partidas).
  * La lectura se detiene al salir (lo hace useGeminiContinuousSpeech).
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import {
@@ -24,6 +24,7 @@ import {
 } from '../../components';
 import { useAppTheme, useAsync, usePreferences, useGeminiContinuousSpeech } from '../../hooks';
 import { DemoMode, MedicationService } from '../../services';
+import { VoiceSettings } from '../../services/VoiceSettings';
 import { endWithPause, limitSpeechParts } from '../../utils/speechText';
 import {
   SPEED_RATES,
@@ -67,7 +68,10 @@ export default function VoiceScreen() {
   const audioParts = reading.parts;
   const demo = DemoMode.isActive();
   // Toda la explicación se prepara y reproduce como un único audio continuo con Sulafat.
-  const speech = useGeminiContinuousSpeech(audioParts, prefs.speechRate, 'Sulafat');
+  // Voz natural: siempre Sulafat (la más clara). Voz del teléfono (si el propietario la eligió para toda la app): de
+  // mujer o de hombre, como la que eligió la persona en Accesibilidad.
+  const deviceVoice = useSyncExternalStore(VoiceSettings.subscribe, VoiceSettings.mode, VoiceSettings.mode) === 'device';
+  const speech = useGeminiContinuousSpeech(audioParts, prefs.speechRate, deviceVoice ? prefs.assistantVoice : 'Sulafat');
 
   const playing = speech.status === 'speaking';
   const loading = speech.status === 'loading';

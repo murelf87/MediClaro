@@ -13,6 +13,7 @@ jest.mock('../../api/functions', () => ({ assertBackendConfigured: () => undefin
 
 import { OwnerAdminService, OWNER_NOT_DEPLOYED, ownerError, toCsv } from '../OwnerAdminService';
 import { OwnerPreview } from '../OwnerPreview';
+import { VoiceSettings } from '../VoiceSettings';
 import { createDemoOwner } from '../../mocks/demoOwner';
 import { __emitAppState } from '../emergency/__mocks__/react-native';
 import { __reset as resetSecureStore, __setBiometrics, getItemAsync, setItemAsync } from '../emergency/__mocks__/expo-secure-store';
@@ -188,4 +189,30 @@ test('cerrar el panel termina también la vista previa «Ver la app como…»', 
   OwnerPreview.set('caregiver');
   OwnerAdminService.clear(); // al cerrar sesión: el panel ya estaba cerrado, pero la vista previa también se va
   expect(OwnerPreview.isActive()).toBe(false);
+});
+
+test('voz de la app: la elige el propietario con el panel abierto y en su móvil se aplica al momento', async () => {
+  let serverMode = 'natural';
+  mockRpc.mockImplementation(async (name: string, args: { p_action: string; p_payload: Record<string, unknown> }) => {
+    if (name !== 'owner_settings') return owner.rpc(name, args);
+    expect(String(args.p_payload.session)).toMatch(/^[0-9a-f]{64}$/);
+    if (args.p_action === 'voice_set') serverMode = String(args.p_payload.mode);
+    return { data: { mode: serverMode }, error: null };
+  });
+  await expect(OwnerAdminService.voiceMode()).rejects.toMatchObject({ code: 'OWNER_LOCKED' });
+  await OwnerAdminService.setupPin('482913', false);
+  expect(await OwnerAdminService.voiceMode()).toBe('natural');
+  expect(await OwnerAdminService.setVoiceMode('device')).toBe('device');
+  expect(serverMode).toBe('device');
+  expect(VoiceSettings.mode()).toBe('device');
+  VoiceSettings.__reset();
+});
+
+test('voz de la app sin activar en el servidor: se dice exactamente qué falta', async () => {
+  await OwnerAdminService.setupPin('482913', false);
+  mockRpc.mockImplementation(async (name: string, args: unknown) =>
+    name === 'owner_settings' ? { data: null, error: { code: 'PGRST202', message: 'Could not find the function public.owner_settings' } } : owner.rpc(name, args),
+  );
+  await expect(OwnerAdminService.voiceMode()).rejects.toMatchObject({ kind: 'not_configured', message: expect.stringMatching(/elección de la voz/) });
+  expect(OwnerAdminService.isUnlocked()).toBe(true);
 });

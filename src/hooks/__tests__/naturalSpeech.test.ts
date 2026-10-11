@@ -14,14 +14,17 @@ jest.mock('expo-audio',()=>({createAudioPlayer:()=>mockPlayer}),{virtual:true});
 const mockReport=jest.fn(async()=>({ref:'E-TEST1'}));
 jest.mock('../../services/ProblemReportService',()=>({ProblemReportService:{send:(...a:any[])=>mockReport(...a)}}));
 import * as Speech from 'expo-speech';
-import { DEVICE_FALLBACK_INTRO, useGeminiSectionSpeech, useGeminiSimpleSpeech } from '../useSpeech';
+import { DEVICE_FALLBACK_INTRO, useGeminiContinuousSpeech, useGeminiSectionSpeech, useGeminiSimpleSpeech } from '../useSpeech';
+import { VoiceSettings } from '../../services/VoiceSettings';
 import { __resetVoiceDiagnostics, clearVoiceFailure, lastVoiceFailure } from '../../services/VoiceDiagnostics';
 let output:any;let tree:any;
 const sections=[{id:'a',title:'A',text:'one'},{id:'b',title:'B',text:'two'}];
-function Probe({voice='Sulafat',simple=false}:any){output=simple?useGeminiSimpleSpeech():useGeminiSectionSpeech(sections,0.85,voice);return null;}
+const readingParts=['Qué es. Un analgésico.','Para qué sirve. Para el dolor.'];
+function Probe({voice='Sulafat',simple=false,continuous=false}:any){output=continuous?useGeminiContinuousSpeech(readingParts,0.85,voice):simple?useGeminiSimpleSpeech():useGeminiSectionSpeech(sections,0.85,voice);return null;}
 async function mount(props:any={}){await act(async()=>{tree=create(React.createElement(Probe,props));});}
 beforeEach(()=>{jest.spyOn(Speech, 'speak').mockImplementation(()=>undefined as any);jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue([{identifier:'es-premium',name:'Spanish',language:'es-ES',quality:'Enhanced' as any}]);(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;mockSynthesize.mockReset();mockConfigure.mockReset().mockResolvedValue(undefined);mockReport.mockClear();__resetVoiceDiagnostics();[mockPlayer.play,mockPlayer.pause,mockPlayer.remove,mockPlayer.addListener,mockPlayer.setPlaybackRate].forEach((f:any)=>f.mockClear());});
 beforeEach(async()=>{await clearVoiceFailure();});
+afterEach(()=>VoiceSettings.__reset());
 afterEach(async()=>{if(tree)await act(async()=>tree.unmount());tree=null;jest.restoreAllMocks();jest.useRealTimers();});
 describe('Natural speech lifecycle',()=>{
  test('preparation is loading; speaking requires real playback',async()=>{
@@ -136,5 +139,52 @@ describe('Natural speech lifecycle',()=>{
   mockSynthesize.mockResolvedValue({uri:'a.wav',cleanup:jest.fn()});await mount();await act(async()=>output.play());
   expect(mockPlayer.setPlaybackRate).toHaveBeenCalled();expect(mockPlayer.play).toHaveBeenCalled();
   await act(async()=>mockListener({playing:true}));expect(output.status).toBe('speaking');
+ });
+ test('voz del teléfono para toda la app (elegida en el panel): el asistente no pide nada al servidor',async()=>{
+  VoiceSettings.apply('device');
+  await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Sulafat','assistant'));
+  expect(mockSynthesize).not.toHaveBeenCalled();
+  expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'es-premium'}));
+  expect(output.speakingId).toBe('x');
+ });
+ test('voz del teléfono: las pruebas de voz suenan directamente con ella, sin el aviso de «no ha respondido»',async()=>{
+  VoiceSettings.apply('device');
+  await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Achird','preview'));
+  expect(mockSynthesize).not.toHaveBeenCalled();
+  expect((Speech.speak as jest.Mock).mock.calls[0][0]).toBe('hola');
+ });
+ test('voz del teléfono: la lectura de un medicamento se lee apartado a apartado, con progreso',async()=>{
+  VoiceSettings.apply('device');
+  await mount({continuous:true});await act(async()=>output.play());
+  expect(mockSynthesize).not.toHaveBeenCalled();
+  expect(output.status).toBe('speaking');
+  expect(output.duration).toBeGreaterThan(0);
+  const first=(Speech.speak as jest.Mock).mock.calls[0];
+  expect(first[0]).toBe('Qué es. Un analgésico.');
+  await act(async()=>first[1].onDone());
+  expect((Speech.speak as jest.Mock).mock.calls[1][0]).toBe('Para qué sirve. Para el dolor.');
+  await act(async()=>output.pause());expect(output.status).toBe('paused');
+  await act(async()=>output.play());expect(output.status).toBe('speaking');
+  const last=(Speech.speak as jest.Mock).mock.calls.at(-1);
+  await act(async()=>last[1].onDone());
+  expect(output.status).toBe('finished');expect(output.progress).toBe(1);
+ });
+ test('voz de hombre (Achird): si la voz natural falla, también se lee con una voz de hombre del teléfono',async()=>{
+  jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([
+   {identifier:'com.apple.voice.premium.es-ES.Marisol',name:'Marisol',language:'es-ES',quality:'Default' as any},
+   {identifier:'com.apple.voice.compact.es-ES.Jorge',name:'Jorge',language:'es-ES',quality:'Default' as any}]);
+  mockSynthesize.mockRejectedValue(new Error('HTTP 429'));await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Achird','assistant'));
+  expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'com.apple.voice.compact.es-ES.Jorge'}));
+ });
+ test('voz del teléfono para toda la app: cada persona sigue oyendo voz de mujer o de hombre, la que eligió',async()=>{
+  VoiceSettings.apply('device');
+  jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([
+   {identifier:'com.apple.voice.premium.es-ES.Marisol',name:'Marisol',language:'es-ES',quality:'Default' as any},
+   {identifier:'com.apple.voice.compact.es-ES.Jorge',name:'Jorge',language:'es-ES',quality:'Default' as any}]);
+  await mount({simple:true});
+  await act(async()=>output.speak('x','hola',0.85,'Sulafat','assistant'));
+  expect((Speech.speak as jest.Mock).mock.calls.at(-1)[1].voice).toBe('com.apple.voice.premium.es-ES.Marisol');
+  await act(async()=>output.speak('y','adiós',0.85,'Achird','assistant'));
+  expect((Speech.speak as jest.Mock).mock.calls.at(-1)[1].voice).toBe('com.apple.voice.compact.es-ES.Jorge');
  });
 });

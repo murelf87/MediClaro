@@ -517,6 +517,24 @@ export function createDemoBackend(opts: DemoBackendOptions = {}) {
         if (!ownerDemo) return { data: null, error: { message: 'OWNER_REQUIRED' } };
         return owner.rpc(name, _args);
       }
+      // Voz de la app (panel › Configuración): se guarda en el app_config de la demostración.
+      if (name === 'owner_settings') {
+        if (!signedIn) return { data: null, error: { message: 'AUTH_REQUIRED' } };
+        if (!ownerDemo) return { data: null, error: { message: 'OWNER_REQUIRED' } };
+        const args = (_args ?? {}) as { p_action?: string; p_payload?: Row };
+        const rows = db.app_config ?? (db.app_config = []);
+        const row = rows.find((r) => r.key === 'voice');
+        const current = (row?.value as { mode?: string } | undefined)?.mode === 'device' ? 'device' : 'natural';
+        if (args.p_action === 'voice_get') return { data: { mode: current }, error: null };
+        if (args.p_action === 'voice_set') {
+          const mode = args.p_payload?.mode;
+          if (mode !== 'natural' && mode !== 'device') return { data: null, error: { message: 'INVALID_REQUEST' } };
+          if (row) row.value = { mode };
+          else rows.push({ key: 'voice', value: { mode } });
+          return { data: { mode }, error: null };
+        }
+        return { data: null, error: { message: 'INVALID_REQUEST' } };
+      }
       // «Notifícanos un error» (Ayuda): con y sin cuenta; llega a la bandeja del panel de la demostración.
       if (name === 'report_problem') return owner.submitReport(signedIn ? DEMO_USER_ID : null, _args);
       // Aviso general (lo pone el propietario desde su panel).

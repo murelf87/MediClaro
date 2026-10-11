@@ -2,8 +2,9 @@
  * Alarma y voz del aviso de una toma (con la app en primer plano):
  *  - `ring()`: el sonido de ALARMA de MediClaro (el mismo de los avisos del teléfono), una vez, como un despertador;
  *  - `speak()`: la voz natural del asistente que la persona eligió (Sulafat o Achird). Si la voz natural no está
- *    disponible (sin conexión, Modo demostración), el aviso NO se queda mudo: se lee con la voz del teléfono, en
- *    español y sin mostrar ningún mensaje que interrumpa.
+ *    disponible (sin conexión, Modo demostración), el aviso NO se queda mudo: se lee con la mejor voz en español del
+ *    teléfono, sin mostrar ningún mensaje que interrumpa. Si el propietario eligió «la voz del teléfono» para toda
+ *    la app (panel › Configuración › Voz de la app), se lee directamente con ella.
  * La voz nunca suena sola con la app cerrada (iOS y Android no lo permiten): ahí avisa el sonido de alarma del aviso.
  */
 import { useCallback, useEffect, useRef } from 'react';
@@ -13,6 +14,8 @@ import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audi
 import { DemoMode, SpeechService, type GeminiVoice } from '../services';
 import { configureAudioForSpeech } from '../utils/audio';
 import { applyPlaybackRate, naturalPlaybackRate } from '../utils/playbackRate';
+import { genderOfVoice, speakOnDevice } from '../utils/deviceSpeech';
+import { VoiceSettings } from '../services/VoiceSettings';
 
 /* eslint-disable-next-line @typescript-eslint/no-require-imports */
 const ALARM = require('../../assets/sounds/mediclaro_alarma.wav');
@@ -76,10 +79,11 @@ export function useReminderVoice() {
       const my = token.current;
       const deviceVoice = () => {
         if (my !== token.current) return;
-        Speech.speak(text, { language: 'es-ES', rate: Math.max(0.6, Math.min(1, rate)) });
+        void speakOnDevice(text, Math.max(0.6, Math.min(1, rate)), () => my === token.current, {}, genderOfVoice(voice)).catch(() => undefined);
       };
-      // En la web (pruebas) y en el Modo demostración no hay voz natural para cualquier texto: voz del dispositivo.
-      if (DemoMode.isActive() || Platform.OS === 'web') {
+      // En la web (pruebas), en el Modo demostración y si la app usa la voz del teléfono: voz del dispositivo.
+      if (DemoMode.isActive() || Platform.OS === 'web' || VoiceSettings.mode() === 'device') {
+        if (Platform.OS !== 'web') await configureAudioForSpeech();
         deviceVoice();
         return;
       }

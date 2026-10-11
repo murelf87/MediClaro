@@ -183,6 +183,13 @@ export function describeAudit(row: OwnerAuditRow): { icon: IconName; color: Tile
       return { icon: 'checkmark-done-outline', color: 'green', title: 'Error notificado resuelto', detail: str('ref') ?? '' };
     case 'owner_report_reopened':
       return { icon: 'refresh-outline', color: 'amber', title: 'Error notificado reabierto', detail: str('ref') ?? '' };
+    case 'owner_voice_mode':
+      return {
+        icon: 'volume-high-outline',
+        color: 'blue',
+        title: 'Voz de la app cambiada',
+        detail: str('to') === 'device' ? 'Ahora: voz del teléfono' : 'Ahora: voz natural',
+      };
     case 'admin_config_changed':
       return { icon: 'settings-outline', color: 'teal', title: 'Configuración cambiada', detail: '' };
     default:

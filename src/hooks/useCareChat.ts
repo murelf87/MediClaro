@@ -19,7 +19,7 @@ import { CareChatService, type CareChatMessage, type CareConversation } from '..
 import { DemoMode } from '../services/DemoMode';
 import { AppError, toAppError } from '../api/errors';
 import { mergeChat, sortChat, type ChatItem } from '../utils/chatTimeline';
-import { speakOnDevice } from '../utils/deviceSpeech';
+import { genderOfVoice, speakOnDevice } from '../utils/deviceSpeech';
 
 export type { ChatItem, ChatItemStatus } from '../utils/chatTimeline';
 
@@ -238,11 +238,13 @@ export function useChatReader() {
       if (my === token.current) setDeviceId(null);
     };
     setDeviceId(id);
-    void speakOnDevice(text, Math.max(0.6, Math.min(1.1, prefs.speechRate)), () => my === token.current, {
-      onDone: done,
-      onStopped: done,
-      onError: done,
-    }).catch(done);
+    void speakOnDevice(
+      text,
+      Math.max(0.6, Math.min(1.1, prefs.speechRate)),
+      () => my === token.current,
+      { onDone: done, onStopped: done, onError: done },
+      genderOfVoice(prefs.assistantVoice),
+    ).catch(done);
   }, [stop, useNatural, naturalSpeak, prefs.speechRate, prefs.assistantVoice]);
 
   useEffect(() => () => stop(), [stop]);

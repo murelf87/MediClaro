@@ -3,8 +3,11 @@
  * Todo se aplica al instante (usePreferences) y se sincroniza con el perfil cuando hay conexión.
  * Voces: al tocar una voz suena una muestra con esa voz. Elegir voces es parte de Premium (un perfil de
  * cuidador/a gratuito no puede elegirlas: se le explica por qué).
+ * Si el propietario eligió «la voz del teléfono» para toda la app (panel › Configuración › Voz de la app), no se
+ * eligen voces: se explica que se usa la voz del móvil y se puede probar.
  */
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useSyncExternalStore } from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   AppHeader,
@@ -18,7 +21,8 @@ import {
   SegmentedControl,
   SettingRow,
 } from '../../components';
-import { useAppTheme, useCareSnapshot, useEntitlement, usePreferences, useGeminiSimpleSpeech } from '../../hooks';
+import { useAppTheme, useAsync, useCareSnapshot, useEntitlement, usePreferences, useGeminiSimpleSpeech } from '../../hooks';
+import { hasDeviceVoice, installedVoices } from '../../utils/deviceSpeech';
 import { FONT_SIZE_LABELS, fontScale, typeScale } from '../../theme';
 import type { FontSizePreference } from '../../types';
 import type { GeminiVoice } from '../../services';
@@ -26,6 +30,7 @@ import { TOUR_VOICE } from '../../config/tour';
 import { VOICE_PREVIEW_TEXTS } from '../../config/voicePreviews';
 import { ASSISTANT_NAME } from '../../config/assistant';
 import { RadioMark } from '../premium/parts';
+import { VoiceSettings } from '../../services/VoiceSettings';
 
 const SIZE_OPTIONS: FontSizePreference[] = ['normal', 'grande', 'muy_grande'];
 
@@ -42,6 +47,11 @@ const VOICE_TEST_TEXT = VOICE_PREVIEW_TEXTS.readingTest;
 const VOICE_OPTIONS: { value: GeminiVoice; label: string }[] = [
   { value: 'Sulafat', label: 'Sulafat · cálida' },
   { value: 'Achird', label: 'Achird · amigable' },
+];
+/** Con la voz del teléfono se elige igual: mujer (la preferencia Sulafat) u hombre (Achird). */
+const GENDER_OPTIONS: { value: GeminiVoice; label: string }[] = [
+  { value: 'Sulafat', label: 'Mujer' },
+  { value: 'Achird', label: 'Hombre' },
 ];
 
 /** La velocidad guardada puede venir del servidor con otro valor: se muestra la opción más cercana. */
@@ -68,6 +78,13 @@ export default function AccessibilityScreen() {
   const { caregiver } = useCareSnapshot();
   // Mismo criterio que el Inicio: solo se bloquea cuando se sabe que no tiene Premium.
   const voicesLocked = entitlement.required && entitlement.status === 'ready' && !entitlement.isPremium;
+  // Voz de toda la app (la elige el propietario en su panel): natural (Sulafat/Achird) o la del teléfono.
+  const deviceVoice = useSyncExternalStore(VoiceSettings.subscribe, VoiceSettings.mode, VoiceSettings.mode) === 'device';
+  // ¿Tiene este teléfono una voz en español del tipo elegido? (cada móvil tiene sus voces)
+  const phoneVoices = useAsync(() => (deviceVoice && Platform.OS !== 'web' ? installedVoices() : Promise.resolve(null)), [deviceVoice]);
+  const wantedGender = prefs.assistantVoice === 'Achird' ? 'male' : 'female';
+  const missingGender =
+    phoneVoices.data && phoneVoices.data.length > 0 && !hasDeviceVoice(phoneVoices.data, wantedGender) ? wantedGender : null;
   // La explicación de la app y la lectura de los prospectos usan siempre la misma voz (Sulafat).
   const readingVoice = TOUR_VOICE;
   const readingTesting = (speakingId === READING_TEST_ID || loadingId === READING_TEST_ID);
@@ -180,7 +197,50 @@ export default function AccessibilityScreen() {
         />
       </ListGroup>
 
-      {voicesLocked ? (
+      {deviceVoice ? (
+        <Card style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }} testID="accessibility-device-voice">
+          <AppText variant="bodyStrong" color="heading">
+            Voz de MediClaro
+          </AppText>
+          <AppText variant="caption" color="textSecondary">
+            MediClaro lee con la voz de tu teléfono: la mejor en español que tengas instalada.
+            {voicesLocked ? ' Elegir voz de mujer o de hombre es parte de MediClaro Premium.' : ''}
+          </AppText>
+          {!voicesLocked ? (
+            <SegmentedControl
+              options={GENDER_OPTIONS}
+              value={prefs.assistantVoice === 'Achird' ? 'Achird' : 'Sulafat'}
+              onChange={(voice) => {
+                stop();
+                void setAssistantVoice(voice);
+                speak(ASSISTANT_TEST_ID, VOICE_PREVIEW_TEXTS.assistantTest, 0.85, voice, 'preview');
+              }}
+              accessibilityLabel="Voz de mujer o de hombre"
+            />
+          ) : null}
+          {!voicesLocked && missingGender ? (
+            <AppText variant="caption" color="warning" testID="accessibility-device-voice-missing">
+              {missingGender === 'male'
+                ? 'Tu teléfono no tiene una voz de hombre en español: de momento se usa otra. Puedes descargarla en los ajustes del teléfono (abajo).'
+                : 'Tu teléfono no tiene una voz de mujer en español: de momento se usa otra. Puedes descargarla en los ajustes del teléfono (abajo).'}
+            </AppText>
+          ) : null}
+          <SecondaryButton
+            label={assistantTesting ? 'Detener prueba' : 'Probar la voz'}
+            icon={assistantTesting ? 'stop-circle' : 'volume-high'}
+            onPress={() => {
+              if (assistantTesting) stop();
+              else speak(ASSISTANT_TEST_ID, VOICE_PREVIEW_TEXTS.assistantTest, 0.85, prefs.assistantVoice, 'preview');
+            }}
+            testID="accessibility-device-voice-test"
+          />
+          <AppText variant="caption" color="textMuted">
+            {Platform.OS === 'ios'
+              ? 'Para que suene más natural: Ajustes del iPhone › Accesibilidad › Leer y hablar › Voces › Español (España), y descarga una voz «Premium».'
+              : 'Para que suene más natural: Ajustes del teléfono › Accesibilidad › Texto a voz, e instala los datos de voz en español.'}
+          </AppText>
+        </Card>
+      ) : voicesLocked ? (
         <Card style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }} testID="accessibility-voices-locked">
           <AppText variant="bodyStrong" color="heading">
             {caregiver ? 'Tu perfil es de cuidador/a' : 'Voces de MediClaro'}
@@ -241,7 +301,9 @@ export default function AccessibilityScreen() {
           accessibilityLabel="Velocidad de lectura en voz alta"
         />
         <AppText variant="caption" color="textSecondary">
-          La explicación de la app y la lectura de los prospectos usan siempre la voz Sulafat, la más clara.
+          {deviceVoice
+            ? 'La explicación de la app y la lectura de los prospectos usan la voz de tu teléfono.'
+            : 'La explicación de la app y la lectura de los prospectos usan siempre la voz Sulafat, la más clara.'}
         </AppText>
         <SecondaryButton
           label={readingTesting ? 'Detener prueba' : 'Probar la velocidad'}

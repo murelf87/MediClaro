@@ -20,7 +20,7 @@ import { VOICE_PREVIEW_TEXTS } from '../../config/voicePreviews';
 import { errorText } from '../../services/VoiceDiagnostics';
 import { configureAudioForSpeech, type AudioModeResult } from '../../utils/audio';
 import { applyPlaybackRate } from '../../utils/playbackRate';
-import { deviceVoiceQuality, pickDeviceVoice, speakOnDevice } from '../../utils/deviceSpeech';
+import { deviceVoiceQuality, hasDeviceVoice, pickDeviceVoice, speakOnDevice } from '../../utils/deviceSpeech';
 import { jsVersionLabel } from '../../utils/appUpdate';
 
 export type CheckState = 'ok' | 'warn' | 'fail' | 'info';
@@ -247,20 +247,30 @@ export async function checkDeviceVoice(): Promise<CheckResult> {
   const voice = pickDeviceVoice(voices);
   const how =
     Platform.OS === 'ios'
-      ? 'En el iPhone: Ajustes → Accesibilidad → Leer y hablar → Voces → Español (España) → descarga «Marisol» o «Mónica» (Premium).'
+      ? 'En el iPhone: Ajustes → Accesibilidad → Leer y hablar → Voces → Español (España) → descarga voces «Premium» o «Mejorada» (de mujer y de hombre).'
       : 'En Android: Ajustes → Accesibilidad → Texto a voz → instala los datos de voz en español.';
   if (!voice) return { state: 'warn', detail: `No hay ninguna voz en español de calidad: se usaría la del sistema. ${how}` };
-  const quality = deviceVoiceQuality(voice);
-  return quality === 'Normal'
-    ? { state: 'warn', detail: `${voice.name} (${voice.language}) · calidad normal. Para que suene menos a robot: ${how}` }
-    : { state: 'ok', detail: `${voice.name} (${voice.language}) · ${quality}.` };
+  // Cada persona elige voz de mujer o de hombre: qué voz del teléfono le tocaría a cada una en este móvil.
+  const female = hasDeviceVoice(voices, 'female') ? pickDeviceVoice(voices, 'female') : undefined;
+  const male = hasDeviceVoice(voices, 'male') ? pickDeviceVoice(voices, 'male') : undefined;
+  const describe = (v?: Speech.Voice) => (v ? `${v.name} (${deviceVoiceQuality(v).toLowerCase()})` : 'no tiene');
+  if (!female && !male) {
+    // No se reconoce si son de mujer o de hombre (p. ej. en Android): se usa la mejor.
+    const quality = deviceVoiceQuality(voice);
+    return quality === 'Normal'
+      ? { state: 'warn', detail: `${voice.name} (${voice.language}) · calidad normal. Para que suene menos a robot: ${how}` }
+      : { state: 'ok', detail: `${voice.name} (${voice.language}) · ${quality}.` };
+  }
+  const detail = `Mujer: ${describe(female)} · Hombre: ${describe(male)}.`;
+  const weak = !female || !male || deviceVoiceQuality(female) === 'Normal' || deviceVoiceQuality(male) === 'Normal';
+  return weak ? { state: 'warn', detail: `${detail} ${how}` } : { state: 'ok', detail };
 }
 
 export function sayOnDevice(): void {
   // Primero se prepara el sonido (si no, con el interruptor de silencio puesto no se oye en iPhone).
   void configureAudioForSpeech()
     .then(() =>
-      speakOnDevice('Hola. Esta es la voz del teléfono. MediClaro la usa solo si la voz natural no está disponible.', 0.95, () => true, {}),
+      speakOnDevice('Hola. Esta es la voz del teléfono. Cada móvil usa la mejor que tenga en español.', 0.95, () => true, {}),
     )
     .catch(() => undefined);
 }

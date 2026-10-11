@@ -1,5 +1,5 @@
 import * as Speech from 'expo-speech';
-import { deviceVoiceQuality, pickDeviceVoice, speakOnDevice } from '../../utils/deviceSpeech';
+import { deviceVoiceGender, deviceVoiceQuality, genderOfVoice, hasDeviceVoice, pickDeviceVoice, speakOnDevice } from '../../utils/deviceSpeech';
 const voice=(identifier:string,language:string,quality='Default')=>({identifier,name:identifier,language,quality:quality as Speech.VoiceQuality});
 beforeEach(()=>jest.spyOn(Speech,'speak').mockImplementation(()=>undefined as any));
 afterEach(()=>jest.restoreAllMocks());
@@ -44,4 +44,37 @@ test('panel «Revisar la app»: qué voz del teléfono se usaría y con qué cal
  expect(deviceVoiceQuality(voices[2])).toBe('Mejorada');
  expect(deviceVoiceQuality(voices[0])).toBe('Normal');
  expect(pickDeviceVoice([voice('com.apple.eloquence.es-ES.Eddy','es-ES'),voice('en','en-US','Enhanced')])).toBeUndefined();
+});
+
+describe('voz de mujer o de hombre (la elige cada persona)', () => {
+  const ios = [
+    voice('com.apple.voice.compact.es-ES.Monica', 'es-ES'),
+    voice('com.apple.voice.premium.es-ES.Marisol', 'es-ES'),
+    voice('com.apple.voice.compact.es-ES.Jorge', 'es-ES'),
+    voice('com.apple.voice.enhanced.es-MX.Juan', 'es-MX', 'Enhanced'),
+    voice('com.apple.eloquence.es-ES.Eddy', 'es-ES'),
+  ];
+  test('se reconoce por el nombre de la voz (con o sin tilde)', () => {
+    expect(deviceVoiceGender(voice('com.apple.voice.compact.es-ES.Monica', 'es-ES'))).toBe('female');
+    expect(deviceVoiceGender({ identifier: 'x', name: 'Mónica', language: 'es-ES', quality: 'Default' as Speech.VoiceQuality })).toBe('female');
+    expect(deviceVoiceGender(voice('com.apple.voice.compact.es-ES.Jorge', 'es-ES'))).toBe('male');
+    expect(deviceVoiceGender(voice('es-es-x-eea-local', 'es-ES'))).toBeNull();
+  });
+  test('Sulafat busca voz de mujer; Achird, de hombre (de España antes que de otros países)', () => {
+    expect(genderOfVoice('Sulafat')).toBe('female');
+    expect(genderOfVoice('Achird')).toBe('male');
+    expect(pickDeviceVoice(ios, 'female')?.name).toBe('com.apple.voice.premium.es-ES.Marisol');
+    expect(pickDeviceVoice(ios, 'male')?.name).toBe('com.apple.voice.compact.es-ES.Jorge');
+    expect(hasDeviceVoice(ios, 'male')).toBe(true);
+  });
+  test('si el teléfono no tiene voz del tipo elegido, se usa la mejor que tenga', () => {
+    const onlyWomen = [voice('com.apple.voice.premium.es-ES.Marisol', 'es-ES')];
+    expect(hasDeviceVoice(onlyWomen, 'male')).toBe(false);
+    expect(pickDeviceVoice(onlyWomen, 'male')?.name).toBe('com.apple.voice.premium.es-ES.Marisol');
+  });
+  test('al leer con la voz del teléfono se usa la del tipo elegido', async () => {
+    jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue(ios);
+    await speakOnDevice('hola', 0.85, () => true, {}, 'male');
+    expect(Speech.speak).toHaveBeenCalledWith('hola', expect.objectContaining({ voice: 'com.apple.voice.compact.es-ES.Jorge' }));
+  });
 });

@@ -32,6 +32,7 @@ import { PostAuthRoute } from '../src/services/PostAuthRoute';
 import { TestAccess } from '../src/services/TestAccess';
 import { AUTH_FLOW, PAYMENT_FLOW, routeTarget } from '../src/navigation/routeGuard';
 import { RecentScreens } from '../src/services/RecentScreens';
+import { VoiceSettings } from '../src/services/VoiceSettings';
 
 function RootNavigator() {
   const { status, session } = useSession();
@@ -126,6 +127,8 @@ function FontGate() {
   const [loaded, error] = useFonts({ ...Ionicons.font });
   useEffect(() => {
     void configureAudioForSpeech();
+    // Voz de la app que eligió el propietario (natural o la del teléfono): la guardada al instante y luego la del servidor.
+    VoiceSettings.start();
   }, []);
   if (!loaded && !error) return <BrandSplash />;
   return <RootNavigator />;
