@@ -77,7 +77,8 @@ import { DocumentSheet } from './DocumentSheet';
 import { choosePhotosForDocument } from './documentFlow';
 import { documentFlowDeps } from './documentFlowDeps';
 import type { DocumentSource } from './documentPhotos';
-import { AssistantSpeed, ASSISTANT_SPEEDS, assistantRate, type AssistantSpeedKey } from '../../services/AssistantSpeed';
+import { AssistantSpeed, assistantRate, type AssistantSpeedKey } from '../../services/AssistantSpeed';
+import { ReadingBar } from './ReadingBar';
 import { AssistantThreads, type AssistantThread } from '../../services/AssistantThreads';
 import { distanceToEnd, pinnedAfterScroll, pinnedWhenSettled, showLatestButton } from './chatScroll';
 
@@ -974,64 +975,16 @@ function AssistantBubbleBase({
             {done ? null : <AppText variant="body" style={{ color: c.primary }}>{' ▍'}</AppText>}
           </AppText>
         </Pressable>
-        {hasText ? (
-          <>
-            <View style={styles.speedRow} accessibilityRole="radiogroup" accessibilityLabel="Velocidad de lectura">
-              {ASSISTANT_SPEEDS.map((o) => {
-                const on = o.key === speed;
-                return (
-                  <Pressable
-                    key={o.key}
-                    onPress={() => onSelectSpeed(message, o.key)}
-                    accessibilityRole="radio"
-                    accessibilityLabel={o.spoken}
-                    accessibilityState={{ selected: on }}
-                    testID={`assistant-speed-${o.key}`}
-                    style={({ pressed }) => [
-                      styles.speedBtn,
-                      {
-                        minHeight: Math.max(64, theme.touchTargets.min + 12),
-                        borderColor: on ? c.primary : c.primarySoft,
-                        backgroundColor: on ? c.primary : pressed ? c.primaryTint : c.surface,
-                      },
-                    ]}
-                  >
-                    <AppText style={styles.speedEmoji} accessible={false}>{o.emoji}</AppText>
-                    <AppText variant="small" style={{ color: on ? c.onPrimary : c.primary, fontWeight: '700' }} accessible={false}>
-                      {o.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {/* Botón grande y siempre visible: mientras suena es «Detener»; cuando acaba (o si no sonó), «Repetir explicación». */}
-            {speaking ? (
-              <SecondaryButton
-                label="Detener"
-                icon="stop-circle-outline"
-                variant="tonal"
-                size="lg"
-                fullWidth
-                onPress={() => onToggleSpeak(message)}
-                style={styles.repeatBtn}
-                testID="assistant-stop"
-              />
-            ) : (
-              <SecondaryButton
-                label="Repetir explicación"
-                icon="refresh"
-                variant="outline"
-                size="lg"
-                fullWidth
-                onPress={() => onToggleSpeak(message)}
-                style={styles.repeatBtn}
-                accessibilityHint="Vuelve a leer esta respuesta en voz alta, a la velocidad elegida"
-                testID="assistant-repeat"
-              />
-            )}
-          </>
-        ) : null}
       </View>
+      {/* Fuera del globo, justo debajo: «Repetir explicación» / «Detener» y los animales de la velocidad. */}
+      {hasText ? (
+        <ReadingBar
+          speaking={speaking}
+          speed={speed}
+          onToggleSpeak={() => onToggleSpeak(message)}
+          onSelectSpeed={(next) => onSelectSpeed(message, next)}
+        />
+      ) : null}
       {sourceUrl ? (
         <View style={styles.actions}>
           <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={() => onOpenSource(sourceUrl)} align="flex-start" />
@@ -1199,10 +1152,6 @@ const styles = StyleSheet.create({
   // Botón «Ir al último mensaje»: flota sobre la conversación, justo encima de la caja de escribir.
   latestWrap: { position: 'absolute', left: 0, right: 0, bottom: 10, alignItems: 'center' },
   latestBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 10 },
-  speedRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  repeatBtn: { marginTop: 10 },
-  speedBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, gap: 2 },
-  speedEmoji: { fontSize: 32, lineHeight: 38 },
   // Aviso legal discreto: letra pequeña y sin negrita (sigue siendo legible y lo lee el lector de pantalla).
   disclaimer: { fontWeight: '400' },
   flex: { flex: 1 },

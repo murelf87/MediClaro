@@ -79,17 +79,38 @@ describe('showLatestButton', () => {
 
 describe('pantalla del asistente (regresión)', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../AssistantScreen.tsx'), 'utf8');
+  const readingBar = fs.readFileSync(path.resolve(__dirname, '../ReadingBar.tsx'), 'utf8');
 
-  test('los animales de la velocidad y «Repetir explicación» salen desde que empieza la respuesta, no al acabar de escribirla', () => {
+  function bubbleSource(): string {
     const start = source.indexOf('function AssistantBubbleBase');
     const end = source.indexOf('function UserMessageBase');
     expect(start).toBeGreaterThan(0);
     expect(end).toBeGreaterThan(start);
-    const bubble = source.slice(start, end);
-    expect(bubble).toContain('assistant-speed-');
-    expect(bubble).toContain('assistant-repeat');
+    return source.slice(start, end);
+  }
+
+  test('los animales de la velocidad y «Repetir explicación» salen desde que empieza la respuesta, no al acabar de escribirla', () => {
+    const bubble = bubbleSource();
+    expect(bubble).toContain('<ReadingBar');
+    expect(readingBar).toContain('assistant-speed-');
+    expect(readingBar).toContain('assistant-repeat');
+    expect(readingBar).toContain('assistant-stop');
     // Antes la fila de animales colgaba de `done` (texto ya escrito del todo) y quedaba fuera de pantalla durante ~20 s.
     expect(bubble).not.toMatch(/done\s*&&\s*message\.text\.trim\(\)/);
+    // La barra solo depende de que haya texto, no de que se haya acabado de escribir.
+    expect(bubble).toMatch(/hasText\s*\?\s*\(\s*<ReadingBar/);
+  });
+
+  test('la barra de lectura va FUERA del globo (debajo del texto) y con animales pequeños', () => {
+    const bubble = bubbleSource();
+    // Lo primero que se cierra tras el texto de la respuesta es el globo; la barra viene después.
+    const afterReply = bubble.slice(bubble.indexOf('</Pressable>'));
+    const closesBubble = afterReply.indexOf('</View>');
+    const opensBar = afterReply.indexOf('<ReadingBar');
+    expect(closesBubble).toBeGreaterThan(-1);
+    expect(opensBar).toBeGreaterThan(closesBubble);
+    // Antes los dibujos eran de 32 puntos dentro de botones grandes con borde grueso.
+    expect(readingBar).not.toMatch(/fontSize:\s*(3\d|[4-9]\d)/);
   });
 
   test('el chat se pega al final por gestos de la persona, no por la distancia (y no usa animaciones al seguir)', () => {
