@@ -119,20 +119,42 @@ export function packContinuousSegments(parts: string[]): string[] {
   return packed;
 }
 
-async function publicPreview(text: string, voice: GeminiVoice): Promise<TtsResponse> {
+/** Lo máximo que se espera a la voz de una prueba (texto corto): después se pasa a la voz del teléfono. */
+export const PREVIEW_TIMEOUT_MS = 30_000;
+
+async function publicPreview(text: string, voice: GeminiVoice, timeoutMs = PREVIEW_TIMEOUT_MS): Promise<TtsResponse> {
   if (!isBackendConfigured) {
     return invokeFunction<TtsResponse>('tts-preview', { text, voice: safeVoice(voice), purpose: 'preview' }, { timeoutMs: 60_000 });
   }
   // La previsualización y la respuesta fija de QA usan textos permitidos: no deben
   // depender de una sesión real, de que haya caducado ni de una suscripción.
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/tts-preview`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
-    body: JSON.stringify({ text, voice: safeVoice(voice), purpose: 'preview' }),
+  // Siempre con tiempo máximo: aunque la conexión se quede colgada, la espera termina (y se explica por qué).
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller?.abort();
+      reject(new Error(`el servidor no ha respondido en ${Math.round(timeoutMs / 1000)} s`));
+    }, timeoutMs);
   });
-  const data = (await r.json().catch(() => ({}))) as TtsResponse & { error?: string };
-  if (!r.ok) throw new Error(data.error || 'La voz natural no está disponible.');
-  return data;
+  try {
+    return await Promise.race([
+      (async () => {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/tts-preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+          body: JSON.stringify({ text, voice: safeVoice(voice), purpose: 'preview' }),
+          ...(controller ? { signal: controller.signal } : null),
+        });
+        const data = (await r.json().catch(() => ({}))) as TtsResponse & { error?: string };
+        if (!r.ok) throw new Error(`${data.error || 'La voz natural no está disponible.'} (HTTP ${r.status})`);
+        return data;
+      })(),
+      expired,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export const SpeechService = {

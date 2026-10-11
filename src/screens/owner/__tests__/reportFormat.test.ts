@@ -47,6 +47,12 @@ describe('bandeja «Errores notificados»', () => {
     expect(Object.fromEntries(reportFacts({ platform: 'android', osVersion: '34' }).map((f) => [f.label, f.value])).Sistema).toBe('Android · API 34');
     expect(reportFacts({})).toEqual([]);
   });
+  test('qué versión de las pantallas tenía el móvil (la de la build o una actualización)', () => {
+    const facts = (c: Record<string, unknown>) => Object.fromEntries(reportFacts(c).map((f) => [f.label, f.value]));
+    expect(facts({ js: 'build' }).Pantallas).toBe('las de la build');
+    expect(facts({ js: '1a2b3c4d' }).Pantallas).toBe('actualización 1a2b3c4d');
+    expect(facts({}).Pantallas).toBeUndefined();
+  });
   test('contestar: llamar o escribir', () => {
     expect(contactAction('600 123 456')).toEqual({ kind: 'tel', url: 'tel:600123456', label: 'Llamar al 600 123 456' });
     expect(contactAction('+34 600-123-456')).toMatchObject({ kind: 'tel', url: 'tel:+34600123456' });

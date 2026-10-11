@@ -1,7 +1,7 @@
 /**
  * Información legal (/legal?section=medical|sources|ai|emergency|subscription|terms|privacy|notice) — pública.
- * Todos los apartados se leen COMPLETOS dentro de la app (src/content/legal.ts), en letra pequeña; si el propietario
- * publica además los textos en su web, se ofrece también el enlace. «Condiciones de la suscripción» usa los precios
+ * Todos los apartados se leen COMPLETOS dentro de la app (src/content/legal.ts), en letra pequeña. Sin enlaces «Ver
+ * también en la web» (fallaban; quitados por decisión del propietario el 11/10/2026). «Condiciones de la suscripción» usa los precios
  * del catálogo real. Tarjetas desplegables; se abre (y se muestra) la indicada en `section`.
  */
 import { useRef, useState, type ReactNode } from 'react';
@@ -9,7 +9,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Screen, AppHeader, AppText, TextButton, type IconName } from '../../components';
 import { useAppTheme, useAsync } from '../../hooks';
-import { APP_NAME, APP_VERSION, COMPANY_INFO, LEGAL_URLS, PURCHASES_ENABLED, SUPPORT_EMAIL } from '../../config/app';
+import { APP_NAME, APP_VERSION, COMPANY_INFO, PURCHASES_ENABLED, SUPPORT_EMAIL } from '../../config/app';
 import { SubscriptionService, perPeriodPhrase, periodName } from '../../services';
 import { formatPrice } from '../../utils/format';
 import { openExternalUrl } from '../../utils/device';
@@ -28,7 +28,7 @@ import {
   type LegalContext,
   type LegalSectionId,
 } from '../../content/legal';
-import { AccordionItem, DocumentRow, useHomeHref } from './parts';
+import { AccordionItem, useHomeHref } from './parts';
 
 type SectionId = LegalSectionId;
 
@@ -117,8 +117,6 @@ export default function LegalScreen() {
     purchases: PURCHASES_ENABLED,
     planLines,
   };
-  const web = (url: string, label: string, icon?: IconName) =>
-    url ? <DocumentRow url={url} label={label} icon={icon} /> : null;
 
   const sections: { id: SectionId; title: string; icon: IconName; iconColor?: string; body: ReactNode }[] = [
     { id: 'medical', title: 'Aviso médico', icon: 'medkit-outline', body: <LegalText blocks={medicalBlocks()} /> },
@@ -152,7 +150,6 @@ export default function LegalScreen() {
       body: (
         <>
           <LegalText blocks={termsBlocks(ctx)} />
-          {web(LEGAL_URLS.terms, 'Ver también en la web')}
         </>
       ),
     },
@@ -163,7 +160,6 @@ export default function LegalScreen() {
       body: (
         <>
           <LegalText blocks={privacyBlocks(ctx)} />
-          {web(LEGAL_URLS.privacy, 'Ver también en la web', 'lock-closed-outline')}
         </>
       ),
     },
@@ -174,7 +170,6 @@ export default function LegalScreen() {
       body: (
         <>
           <LegalText blocks={noticeBlocks(ctx)} />
-          {web(LEGAL_URLS.legalNotice, 'Ver también en la web', 'business-outline')}
         </>
       ),
     },

@@ -55,7 +55,7 @@ test('datos técnicos: versión, sistema y pantallas; nunca datos de salud', () 
   });
   expect(c).not.toHaveProperty('preview');
   // Solo estos datos técnicos: nada de medicamentos, salud, ubicación ni el nombre del móvil.
-  const allowed = ['appVersion', 'runtime', 'platform', 'osVersion', 'payments', 'sentAt', 'build', 'timeZone', 'screen', 'screens', 'area', 'account', 'premium', 'fontSize', 'easyMode', 'readingVoice', 'assistantVoice', 'preview'];
+  const allowed = ['appVersion', 'runtime', 'platform', 'osVersion', 'payments', 'sentAt', 'build', 'timeZone', 'screen', 'screens', 'area', 'account', 'premium', 'fontSize', 'easyMode', 'readingVoice', 'assistantVoice', 'preview', 'js'];
   expect(Object.keys(c).filter((k) => !allowed.includes(k))).toEqual([]);
   expect(buildReportContext({}).account).toBe('none');
 });

@@ -86,3 +86,26 @@ test('una voz desconocida se sustituye por Sulafat en la petición', async () =>
   await SpeechService.synthesize('Hola.', 'Desconocida' as never, 'reading');
   expect(mockInvoke.mock.calls[0][1].voice).toBe('Sulafat');
 });
+
+test('la prueba de voz nunca espera para siempre: a los 30 s se corta la conexión y se explica', async () => {
+  jest.useFakeTimers();
+  try {
+    let signal: AbortSignal | undefined;
+    fetchMock.mockImplementation((_url: string, init: { signal?: AbortSignal }) => {
+      signal = init.signal;
+      return new Promise(() => undefined);
+    });
+    const pending = SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Sulafat', 'preview');
+    const outcome = expect(pending).rejects.toThrow('el servidor no ha respondido en 30 s');
+    await jest.advanceTimersByTimeAsync(30_000);
+    await outcome;
+    expect(signal?.aborted).toBe(true);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('si el servidor rechaza la prueba de voz, se dice el código (para saber qué falla)', async () => {
+  fetchMock.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ error: 'Servicio no disponible' }) });
+  await expect(SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Sulafat', 'preview')).rejects.toThrow('Servicio no disponible (HTTP 503)');
+});

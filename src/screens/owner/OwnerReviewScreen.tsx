@@ -8,13 +8,14 @@
  *     código MediClaro, con una frase clara de qué falla y dónde.
  *  3. Accesos directos: errores que han notificado los usuarios y el estado del servidor.
  */
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { AppText, Icon, type IconName } from '../../components';
 import { usePreferences } from '../../hooks';
 import { OwnerPreview, PREVIEW_LABEL, type PreviewRole } from '../../services/OwnerPreview';
 import type { GeminiVoice } from '../../services/PreferencesService';
+import { clearVoiceFailure, lastVoiceFailure, type VoiceFailure } from '../../services/VoiceDiagnostics';
 import { OButton, OC, OCard, OChips, OIcon, ONote, ORow, OSection, OT, OwnerScreen } from './OwnerKit';
 import {
   appInfo,
@@ -78,6 +79,11 @@ export default function OwnerReviewScreen() {
   const [results, setResults] = useState<Record<string, CheckResult>>({ app: appInfo() });
   const [permissions, setPermissions] = useState<{ label: string; result: CheckResult }[]>([]);
   const [running, setRunning] = useState<Running>({});
+  const [voiceFailure, setVoiceFailure] = useState<VoiceFailure | null>(null);
+  const refreshVoiceFailure = useCallback(() => {
+    void lastVoiceFailure().then(setVoiceFailure).catch(() => undefined);
+  }, []);
+  useEffect(refreshVoiceFailure, [refreshVoiceFailure]);
 
   const run = useCallback(async (key: string, task: () => Promise<void>) => {
     setRunning((r) => ({ ...r, [key]: true }));
@@ -91,8 +97,12 @@ export default function OwnerReviewScreen() {
   const put = (key: string, value: CheckResult) => setResults((r) => ({ ...r, [key]: value }));
 
   const runVoice = useCallback(
-    (v: GeminiVoice) => run('voice', async () => put('voice', await testNaturalVoice(v))),
-    [run],
+    (v: GeminiVoice) =>
+      run('voice', async () => {
+        put('voice', await testNaturalVoice(v));
+        refreshVoiceFailure();
+      }),
+    [run, refreshVoiceFailure],
   );
   const runServer = useCallback(
     () =>
@@ -154,6 +164,23 @@ export default function OwnerReviewScreen() {
           </View>
         }
       />
+      {voiceFailure ? (
+        <CheckRow
+          label="Último fallo de la voz en este móvil"
+          result={{
+            state: 'warn',
+            detail: `${new Date(voiceFailure.at).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · ${voiceFailure.text}`,
+          }}
+          testID="owner-review-voice-failure"
+          action={
+            <OButton
+              label="Borrar este aviso"
+              variant="outline"
+              onPress={() => void clearVoiceFailure().then(() => setVoiceFailure(null))}
+            />
+          }
+        />
+      ) : null}
       <CheckRow
         label="Voz del teléfono (respaldo)"
         result={results.device}

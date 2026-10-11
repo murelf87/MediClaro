@@ -11,13 +11,17 @@ jest.mock('../../services',()=>({SpeechService:{synthesize:(...a:any[])=>mockSyn
 jest.mock('../../utils/audio',()=>({configureAudioForSpeech:()=>mockConfigure()}));
 jest.mock('../../utils/dialogs',()=>({showAlert:jest.fn(async()=>undefined)}));
 jest.mock('expo-audio',()=>({createAudioPlayer:()=>mockPlayer}),{virtual:true});
+const mockReport=jest.fn(async()=>({ref:'E-TEST1'}));
+jest.mock('../../services/ProblemReportService',()=>({ProblemReportService:{send:(...a:any[])=>mockReport(...a)}}));
 import * as Speech from 'expo-speech';
-import { useGeminiSectionSpeech, useGeminiSimpleSpeech } from '../useSpeech';
+import { DEVICE_FALLBACK_INTRO, useGeminiSectionSpeech, useGeminiSimpleSpeech } from '../useSpeech';
+import { __resetVoiceDiagnostics, clearVoiceFailure, lastVoiceFailure } from '../../services/VoiceDiagnostics';
 let output:any;let tree:any;
 const sections=[{id:'a',title:'A',text:'one'},{id:'b',title:'B',text:'two'}];
 function Probe({voice='Sulafat',simple=false}:any){output=simple?useGeminiSimpleSpeech():useGeminiSectionSpeech(sections,0.85,voice);return null;}
 async function mount(props:any={}){await act(async()=>{tree=create(React.createElement(Probe,props));});}
-beforeEach(()=>{jest.spyOn(Speech, 'speak').mockImplementation(()=>undefined as any);jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue([{identifier:'es-premium',name:'Spanish',language:'es-ES',quality:'Enhanced' as any}]);(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;mockSynthesize.mockReset();mockConfigure.mockReset().mockResolvedValue(undefined);[mockPlayer.play,mockPlayer.pause,mockPlayer.remove,mockPlayer.addListener,mockPlayer.setPlaybackRate].forEach((f:any)=>f.mockClear());});
+beforeEach(()=>{jest.spyOn(Speech, 'speak').mockImplementation(()=>undefined as any);jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue([{identifier:'es-premium',name:'Spanish',language:'es-ES',quality:'Enhanced' as any}]);(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;mockSynthesize.mockReset();mockConfigure.mockReset().mockResolvedValue(undefined);mockReport.mockClear();__resetVoiceDiagnostics();[mockPlayer.play,mockPlayer.pause,mockPlayer.remove,mockPlayer.addListener,mockPlayer.setPlaybackRate].forEach((f:any)=>f.mockClear());});
+beforeEach(async()=>{await clearVoiceFailure();});
 afterEach(async()=>{if(tree)await act(async()=>tree.unmount());tree=null;jest.restoreAllMocks();jest.useRealTimers();});
 describe('Natural speech lifecycle',()=>{
  test('preparation is loading; speaking requires real playback',async()=>{
@@ -58,10 +62,35 @@ describe('Natural speech lifecycle',()=>{
   expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
   const opts=(Speech.speak as jest.Mock).mock.calls[0][1];await act(async()=>opts.onDone());expect(output.speakingId).toBeNull();
  });
- test('voice previews are never replaced by the device voice',async()=>{
+ test('a voice test that fails never stays silent: the phone voice reads it, saying first it is not the natural voice',async()=>{
   mockSynthesize.mockRejectedValue(new Error('offline'));await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Sulafat','preview'));
-  expect(Speech.speak).not.toHaveBeenCalled();
-  expect(output.speakingId).toBeNull();expect(output.loadingId).toBeNull();
+  expect(Speech.speak).toHaveBeenCalledWith(`${DEVICE_FALLBACK_INTRO} hola`,expect.objectContaining({voice:'es-premium',language:'es-ES'}));
+  expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
+  const opts=(Speech.speak as jest.Mock).mock.calls[0][1];await act(async()=>opts.onDone());expect(output.speakingId).toBeNull();
+ });
+ test('a failed voice test records WHERE it failed (step, time and reason) for «Revisar la app»',async()=>{
+  mockSynthesize.mockRejectedValue(new Error('HTTP 503'));await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Achird','preview'));
+  const failure=await lastVoiceFailure();
+  expect(failure?.text).toContain('Achird, prueba de voz');
+  expect(failure?.text).toContain('el servidor no ha devuelto la voz: HTTP 503');
+  expect(failure?.text).toMatch(/inicio 0,\d s → audio \d+,\d s → servidor \d+,\d s/);
+  expect(failure?.text).not.toContain('hola');
+ });
+ test('a voice test that never arrives switches to the phone voice after 20 s and ignores late audio',async()=>{
+  jest.useFakeTimers();let resolve:any;const cleanup=jest.fn();mockSynthesize.mockReturnValue(new Promise(r=>resolve=r));
+  await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Sulafat','preview'));
+  await act(async()=>jest.advanceTimersByTime(19000));expect(Speech.speak).not.toHaveBeenCalled();
+  await act(async()=>jest.advanceTimersByTime(1000));
+  expect(Speech.speak).toHaveBeenCalledWith(`${DEVICE_FALLBACK_INTRO} hola`,expect.anything());
+  await act(async()=>resolve({uri:'late.wav',cleanup}));
+  expect(cleanup).toHaveBeenCalledTimes(1);expect(mockPlayer.play).not.toHaveBeenCalled();
+  expect((await lastVoiceFailure())?.text).toContain('no ha llegado en 20 s (último paso: servidor)');
+ });
+ test('a voice test that plays records nothing',async()=>{
+  mockSynthesize.mockResolvedValue({uri:'ok.wav',cleanup:jest.fn()});await mount({simple:true});
+  await act(async()=>output.speak('x','hola',0.85,'Sulafat','preview'));await act(async()=>mockListener({playing:true}));
+  expect(output.speakingId).toBe('x');expect(Speech.speak).not.toHaveBeenCalled();
+  expect(await lastVoiceFailure()).toBeNull();expect(mockReport).not.toHaveBeenCalled();
  });
  test('native playback error releases natural audio and reads with the device voice',async()=>{
   const cleanup=jest.fn();mockSynthesize.mockResolvedValue({uri:'bad.wav',cleanup});await mount({simple:true});

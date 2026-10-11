@@ -44,3 +44,26 @@ test('la pantalla de Lucía activa la grabación ANTES de preparar el micrófono
   expect(body.indexOf('configureAudioForRecording()')).toBeGreaterThan(0);
   expect(body.indexOf('configureAudioForRecording()')).toBeLessThan(body.indexOf('prepareToRecordAsync()'));
 });
+
+test('preparar la voz NUNCA bloquea: si el sistema no responde, se sigue a los 1,5 s', async () => {
+  jest.useFakeTimers();
+  try {
+    mockSetAudioMode.mockImplementationOnce(() => new Promise<undefined>(() => undefined));
+    const result = configureAudioForSpeech();
+    await jest.advanceTimersByTimeAsync(1_499);
+    let settled = false;
+    void result.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    await jest.advanceTimersByTimeAsync(1);
+    await expect(result).resolves.toBe('timeout');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('si el sistema rechaza el modo de audio, la voz sigue (y se sabe por qué)', async () => {
+  mockSetAudioMode.mockRejectedValueOnce(new Error('denied'));
+  await expect(configureAudioForSpeech()).resolves.toBe('error');
+  await expect(configureAudioForSpeech()).resolves.toBe('ok');
+});

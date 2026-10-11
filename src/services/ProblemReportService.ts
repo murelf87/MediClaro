@@ -12,6 +12,7 @@ import * as Application from 'expo-application';
 import { supabase, isBackendConfigured, isDemoClientActive } from '../lib/supabase';
 import { AppError, toAppError } from '../api/errors';
 import { APP_VERSION, PAYMENT_CHANNELS } from '../config/app';
+import { jsVersionTag } from '../utils/appUpdate';
 
 export const REPORT_MIN = 10;
 export const REPORT_MAX = 2000;
@@ -59,6 +60,9 @@ export function buildReportContext(input: ReportContextInput): Record<string, st
   };
   // Número de compilación real (el de la tienda o de EAS), solo en la app instalada (en Expo Go sería el de Expo Go).
   if (runtime() === 'app' && Application.nativeBuildVersion) out.build = String(Application.nativeBuildVersion);
+  // Qué versión de las pantallas funciona (la de la build o una actualización publicada después).
+  const js = runtime() === 'app' ? jsVersionTag() : null;
+  if (js) out.js = js;
   const tz = timeZone();
   if (tz) out.timeZone = tz;
   if (input.screen) out.screen = String(input.screen).slice(0, 80);

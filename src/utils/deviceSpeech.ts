@@ -29,6 +29,22 @@ export function deviceVoiceQuality(v: Speech.Voice): 'Premium' | 'Mejorada' | 'N
   return t >= 3 ? 'Premium' : t === 2 ? 'Mejorada' : 'Normal';
 }
 
+/** Lo máximo que se espera la lista de voces del teléfono: si tarda más, habla la voz española por defecto. */
+const VOICE_LIST_WAIT_MS = 1_500;
+
+function installedVoices(): Promise<Speech.Voice[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<Speech.Voice[]>((resolve) => {
+    timer = setTimeout(() => resolve([]), VOICE_LIST_WAIT_MS);
+  });
+  const list = Promise.resolve()
+    .then(() => Speech.getAvailableVoicesAsync())
+    .catch(() => [] as Speech.Voice[]);
+  return Promise.race([list, late]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 /** Prefer an installed high-quality Spanish voice; never depend on a fixed iOS voice ID. */
 export async function speakOnDevice(
   text: string,
@@ -36,7 +52,7 @@ export async function speakOnDevice(
   isCurrent: () => boolean,
   callbacks: Pick<Speech.SpeechOptions, 'onStart' | 'onDone' | 'onStopped' | 'onError'>,
 ): Promise<void> {
-  const voices = await Speech.getAvailableVoicesAsync().catch(() => []);
+  const voices = await installedVoices();
   if (!isCurrent()) return;
   const voice = pickDeviceVoice(voices);
   await Speech.speak(text, {

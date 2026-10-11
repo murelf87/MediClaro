@@ -52,6 +52,8 @@ export function reportFacts(c: Ctx | null | undefined): { label: string; value: 
   add('Pantalla anterior', str(c, 'screen'));
   add('Últimas pantallas', str(c, 'screens'));
   add('Versión de MediClaro', [str(c, 'appVersion'), str(c, 'build') ? `build ${str(c, 'build')}` : null].filter(Boolean).join(' · ') || null);
+  const js = str(c, 'js');
+  add('Pantallas', js ? (js === 'build' ? 'las de la build' : `actualización ${js}`) : null);
   const runtime = str(c, 'runtime');
   add('Dónde', runtime ? RUNTIME[runtime] ?? runtime : null);
   const os = str(c, 'osVersion');

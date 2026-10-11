@@ -155,6 +155,7 @@ import { showAlert } from '../utils/dialogs';
 import { isVoicePreviewText } from '../config/voicePreviews';
 import { speakOnDevice } from '../utils/deviceSpeech';
 import { prepareSpeechText } from '../utils/speechText';
+import { errorText, startVoiceTrace, type VoiceTrace } from '../services/VoiceDiagnostics';
 
 /** Si el reproductor no arranca en este tiempo, se avisa (nunca se queda «Preparando…» para siempre). */
 const PLAYER_STARTUP_MS = 15_000;
@@ -212,9 +213,11 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
   }, []);
 
   const durationRef = useRef(0);
+  const traceRef = useRef<VoiceTrace | null>(null);
 
-  const fail = useCallback((my: number, message: string) => {
+  const fail = useCallback((my: number, message: string, reason?: string) => {
     if (my !== token.current) return;
+    traceRef.current?.fail(reason ?? message);
     releaseGeminiPlayer(playerRef);
     setSpeechStatus('error');
     void showAlert(`${voiceRef.current} no está disponible`, message);
@@ -230,17 +233,28 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
     setCurrentTime(0);
     setDuration(0);
     setSpeechStatus('loading');
+    const trace = startVoiceTrace('lectura', voiceRef.current);
+    traceRef.current = trace;
     try {
-      await configureAudioForSpeech();
+      const audioMode = await configureAudioForSpeech();
+      trace.step('audio', audioMode === 'ok' ? undefined : audioMode);
+      trace.step('servidor');
       const audio = await SpeechService.synthesizeContinuous(cleanParts, voiceRef.current);
       if (my !== token.current) { audio.cleanup(); return; }
+      trace.step('respuesta');
 
       const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
       applyPlaybackRate(player, playbackRate(rateRef.current));
+      trace.step('reproductor');
+      let sounding = false;
       const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
         if (my !== token.current) return;
         if (s.error) {
-          fail(my, 'No se ha podido reproducir la explicación completa. Comprueba la conexión y vuelve a intentarlo.');
+          fail(
+            my,
+            'No se ha podido reproducir la explicación completa. Comprueba la conexión y vuelve a intentarlo.',
+            `error del reproductor: ${errorText(s.error)}`,
+          );
           return;
         }
         if (Number.isFinite(s.currentTime)) setCurrentTime(Math.max(0, s.currentTime));
@@ -249,6 +263,7 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
           setDuration(s.duration);
         }
         if (s.playing) {
+          if (!sounding) { sounding = true; trace.step('sonando'); }
           const startup = playerRef.current?.startupTimer;
           if (startup) {
             clearTimeout(startup);
@@ -266,11 +281,14 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
         subscription,
         cleanupFile: audio.cleanup,
         // Si el audio no llega a sonar, se avisa en lugar de quedarse «Preparando…» para siempre.
-        startupTimer: setTimeout(() => fail(my, NATURAL_VOICE_UNAVAILABLE), PLAYER_STARTUP_MS),
+        startupTimer: setTimeout(
+          () => fail(my, NATURAL_VOICE_UNAVAILABLE, `el reproductor no empieza a sonar en ${PLAYER_STARTUP_MS / 1000} s`),
+          PLAYER_STARTUP_MS,
+        ),
       };
       player.play();
-    } catch {
-      fail(my, NATURAL_VOICE_UNAVAILABLE);
+    } catch (e) {
+      fail(my, NATURAL_VOICE_UNAVAILABLE, `${trace.last() === 'servidor' ? 'el servidor no ha devuelto la voz' : 'error'}: ${errorText(e)}`);
     }
   }, [fail, setSpeechStatus]);
 
@@ -520,7 +538,14 @@ export function canAutoSpeak(text: string): boolean {
   return !inDemoMode() || isVoicePreviewText(text);
 }
 
-/** Voz natural (Sulafat · Achird) para el asistente, pruebas de voz y explicaciones. Sin respaldo robótico: si falla, se avisa. */
+/** Lo que se dice antes de leer una PRUEBA de voz con la voz del teléfono (para no hacer creer que esa es la elegida). */
+export const DEVICE_FALLBACK_INTRO = 'La voz natural no ha respondido. Te leo con la voz del teléfono.';
+
+/**
+ * Voz natural (Sulafat · Achird) para el asistente y las pruebas de voz. NUNCA se queda en silencio: si la voz natural
+ * no llega o no suena, se lee con la mejor voz en español del teléfono (en las pruebas, avisando antes de que no es la
+ * voz natural). Cada intento deja constancia de por qué paso va (VoiceDiagnostics): si falla, se sabe dónde.
+ */
 export function useGeminiSimpleSpeech() {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -554,6 +579,7 @@ export function useGeminiSimpleSpeech() {
     Speech.stop();
     setSpeakingId(null);
     setLoadingId(id);
+    const trace = startVoiceTrace(localPreviewSource ? 'grabación' : purpose === 'preview' ? 'prueba de voz' : 'asistente', voice);
     let fallbackStarted = false;
     let pendingCleanup: (() => void) | undefined;
     const current = () => my === token.current;
@@ -562,17 +588,18 @@ export function useGeminiSimpleSpeech() {
       setSpeakingId(null);
       setLoadingId(null);
     };
-    const fallback = () => {
+    const fallback = (reason: string) => {
       if (!current() || fallbackStarted) return;
       fallbackStarted = true;
+      trace.fail(reason);
       clearPreparation();
       releaseGeminiPlayer(playerRef);
       pendingCleanup?.();
       pendingCleanup = undefined;
-      // Respuestas del asistente: si la voz natural falla, la respuesta se lee igualmente con la mejor voz en
-      // español instalada en el teléfono (sin avisos que interrumpan). Las pruebas de voz (Sulafat/Achird) no se
-      // sustituyen, para no hacer creer que esa es la voz elegida.
-      const deviceText = purpose === 'assistant' && !localPreviewSource ? prepareSpeechText(text) : '';
+      // Nunca en silencio: se lee igualmente con la mejor voz en español instalada en el teléfono. En las pruebas de
+      // voz (Sulafat/Achird) se dice antes que no es la voz natural, para no hacer creer que esa es la voz elegida.
+      const spoken = prepareSpeechText(text);
+      const deviceText = spoken ? (purpose === 'preview' ? `${DEVICE_FALLBACK_INTRO} ${spoken}` : spoken) : '';
       if (deviceText) {
         setLoadingId(null);
         setSpeakingId(id);
@@ -593,19 +620,25 @@ export function useGeminiSimpleSpeech() {
       finish();
       void showAlert('Voz natural no disponible', inDemoMode() ? DEMO_VOICE_UNAVAILABLE : NATURAL_VOICE_UNAVAILABLE);
     };
-    // Las respuestas largas se generan por frases en el servidor (un único audio): necesitan más tiempo.
-    // Asistente: si la voz natural tarda demasiado, se pasa antes a la voz del teléfono (la persona no espera en silencio).
-    const preparationMs = text.length > 2800 ? 120_000 : purpose === 'assistant' ? 20_000 : 35_000;
-    preparationRef.current = setTimeout(fallback, preparationMs);
+    // Las respuestas largas se generan por frases en el servidor (un único audio): necesitan más tiempo. Si la voz
+    // natural tarda demasiado, se pasa a la voz del teléfono (la persona no espera en silencio).
+    const preparationMs = text.length > 2800 ? 120_000 : 20_000;
+    preparationRef.current = setTimeout(
+      () => fallback(`no ha llegado en ${Math.round(preparationMs / 1000)} s (último paso: ${trace.last()})`),
+      preparationMs,
+    );
     void (async () => {
       try {
-        await configureAudioForSpeech();
+        const audioMode = await configureAudioForSpeech();
+        trace.step('audio', audioMode === 'ok' ? undefined : audioMode);
         if (!current() || fallbackStarted) return;
         let source: AudioSource = localPreviewSource ?? null;
         let cleanup = () => undefined as void;
         if (!localPreviewSource) {
+          trace.step('servidor');
           const audio = await SpeechService.synthesize(text, voice, purpose);
           if (!current() || fallbackStarted) { audio.cleanup(); return; }
+          trace.step('respuesta');
           source = audio.uri;
           cleanup = audio.cleanup;
         }
@@ -615,10 +648,13 @@ export function useGeminiSimpleSpeech() {
         playerRef.current = { player, subscription: { remove: () => undefined }, cleanupFile: cleanup };
         pendingCleanup = undefined;
         applyPlaybackRate(player, playbackRate(rate));
+        trace.step('reproductor');
+        let sounding = false;
         const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
           if (!current() || fallbackStarted) return;
-          if (s.error) { fallback(); return; }
+          if (s.error) { fallback(`error del reproductor: ${errorText(s.error)}`); return; }
           if (s.playing) {
+            if (!sounding) { sounding = true; trace.step('sonando'); }
             if (playerRef.current?.startupTimer) clearTimeout(playerRef.current.startupTimer);
             setLoadingId(null);
             setSpeakingId(id);
@@ -626,11 +662,11 @@ export function useGeminiSimpleSpeech() {
           if (s.didJustFinish) { releaseGeminiPlayer(playerRef); finish(); }
         });
         playerRef.current.subscription = subscription;
-        playerRef.current.startupTimer = setTimeout(fallback, 10_000);
+        playerRef.current.startupTimer = setTimeout(() => fallback('el reproductor no empieza a sonar en 10 s'), 10_000);
         player.play();
-      } catch {
+      } catch (e) {
         if (!current()) { pendingCleanup?.(); return; }
-        fallback();
+        fallback(`${trace.last() === 'servidor' ? 'el servidor no ha devuelto la voz' : 'error'}: ${errorText(e)}`);
       }
     })();
   }, []);
