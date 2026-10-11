@@ -35,8 +35,9 @@ export default function AccessCodeScreen() {
     setBusy(true);
     setError(null);
     try {
-      await AccessCodeService.login(code);
-      router.replace('/(tabs)');
+      const { premium } = await AccessCodeService.login(code);
+      // Premium caducado o cancelado: a las suscripciones para renovarlo (con su cuenta ya abierta).
+      router.replace(premium ? '/(tabs)' : '/premium');
     } catch (e) {
       setError(asAppError(e));
     } finally {

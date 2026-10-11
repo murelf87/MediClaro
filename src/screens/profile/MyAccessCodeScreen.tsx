@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { AppText, Icon, InfoBanner, LoadingState, MediClaroLogo, PrimaryButton, Screen, SecondaryButton } from '../../components';
 import { useAppTheme } from '../../hooks';
 import { AccessCodeService } from '../../services';
+import { isAppError } from '../../api';
 import { errorMessage } from '../premium/parts';
 
 export default function MyAccessCodeScreen() {
@@ -21,7 +22,14 @@ export default function MyAccessCodeScreen() {
 
   const create = () => {
     setError('');
-    AccessCodeService.issue().then(setCode).catch((e) => setError(errorMessage(e)));
+    AccessCodeService.issue().then(setCode).catch((e) => {
+      // Sin Premium en vigor (p. ej. entró con «He olvidado mi código» y su suscripción terminó): a renovarla.
+      if (isAppError(e) && (e.code === 'PREMIUM_REQUIRED' || e.status === 402)) {
+        router.replace('/premium');
+        return;
+      }
+      setError(errorMessage(e));
+    });
   };
   useEffect(() => {
     if (started.current) return;

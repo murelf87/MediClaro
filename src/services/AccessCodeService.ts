@@ -45,8 +45,8 @@ export const AccessCodeService = {
     return r.code;
   },
 
-  /** Entra con el código: abre la sesión de esa persona sin SMS. */
-  async login(raw: string): Promise<void> {
+  /** Entra con el código: abre la sesión de esa persona sin SMS. Devuelve si su Premium está en vigor. */
+  async login(raw: string): Promise<{ premium: boolean }> {
     assertBackendConfigured();
     const code = normalizeAccessCode(raw);
     if (!code) throw new AppError('invalid_input', INVALID);
@@ -60,15 +60,15 @@ export const AccessCodeService = {
     } catch (e) {
       throw toAppError(e, 'offline');
     }
-    const data = (await r.json().catch(() => ({}))) as { phone?: string; password?: string; error?: string; code?: string };
+    const data = (await r.json().catch(() => ({}))) as { phone?: string; password?: string; premium?: boolean; error?: string; code?: string };
     if (!r.ok || !data.phone || !data.password) {
       if (r.status === 404) throw new AppError('not_configured', 'El acceso con código todavía no está activado.');
       if (r.status === 429) throw new AppError('rate_limited', data.error || 'Demasiados intentos. Espera unos minutos.');
-      if (data.code === 'PREMIUM_INACTIVE') throw new AppError('conflict', data.error || 'Tu Premium no está en vigor.', { code: data.code });
       if (data.code === 'CODE_INVALID') throw new AppError('invalid_input', INVALID, { code: data.code });
       throw new AppError('unknown', 'No hemos podido entrar. Inténtalo de nuevo.');
     }
     const { error } = await supabase.auth.signInWithPassword({ phone: data.phone, password: data.password });
     if (error) throw new AppError('unknown', 'No hemos podido abrir tu sesión. Inténtalo de nuevo.');
+    return { premium: data.premium !== false };
   },
 };

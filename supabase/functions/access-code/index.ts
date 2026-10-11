@@ -4,9 +4,10 @@
  *  - action 'status' (con sesión): ¿tiene ya un código?
  *  - action 'issue'  (con sesión, teléfono verificado y Premium en vigor; los propietarios también): crea un código
  *    nuevo (el anterior deja de valer) y lo devuelve UNA vez. Solo se guarda su huella.
- *  - action 'login'  (sin sesión): con el código correcto y el Premium en vigor, devuelve una clave de un solo uso
- *    con la que la app abre la sesión de esa persona (sin SMS ni correo). Intentos limitados por origen.
- * Si olvida el código: entra con su teléfono (SMS) y crea uno nuevo en Perfil → Cuenta.
+ *  - action 'login'  (sin sesión): con el código correcto devuelve una clave de un solo uso con la que la app abre la
+ *    sesión de esa persona (sin SMS ni correo), y si su Premium está en vigor. Si no lo está, la app le lleva a
+ *    las suscripciones para renovarlo. Intentos limitados por origen.
+ * Si olvida el código: entra con su teléfono (SMS) y se le da uno nuevo (si su Premium no está en vigor, va a renovarlo).
  * Sin correo electrónico: la sesión se abre con el teléfono de la cuenta y una clave aleatoria de un solo uso.
  * Opcional: ACCESS_CODE_PEPPER (secreto) para reforzar la huella.
  */
@@ -38,10 +39,9 @@ async function login(req: Request, body: any): Promise<Response> {
   if (error) throw error;
   if (!row) return fail('Ese código no es correcto. Revísalo: es como MC-4K7P-9X2Q.', 400, 'CODE_INVALID');
 
+  // Si el Premium ya no está en vigor, entra igualmente en SU cuenta y la app le lleva a renovarlo (suscripciones).
   const ent = await entitlementFor(row.user_id);
-  if (ent.plan !== 'premium' || !ACTIVE.has(ent.subState)) {
-    return fail('Tu Premium no está en vigor. Entra con tu teléfono para comprobarlo o renovarlo.', 402, 'PREMIUM_INACTIVE');
-  }
+  const premium = ent.plan === 'premium' && ACTIVE.has(ent.subState);
 
   const { data: found, error: userError } = await admin.auth.admin.getUserById(row.user_id);
   if (userError || !found?.user?.phone) return fail('Ese código no es correcto.', 400, 'CODE_INVALID');
@@ -54,7 +54,7 @@ async function login(req: Request, body: any): Promise<Response> {
   if (upd) throw upd;
   await admin.from('premium_access_codes').update({ last_used_at: new Date().toISOString() }).eq('user_id', row.user_id);
   const phone = found.user.phone.startsWith('+') ? found.user.phone : `+${found.user.phone}`;
-  return json({ phone, password });
+  return json({ phone, password, premium });
 }
 
 Deno.serve(async (req) => {
