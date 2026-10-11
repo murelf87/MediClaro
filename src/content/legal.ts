@@ -185,7 +185,7 @@ export function privacyBlocks(ctx: LegalContext): LegalBlock[] {
         'Chat con tu cuidador/a (o con el familiar al que cuidas): los mensajes que os escribís, su hora y si se han leído. Solo los veis las dos personas vinculadas; los avisos del teléfono dicen quién ha escrito, nunca el texto.',
         'Llamadas de voz con tu cuidador/a: la voz va directamente de un móvil al otro, cifrada; MediClaro no la graba ni la guarda. Solo queda en vuestro chat el registro de la llamada (quién llamó, cuándo y cuánto duró).',
         'Premium de regalo: si el titular de MediClaro te regala Premium, se guarda tu número de teléfono (para activarlo cuando entres con él) y hasta cuándo dura.',
-        'Pagos: el plan y el estado de tu suscripción. Los datos de la tarjeta, de Bizum, de la cuenta bancaria (domiciliación), de PayPal o de las tiendas los tratan Stripe, PayPal, Apple o Google: MediClaro nunca los ve.',
+        'Pagos: el plan y el estado de tu suscripción. Los datos de la tarjeta, de Bizum, de la cuenta bancaria (domiciliación) o de las tiendas los tratan Stripe, Apple o Google: MediClaro nunca los ve.',
         'Datos técnicos mínimos para que el servicio funcione y sea seguro (por ejemplo, registros de acceso y de errores).',
       ],
     },
@@ -214,7 +214,7 @@ export function privacyBlocks(ctx: LegalContext): LegalBlock[] {
       list: [
         'Supabase: servidores, base de datos y acceso con tu teléfono.',
         'Google (Gemini): inteligencia artificial para leer las fotos, responder, resumir, pasar la voz a texto y generar las voces.',
-        'Stripe: pagos con tarjeta, Bizum, domiciliación bancaria, PayPal y pagos de un familiar (PayPal trata además los datos de tu cuenta de PayPal). Apple y Google: compras dentro de la app.',
+        'Stripe: pagos con tarjeta, Bizum, domiciliación bancaria y pagos de un familiar. Apple y Google: compras dentro de la app.',
         'Twilio: llamadas y mensajes de emergencia; y el proveedor de SMS que envía el código de verificación.',
         'Expo, Apple y Google: envío de notificaciones (por ejemplo, los avisos a tu cuidador/a).',
         'El servidor de retransmisión de las llamadas de voz por internet entre paciente y cuidador/a, cuando se usan.',
@@ -341,10 +341,10 @@ export function subscriptionBlocks(ctx: LegalContext): LegalBlock[] {
     {
       list: [
         'Con tu cuenta de Apple, con Google Play o con tarjeta (a través de Stripe), según elijas: se renueva sola.',
-        'Con domiciliación bancaria SEPA o con PayPal (a través de Stripe), cuando estén disponibles: la misma suscripción, que se renueva sola. Con la domiciliación puedes pedir a tu banco la devolución de un recibo en las 8 semanas siguientes al cargo.',
+        'Con domiciliación bancaria SEPA (a través de Stripe), cuando estén disponibles: la misma suscripción, que se renueva sola. Con la domiciliación puedes pedir a tu banco la devolución de un recibo en las 8 semanas siguientes al cargo.',
         'Con Bizum (a través de Stripe): pagas el periodo elegido de una vez y NO se renueva solo. Al terminar vuelves al plan gratuito, salvo que pagues otro periodo; si lo pagas antes de que termine, se suma al final.',
         'Que pague un familiar o cuidador/a: le envías un enlace seguro y paga con tarjeta, Apple Pay o Google Pay. Solo verá tu nombre de pila y el plan, nunca tus datos de salud ni tus conversaciones. La suscripción se renueva sola y la gestiona y puede cancelarla esa persona desde el enlace de su correo de Stripe.',
-        'MediClaro nunca ve ni guarda los datos de tu tarjeta, de tu cuenta bancaria ni de tu cuenta de PayPal.',
+        'MediClaro nunca ve ni guarda los datos de tu tarjeta ni de tu cuenta bancaria.',
       ],
     },
     { h: 'Renovación y cancelación' },
@@ -359,7 +359,7 @@ export function subscriptionBlocks(ctx: LegalContext): LegalBlock[] {
     { h: 'Derecho de desistimiento y devoluciones' },
     {
       list: [
-        `Si contratas con tarjeta, Bizum, domiciliación bancaria o PayPal, tienes 14 días naturales para desistir ${contact(ctx)}. Como Premium empieza a funcionar en cuanto pagas porque así lo pides, si desistes te devolveremos el importe descontando la parte proporcional del tiempo ya usado.`,
+        `Si contratas con tarjeta, Bizum o domiciliación bancaria, tienes 14 días naturales para desistir ${contact(ctx)}. Como Premium empieza a funcionar en cuanto pagas porque así lo pides, si desistes te devolveremos el importe descontando la parte proporcional del tiempo ya usado.`,
         'Las compras hechas con Apple o Google Play se reembolsan según sus condiciones: se piden a Apple o a Google.',
         'Si cambias de teléfono, entra con tu número («Ya soy Premium») o pulsa «Restaurar compra».',
       ],

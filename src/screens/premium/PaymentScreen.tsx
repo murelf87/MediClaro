@@ -168,7 +168,7 @@ function PaymentMethodsScreen() {
     const cardAvailable = !!card && has('card');
     const bizumAvailable = !!offer.data.bizum && has('bizum');
     const sepaAvailable = !!offer.data.sepa && has('sepa');
-    const paypalAvailable = !!offer.data.paypal && has('paypal');
+    const paypalAvailable = false; // PayPal retirado
     const familyAvailable = !!offer.data.family && has('family');
     const provider = card?.provider ?? offer.data.bizum?.provider ?? 'Stripe';
     const anyHosted = cardAvailable || bizumAvailable || sepaAvailable || paypalAvailable || familyAvailable;
@@ -265,20 +265,6 @@ function PaymentMethodsScreen() {
                   onPress={() => goHosted('sepa')}
                   disabled={!!purchase.busy}
                   testID="payment-method-sepa"
-                />
-              </FadeIn>
-            ) : null}
-            {paypalAvailable ? (
-              <FadeIn delay={next()}>
-                <MethodCard
-                  icon="logo-paypal"
-                  iconColor="#FFFFFF"
-                  iconBg="#003087"
-                  title="PayPal"
-                  subtitle="Entras en tu cuenta de PayPal y aceptas. Sin escribir ninguna tarjeta."
-                  onPress={() => goHosted('paypal')}
-                  disabled={!!purchase.busy}
-                  testID="payment-method-paypal"
                 />
               </FadeIn>
             ) : null}

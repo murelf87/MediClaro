@@ -243,7 +243,7 @@ export const SubscriptionService = {
       bizumPayments: remote?.bizum === true,
       familyPayments: remote?.familyPay === true,
       sepaPayments: remote?.sepaDebit === true,
-      paypalPayments: remote?.paypal === true,
+      paypalPayments: false, // PayPal retirado: MediClaro no lo ofrece
     };
   },
 
