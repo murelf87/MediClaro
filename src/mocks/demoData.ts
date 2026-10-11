@@ -351,6 +351,18 @@ const DEMO_FORGOT_REPLY =
 const DEMO_STORAGE_REPLY =
   'Guarda tus medicinas en su caja, con su prospecto, en un sitio fresco y seco, sin sol directo y fuera del alcance de los niños; el baño y la cocina no son buenos sitios por el calor y la humedad. Algunas, como ciertas insulinas, van en la nevera: lo dice su prospecto. Las caducadas o las que ya no uses, llévalas al punto SIGRE de tu farmacia.';
 
+/**
+ * \u00abExplicar un documento\u00bb (clip del chat) en el Modo demostraci\u00f3n y la vista previa: no lee la foto, ense\u00f1a c\u00f3mo suena una
+ * explicaci\u00f3n. Con la cuenta real el servidor (funci\u00f3n `explain-document`) lee la foto con la IA.
+ */
+export const DEMO_DOCUMENT_REPLY =
+  'Esto es un ejemplo de la demostraci\u00f3n: no he le\u00eddo tu foto de verdad.\n\n' +
+  'Cuando env\u00edas la foto de un informe, una receta o una anal\u00edtica, te lo explico con palabras sencillas:\n' +
+  '- Qu\u00e9 dice el documento, sin t\u00e9rminos raros.\n' +
+  '- Qu\u00e9 valores est\u00e1n dentro de lo normal y cu\u00e1les conviene comentar con tu m\u00e9dico.\n' +
+  '- Qu\u00e9 te piden que hagas: tomar un medicamento, pedir una cita o repetir una prueba.\n\n' +
+  'Lo que te explico no sustituye a tu m\u00e9dico ni a tu farmac\u00e9utico.';
+
 const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 /** Medicamentos de ejemplo que el asistente reconoce por su nombre (el primero de cada uno es el que se explica). */
 const DEMO_NAMES: { pattern: RegExp; id: string }[] = [

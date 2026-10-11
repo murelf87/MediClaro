@@ -17,6 +17,7 @@ import {
   demoAmbiguous,
   demoChatEmergency,
   demoChatAnswer,
+  DEMO_DOCUMENT_REPLY,
   demoDetail,
   demoEmergencyConfig,
   demoEmergencyProfile,
@@ -307,6 +308,12 @@ export function createDemoBackend(opts: DemoBackendOptions = {}) {
           }
           return { data: demoChatAnswer(question, medicineId), error: null };
         }
+      case 'explain-document':
+        // Clip del chat: en la demostración no se lee la foto; se enseña cómo suena una explicación.
+        await delay(2200);
+        if (has('premiumonly')) return httpError(402, 'Función solo para Premium.', 'PREMIUM_REQUIRED');
+        if (has('chatlimit')) return httpError(402, 'Ha llegado al límite de preguntas de hoy. Mañana podrá seguir.', 'CHAT_LIMIT');
+        return { data: { reply: DEMO_DOCUMENT_REPLY, sourceUrl: null }, error: null };
       case 'create-checkout': {
         await delay(600);
         const bizum = body.method === 'bizum';

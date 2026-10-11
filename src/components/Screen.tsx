@@ -33,6 +33,12 @@ export interface ScreenProps {
   header?: ReactNode;
   /** Pie fijo (botones principales). Respeta la barra de gestos. */
   footer?: ReactNode;
+  /**
+   * Capa que se pinta encima de TODA la pantalla (cabecera incluida), p. ej. una hoja inferior. Es una vista normal, no una
+   * ventana nativa (`Modal`): se abre y se cierra al instante, así que se puede abrir la cámara o la galería justo después
+   * de cerrarla (en iPhone no se puede presentar un selector mientras una ventana nativa aún se está cerrando).
+   */
+  overlay?: ReactNode;
   scroll?: boolean;
   /** Márgenes horizontales estándar. */
   padded?: boolean;
@@ -61,6 +67,7 @@ export function Screen({
   children,
   header,
   footer,
+  overlay,
   scroll = true,
   padded = true,
   edges = ['top', 'bottom'],
@@ -145,6 +152,7 @@ export function Screen({
       ) : (
         content
       )}
+      {overlay}
     </View>
   );
 }

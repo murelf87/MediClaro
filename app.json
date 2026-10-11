@@ -90,7 +90,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "MediClaro usa la cámara para fotografiar la caja de tu medicamento e identificarlo.",
+          "cameraPermission": "MediClaro usa la cámara para fotografiar la caja de tu medicamento e identificarlo, o un documento (informe, receta) para que la asistente te lo explique.",
           "microphonePermission": "MediClaro usa el micrófono cuando mantienes pulsado para hablar con la asistente o cuando aceptas una llamada de audio con tu cuidador.",
           "recordAudioAndroid": true
         }
@@ -110,8 +110,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "MediClaro usa tus fotos solo si eliges una imagen de la caja de tu medicamento para identificarla.",
-          "cameraPermission": "MediClaro usa la cámara para fotografiar la caja de tu medicamento e identificarlo.",
+          "photosPermission": "MediClaro usa tus fotos solo si eliges una imagen de la caja de tu medicamento para identificarla, o de un documento (informe, receta) para que la asistente te lo explique.",
+          "cameraPermission": "MediClaro usa la cámara para fotografiar la caja de tu medicamento e identificarlo, o un documento (informe, receta) para que la asistente te lo explique.",
           "microphonePermission": "MediClaro usa el micrófono cuando mantienes pulsado para hablar con la asistente o cuando aceptas una llamada de audio con tu cuidador."
         }
       ],

@@ -125,8 +125,13 @@ export async function invokeFunction<T>(
         let message: string | undefined;
         let code: string | undefined;
         try {
-          const parsed = (await ctx?.json?.()) as { error?: unknown; code?: unknown } | undefined;
+          const parsed = (await ctx?.json?.()) as { error?: unknown; code?: unknown; message?: unknown } | undefined;
           if (parsed && typeof parsed.error === 'string') message = parsed.error;
+          // Una función sin desplegar responde 404 con {"code":"NOT_FOUND","message":"Requested function was not found"}
+          // (el texto va en `message`, no en `error`): se reconoce para decir algo claro en vez de «no hemos encontrado…».
+          else if (status === 404 && parsed && typeof parsed.message === 'string' && /function was not found/i.test(parsed.message)) {
+            message = 'Requested function was not found';
+          }
           if (parsed && typeof parsed.code === 'string') code = parsed.code;
         } catch {
           // Cuerpo no JSON: usamos el mensaje por defecto del tipo de error

@@ -24,6 +24,7 @@ import { currentCaregiverSignal } from '../../services/CaregiverAlert';
 import { CaregiverService } from '../../services/CaregiverService';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -73,7 +74,9 @@ import {
 } from './parts';
 import { ConversationsSheet } from './ConversationsSheet';
 import { DocumentSheet } from './DocumentSheet';
-import { pickDocumentPhotos, type DocumentSource } from './documentPhotos';
+import { choosePhotosForDocument } from './documentFlow';
+import { documentFlowDeps } from './documentFlowDeps';
+import type { DocumentSource } from './documentPhotos';
 import { AssistantSpeed, ASSISTANT_SPEEDS, assistantRate, type AssistantSpeedKey } from '../../services/AssistantSpeed';
 import { AssistantThreads, type AssistantThread } from '../../services/AssistantThreads';
 import { distanceToEnd, pinnedAfterScroll, pinnedWhenSettled, showLatestButton } from './chatScroll';
@@ -395,22 +398,29 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   }, [initialQuestion, sending, submit]);
 
   // Clip: foto(s) de un informe, receta o analítica para que el asistente las explique con palabras sencillas.
+  //
+  // Orden que hace que se abran la cámara y la galería en el iPhone (antes no pasaba nada): primero el permiso de IA, con
+  // nada más abierto (dos ventanas nativas no caben a la vez); después la hoja, que es una capa de la pantalla y no un
+  // `Modal`; y al elegir una opción la hoja desaparece al instante y la cámara o la galería se abren sobre la pantalla libre.
+  const openDocSheet = useCallback(async () => {
+    if (sending) return;
+    Keyboard.dismiss();
+    if (!(await AiConsentService.ensure())) return;
+    setDocBusy(false);
+    setDocOpen(true);
+  }, [sending]);
+  const closeDocSheet = useCallback(() => setDocOpen(false), []);
   const attachDocument = useCallback(
     async (source: DocumentSource) => {
       if (docBusy || sending) return;
       setDocBusy(true);
+      setDocOpen(false);
       try {
-        // Permiso explícito antes de mandar nada a la IA (si no lo da, no se abre ni la cámara).
-        if (!(await AiConsentService.ensure())) return;
-        setDocOpen(false);
-        const photos = await pickDocumentPhotos(source);
+        const photos = await choosePhotosForDocument(source, documentFlowDeps);
         if (!photos.length) return;
         autoSpeakAfterRef.current = Date.now();
         goToLatest();
         void sendDocument(photos);
-      } catch (e) {
-        setDocOpen(false);
-        await showAlert('No se ha podido añadir la foto', (e as Error).message || 'Inténtalo de nuevo.');
       } finally {
         setDocBusy(false);
       }
@@ -659,7 +669,22 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   );
 
   return (
-    <Screen edges={['top']} scroll={false} padded={false} header={header}>
+    <Screen
+      edges={['top']}
+      scroll={false}
+      padded={false}
+      header={header}
+      overlay={
+        <DocumentSheet
+          visible={docOpen}
+          busy={docBusy}
+          bottomInset={mode === 'stack' ? insets.bottom : 0}
+          onCamera={() => void attachDocument('camera')}
+          onLibrary={() => void attachDocument('library')}
+          onClose={closeDocSheet}
+        />
+      }
+    >
       {!medicationId ? (
         <ConversationsSheet
           visible={chatsOpen}
@@ -671,7 +696,6 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
           onClose={() => setChatsOpen(false)}
         />
       ) : null}
-      <DocumentSheet visible={docOpen} busy={docBusy} onCamera={() => void attachDocument('camera')} onLibrary={() => void attachDocument('library')} onClose={() => setDocOpen(false)} />
       <View ref={wrapRef} style={styles.flex} onLayout={measureWrap} collapsable={false}>
         <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
           {medicationName ? (
@@ -772,7 +796,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
                 <TextInput
                   value={draft}
                   onChangeText={setDraft}
-                  placeholder={recordingVoice ? 'Te escucho…' : processingVoice ? 'Entendiendo…' : placeholder}
+                  placeholder={recordingVoice ? 'Te escucho…' : processingVoice ? 'Entendiendo…' : docBusy ? 'Preparando…' : placeholder}
                   placeholderTextColor={recordingVoice ? c.dangerText : c.textMuted}
                   editable={!recordingVoice && !processingVoice}
                   multiline
@@ -803,8 +827,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
                     variant="tonal"
                     size={24}
                     accessibilityLabel="Adjuntar la foto de un documento"
-                    onPress={() => setDocOpen(true)}
-                    disabled={sending || recordingVoice || processingVoice}
+                    onPress={() => void openDocSheet()}
+                    disabled={sending || recordingVoice || processingVoice || docBusy}
                     testID="assistant-attach"
                   />
                 </View>
