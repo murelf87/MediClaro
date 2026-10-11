@@ -13,21 +13,26 @@
  * edge-to-edge, obligatorio en Android 15+, la ventana ya no se redimensiona).
  * keyboardVerticalOffset = posición real (en ventana) del contenedor, medida con
  * measureInWindow: así el cálculo es exacto con o sin barra de pestañas debajo.
+ *
+ * Desplazamiento: el chat va SIEMPRE a lo último que se habló (al abrirlo, al cambiar de conversación, al enviar, cuando
+ * llega la respuesta y mientras se va escribiendo) y solo se queda quieto si la persona sube a releer; entonces aparece el
+ * botón «Ir al último mensaje». Las reglas están en chatScroll.ts. La lista es un ScrollView con todos los mensajes (el
+ * servidor guarda como mucho 180 por conversación): así el final es exacto, sin estimaciones de alto.
  */
 import { currentEmergencyMessage } from '../../services/AssistantService';
 import { currentCaregiverSignal } from '../../services/CaregiverAlert';
 import { CaregiverService } from '../../services/CaregiverService';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
   useWindowDimensions,
-  type ListRenderItem,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -71,6 +76,7 @@ import { DocumentSheet } from './DocumentSheet';
 import { pickDocumentPhotos, type DocumentSource } from './documentPhotos';
 import { AssistantSpeed, ASSISTANT_SPEEDS, assistantRate, type AssistantSpeedKey } from '../../services/AssistantSpeed';
 import { AssistantThreads, type AssistantThread } from '../../services/AssistantThreads';
+import { distanceToEnd, pinnedAfterScroll, pinnedWhenSettled, showLatestButton } from './chatScroll';
 
 export type AssistantMode = 'tab' | 'stack';
 
@@ -128,7 +134,9 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   const c = theme.colors;
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const compact = width < 390;
+  // La caja de escribir lleva «adjuntar» y «enviar» dentro y es estrecha: el texto de ayuda se acorta según el ancho para que
+  // no se parta en dos líneas (la segunda quedaba cortada).
+  const placeholder = width >= 600 ? 'Escribe tu pregunta…' : width >= 370 ? 'Tu pregunta…' : 'Pregunta…';
   // Móviles bajos (iPhone SE…): la ayuda del micrófono ocupa una sola línea y deja más sitio a la conversación.
   const short = height < 760;
   const { prefs } = usePreferences();
@@ -251,27 +259,90 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   }, []);
 
   // ── Desplazamiento automático al último mensaje ──
-  const listRef = useRef<FlatList<Row>>(null);
-  const stickToBottom = useRef(true);
-  const scrollToEnd = useCallback((animated = true) => {
-    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
+  // El chat va SIEMPRE a lo último que se habló. «Pegado» (pinned) lo suelta solo la persona al arrastrar la lista hacia
+  // arriba; se vuelve a pegar al llegar abajo y, sin excepción, al abrir el chat, cambiar de conversación, enviar o llegar
+  // un mensaje nuevo. Las animaciones, el teclado o una respuesta que crece NO lo cambian (ver chatScroll.ts).
+  const listRef = useRef<ScrollView>(null);
+  const pinned = useRef(true);
+  const touching = useRef(false);
+  const emptyChat = useRef(messages.length === 0);
+  emptyChat.current = messages.length === 0;
+  const scrollMetrics = useRef({ y: 0, lastY: 0, contentHeight: 0, viewHeight: 0 });
+  const [showLatest, setShowLatest] = useState(false);
+  const showLatestRef = useRef(false);
+  const refreshLatestButton = useCallback(() => {
+    const m = scrollMetrics.current;
+    // Sin mensajes no hay «último mensaje»: se ve la bienvenida desde arriba.
+    const next = !emptyChat.current && showLatestButton(pinned.current, distanceToEnd(m));
+    if (next !== showLatestRef.current) {
+      showLatestRef.current = next;
+      setShowLatest(next);
+    }
   }, []);
-  // Al abrir el chat (o cambiar de conversación) se va SIEMPRE a lo último que se habló. El historial llega después de
-  // abrir la pantalla y la lista crece por partes: durante un momento se fuerza el final sin dejar que esos
-  // crecimientos hagan creer que la persona se ha desplazado hacia arriba.
-  const forceBottomUntil = useRef(0);
+  const scrollToEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      // Chat vacío: se ve la bienvenida desde arriba (no el final de las sugerencias).
+      if (emptyChat.current) listRef.current?.scrollTo({ y: 0, animated: false });
+      else listRef.current?.scrollToEnd({ animated: false });
+    });
+  }, []);
   const goToLatest = useCallback(() => {
-    forceBottomUntil.current = Date.now() + 2500;
-    stickToBottom.current = true;
-    scrollToEnd(false);
-  }, [scrollToEnd]);
-  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (Date.now() < forceBottomUntil.current) return;
-    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-    stickToBottom.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 120;
+    pinned.current = true;
+    touching.current = false; // por si se perdió el aviso de «soltó el dedo»: nunca se queda sin seguir
+    refreshLatestButton();
+    scrollToEnd();
+    // El historial, las fuentes y el teclado terminan de medirse un instante después: se vuelve a bajar.
+    setTimeout(() => { if (pinned.current) scrollToEnd(); }, 250);
+    setTimeout(() => { if (pinned.current) scrollToEnd(); }, 800);
+  }, [refreshLatestButton, scrollToEnd]);
+  const readMetrics = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const ne = e?.nativeEvent;
+    if (!ne?.contentOffset || !ne.contentSize || !ne.layoutMeasurement) return;
+    const m = scrollMetrics.current;
+    m.lastY = m.y;
+    m.y = ne.contentOffset.y;
+    m.contentHeight = ne.contentSize.height;
+    m.viewHeight = ne.layoutMeasurement.height;
   }, []);
+  const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    readMetrics(e);
+    const m = scrollMetrics.current;
+    // Chat vacío: la lista se lleva sola arriba del todo (bienvenida); eso no es «subir a releer».
+    pinned.current = emptyChat.current
+      ? true
+      : pinnedAfterScroll({ pinned: pinned.current, lastY: m.lastY, y: m.y, distance: distanceToEnd(m), touching: touching.current });
+    refreshLatestButton();
+  }, [readMetrics, refreshLatestButton]);
+  // Dedo sobre la lista: mientras la mueve (y su inercia) no se baja sola; al soltarla se decide si queda pegada.
+  // Si hay inercia, `onUserScrollStart` la vuelve a marcar al empezar y `settle` decide otra vez al acabar.
+  const onUserScrollStart = useCallback(() => { touching.current = true; pinned.current = false; }, []);
+  const settle = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    touching.current = false;
+    readMetrics(e);
+    pinned.current = pinnedWhenSettled(distanceToEnd(scrollMetrics.current));
+    refreshLatestButton();
+    if (pinned.current) scrollToEnd();
+  }, [readMetrics, refreshLatestButton, scrollToEnd]);
+  const onContentSizeChange = useCallback((_w: number, h: number) => {
+    scrollMetrics.current.contentHeight = h;
+    if (pinned.current) scrollToEnd();
+    else refreshLatestButton();
+  }, [refreshLatestButton, scrollToEnd]);
+  const onListLayout = useCallback((e: LayoutChangeEvent) => {
+    scrollMetrics.current.viewHeight = e.nativeEvent.layout.height;
+    if (pinned.current) scrollToEnd();
+    else refreshLatestButton();
+  }, [refreshLatestButton, scrollToEnd]);
+  // En el navegador (vista previa) la rueda del ratón no genera «arrastre»: subir con ella también suelta el chat.
+  const webScrollIntent = useMemo<Record<string, unknown>>(
+    () => (Platform.OS === 'web' ? { onWheel: (e: { deltaY?: number }) => { if ((e.deltaY ?? 0) < 0) pinned.current = false; } } : {}),
+    [],
+  );
   useFocusEffect(useCallback(() => { goToLatest(); }, [goToLatest]));
   useEffect(() => { goToLatest(); }, [activeThread, goToLatest]);
+  // Mensaje nuevo al final (la pregunta, la respuesta, el historial que llega…): se va a él aunque se hubiera subido a releer.
+  const lastMessageId = messages.length ? messages[messages.length - 1].id : '';
+  useEffect(() => { if (lastMessageId) goToLatest(); }, [lastMessageId, goToLatest]);
 
   const suggestions = useMemo(
     () =>
@@ -311,11 +382,10 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
       if (!(await AiConsentService.ensure())) return;
       if (text === undefined) setDraft('');
       autoSpeakAfterRef.current = Date.now();
-      stickToBottom.current = true;
+      goToLatest();
       void send(question);
-      scrollToEnd();
     },
-    [draft, sending, send, scrollToEnd, messages],
+    [draft, sending, send, goToLatest],
   );
 
   useEffect(() => {
@@ -336,9 +406,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
         const photos = await pickDocumentPhotos(source);
         if (!photos.length) return;
         autoSpeakAfterRef.current = Date.now();
-        stickToBottom.current = true;
+        goToLatest();
         void sendDocument(photos);
-        scrollToEnd();
       } catch (e) {
         setDocOpen(false);
         await showAlert('No se ha podido añadir la foto', (e as Error).message || 'Inténtalo de nuevo.');
@@ -346,7 +415,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
         setDocBusy(false);
       }
     },
-    [docBusy, sending, sendDocument, scrollToEnd],
+    [docBusy, sending, sendDocument, goToLatest],
   );
 
   const beginVoiceMessage = useCallback(async () => {
@@ -413,22 +482,22 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   }, [recorder, submit]);
   finishVoiceRef.current = finishVoiceMessage;
 
-  const toggleSpeak = useCallback(
-    (message: AssistantMessage) => {
-      if (speakingId === message.id || loadingId === message.id) stop();
-      else speak(message.id, message.text, rate, prefs.assistantVoice, 'assistant');
-    },
-    [speakingId, loadingId, speak, stop, rate, prefs.assistantVoice],
-  );
+  // Lo último que sabe la pantalla sobre la voz. Así los botones de cada globo no cambian de identidad y los globos no se
+  // repintan con cada letra que se escribe (la conversación puede tener cientos de mensajes).
+  const live = useRef({ speakingId, loadingId, speak, stop, rate, voice: prefs.assistantVoice });
+  live.current = { speakingId, loadingId, speak, stop, rate, voice: prefs.assistantVoice };
+  const toggleSpeak = useCallback((message: AssistantMessage) => {
+    const l = live.current;
+    if (l.speakingId === message.id || l.loadingId === message.id) l.stop();
+    else l.speak(message.id, message.text, l.rate, l.voice, 'assistant');
+  }, []);
   // Un animal: se queda encendido y la respuesta se lee otra vez a esa velocidad.
-  const readAtSpeed = useCallback(
-    (message: AssistantMessage, next: AssistantSpeedKey) => {
-      AssistantSpeed.set(next);
-      stop();
-      speak(message.id, message.text, assistantRate(next), prefs.assistantVoice, 'assistant');
-    },
-    [speak, stop, prefs.assistantVoice],
-  );
+  const readAtSpeed = useCallback((message: AssistantMessage, next: AssistantSpeedKey) => {
+    const l = live.current;
+    AssistantSpeed.set(next);
+    l.stop();
+    l.speak(message.id, message.text, assistantRate(next), l.voice, 'assistant');
+  }, []);
 
   const startNewChat = useCallback(() => {
     stop();
@@ -455,30 +524,41 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
     }
   }, [messages, router]);
 
-  const openSource = useCallback(async (url: string) => {
-    const ok = await openExternalUrl(url);
-    if (!ok) await showAlert('No se ha podido abrir el prospecto', 'Inténtalo de nuevo en un momento.');
+  const openSource = useCallback((url: string) => {
+    void (async () => {
+      const ok = await openExternalUrl(url);
+      if (!ok) await showAlert('No se ha podido abrir el prospecto', 'Inténtalo de nuevo en un momento.');
+    })();
   }, []);
+  const onNotifyCaregiver = useCallback(() => { void notifyCaregiver(); }, [notifyCaregiver]);
+  const openEmergency = useCallback(() => router.push('/emergency'), [router]);
+  const openPremium = useCallback(() => router.push('/premium'), [router]);
+  const retryMessage = useCallback(
+    (id: string) => {
+      goToLatest();
+      void AiConsentService.ensure().then((ok) => (ok ? retry(id) : undefined));
+    },
+    [goToLatest, retry],
+  );
 
-  const renderItem: ListRenderItem<Row> = ({ item }) => {
+  // Cada fila es un componente memorizado con funciones que no cambian: al escribir en la caja no se repinta la conversación.
+  const renderRow = (item: Row) => {
     switch (item.kind) {
       case 'typing':
-        return <TypingIndicator />;
+        return <TypingIndicator key={item.key} />;
       case 'user':
         return (
           <UserMessage
+            key={item.key}
             message={item.message}
             canRetry={!sending}
-            onRetry={() => {
-              stickToBottom.current = true;
-              void AiConsentService.ensure().then((ok) => (ok ? retry(item.message.id) : undefined));
-            }}
-            onPremium={offerPremium ? () => router.push('/premium') : undefined}
+            onRetry={retryMessage}
+            onPremium={offerPremium ? openPremium : undefined}
             premium={entitlement.isPremium}
           />
         );
       case 'emergency':
-        return <EmergencyReply message={item.message} onOpenEmergency={() => router.push('/emergency')} onNotifyCaregiver={() => void notifyCaregiver()} />;
+        return <EmergencyReply key={item.key} message={item.message} onOpenEmergency={openEmergency} onNotifyCaregiver={onNotifyCaregiver} />;
       case 'assistant':
       default: {
         const isRecent = Date.now() - Date.parse(item.message.createdAt) < 15_000;
@@ -486,13 +566,14 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
         animatedAssistantIds.current.add(item.message.id);
         return (
           <AssistantBubble
+            key={item.key}
             message={item.message}
             animate={animate}
             speaking={speakingId === item.message.id || loadingId === item.message.id}
             speed={speed}
-            onToggleSpeak={() => toggleSpeak(item.message)}
-            onSelectSpeed={(next) => readAtSpeed(item.message, next)}
-            onOpenSource={item.message.sourceUrl ? () => void openSource(item.message.sourceUrl as string) : undefined}
+            onToggleSpeak={toggleSpeak}
+            onSelectSpeed={readAtSpeed}
+            onOpenSource={openSource}
           />
         );
       }
@@ -602,37 +683,64 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
             </View>
           ) : null}
 
-          <FlatList
-            ref={listRef}
-            style={styles.flex}
-            data={rows}
-            extraData={`${speakingId ?? ''}|${sending ? 1 : 0}`}
-            keyExtractor={(item) => item.key}
-            renderItem={renderItem}
-            ListHeaderComponent={listHeader}
-            contentContainerStyle={{
-              // La conversación se apoya abajo, junto a la caja de escribir (como en cualquier chat), y no arriba del todo.
-              flexGrow: 1,
-              justifyContent: 'flex-end',
-              paddingHorizontal: theme.layout.screenPaddingH,
-              paddingTop: theme.spacing.md,
-              paddingBottom: theme.spacing.lg,
-              gap: theme.spacing.md,
-            }}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            onScroll={onScroll}
-            scrollEventThrottle={100}
-            onContentSizeChange={() => {
-              if (Date.now() < forceBottomUntil.current) scrollToEnd(false);
-              else if (stickToBottom.current) scrollToEnd();
-            }}
-            onLayout={() => {
-              if (stickToBottom.current || Date.now() < forceBottomUntil.current) scrollToEnd(false);
-            }}
-            showsVerticalScrollIndicator={false}
-            accessibilityLabel="Conversación con el asistente"
-          />
+          <View style={styles.flex}>
+            <ScrollView
+              ref={listRef}
+              style={styles.flex}
+              contentContainerStyle={{
+                // La conversación se apoya abajo, junto a la caja de escribir (como en cualquier chat), y no arriba del todo.
+                flexGrow: 1,
+                justifyContent: 'flex-end',
+                paddingHorizontal: theme.layout.screenPaddingH,
+                paddingTop: theme.spacing.md,
+                paddingBottom: theme.spacing.lg,
+                gap: theme.spacing.md,
+              }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              onScroll={onScroll}
+              scrollEventThrottle={32}
+              onScrollBeginDrag={onUserScrollStart}
+              onScrollEndDrag={settle}
+              onMomentumScrollBegin={onUserScrollStart}
+              onMomentumScrollEnd={settle}
+              onContentSizeChange={onContentSizeChange}
+              onLayout={onListLayout}
+              showsVerticalScrollIndicator={false}
+              accessibilityLabel="Conversación con el asistente"
+              testID="assistant-list"
+              {...webScrollIntent}
+            >
+              {listHeader}
+              {rows.map(renderRow)}
+            </ScrollView>
+            {/* Si la persona sube a releer, un botón grande la devuelve a lo último que se habló. */}
+            {showLatest ? (
+              <View style={styles.latestWrap} pointerEvents="box-none">
+                <Pressable
+                  onPress={goToLatest}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ir al último mensaje"
+                  accessibilityHint="Baja la conversación hasta lo último que se ha dicho"
+                  testID="assistant-go-latest"
+                  style={({ pressed }) => [
+                    styles.latestBtn,
+                    {
+                      minHeight: theme.touchTargets.comfortable,
+                      borderRadius: theme.radius.pill,
+                      backgroundColor: pressed ? c.primaryPressed : c.primary,
+                    },
+                    theme.shadow.button,
+                  ]}
+                >
+                  <Icon name="arrow-down" size={26} color={c.onPrimary} />
+                  <AppText variant="label" style={{ color: c.onPrimary }}>
+                    Ir al último mensaje
+                  </AppText>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
 
           <View
             style={[
@@ -664,7 +772,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
                 <TextInput
                   value={draft}
                   onChangeText={setDraft}
-                  placeholder={recordingVoice ? 'Te escucho…' : processingVoice ? 'Entendiendo tu mensaje…' : compact ? 'Tu pregunta…' : 'Escribe tu pregunta…'}
+                  placeholder={recordingVoice ? 'Te escucho…' : processingVoice ? 'Entendiendo…' : placeholder}
                   placeholderTextColor={recordingVoice ? c.dangerText : c.textMuted}
                   editable={!recordingVoice && !processingVoice}
                   multiline
@@ -678,7 +786,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
                   textAlignVertical="center"
                   onFocus={() => {
                     setFocused(true);
-                    stickToBottom.current = true;
+                    goToLatest();
                     measureWrap(); // posición al día justo antes de que llegue el evento del teclado
                   }}
                   onBlur={() => setFocused(false)}
@@ -778,7 +886,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
 
 // ─── Mensajes ─────────────────────────────────────────────────────────────────
 
-function AssistantBubble({
+function AssistantBubbleBase({
   message,
   animate,
   speaking,
@@ -791,9 +899,9 @@ function AssistantBubble({
   animate: boolean;
   speaking: boolean;
   speed: AssistantSpeedKey;
-  onToggleSpeak: () => void;
-  onSelectSpeed: (speed: AssistantSpeedKey) => void;
-  onOpenSource?: () => void;
+  onToggleSpeak: (message: AssistantMessage) => void;
+  onSelectSpeed: (message: AssistantMessage, speed: AssistantSpeedKey) => void;
+  onOpenSource: (url: string) => void;
 }) {
   const theme = useAppTheme();
   const c = theme.colors;
@@ -816,6 +924,10 @@ function AssistantBubble({
     return () => clearInterval(timer);
   }, [message.id, total, typing]);
   const done = visible >= total;
+  // Los animales de la velocidad y «Repetir explicación» están desde que empieza la respuesta (no hay que esperar a que
+  // acabe de escribirse: son hasta ~20 s y, sin ellos a la vista, no se sabe que se puede leer más despacio).
+  const hasText = message.text.trim().length > 0;
+  const sourceUrl = message.sourceUrl;
   return (
     <View style={styles.assistantColumn}>
       <View
@@ -838,7 +950,7 @@ function AssistantBubble({
             {done ? null : <AppText variant="body" style={{ color: c.primary }}>{' ▍'}</AppText>}
           </AppText>
         </Pressable>
-        {done && message.text.trim() ? (
+        {hasText ? (
           <>
             <View style={styles.speedRow} accessibilityRole="radiogroup" accessibilityLabel="Velocidad de lectura">
               {ASSISTANT_SPEEDS.map((o) => {
@@ -846,7 +958,7 @@ function AssistantBubble({
                 return (
                   <Pressable
                     key={o.key}
-                    onPress={() => onSelectSpeed(o.key)}
+                    onPress={() => onSelectSpeed(message, o.key)}
                     accessibilityRole="radio"
                     accessibilityLabel={o.spoken}
                     accessibilityState={{ selected: on }}
@@ -876,7 +988,7 @@ function AssistantBubble({
                 variant="tonal"
                 size="lg"
                 fullWidth
-                onPress={onToggleSpeak}
+                onPress={() => onToggleSpeak(message)}
                 style={styles.repeatBtn}
                 testID="assistant-stop"
               />
@@ -887,7 +999,7 @@ function AssistantBubble({
                 variant="outline"
                 size="lg"
                 fullWidth
-                onPress={onToggleSpeak}
+                onPress={() => onToggleSpeak(message)}
                 style={styles.repeatBtn}
                 accessibilityHint="Vuelve a leer esta respuesta en voz alta, a la velocidad elegida"
                 testID="assistant-repeat"
@@ -896,16 +1008,17 @@ function AssistantBubble({
           </>
         ) : null}
       </View>
-      {onOpenSource ? (
+      {sourceUrl ? (
         <View style={styles.actions}>
-          <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={onOpenSource} align="flex-start" />
+          <TextButton label="Ver prospecto oficial" icon="document-text-outline" onPress={() => onOpenSource(sourceUrl)} align="flex-start" />
         </View>
       ) : null}
     </View>
   );
 }
+const AssistantBubble = memo(AssistantBubbleBase);
 
-function UserMessage({
+function UserMessageBase({
   message,
   canRetry,
   onRetry,
@@ -914,7 +1027,7 @@ function UserMessage({
 }: {
   message: AssistantMessage;
   canRetry: boolean;
-  onRetry: () => void;
+  onRetry: (id: string) => void;
   /** Solo si se puede ofrecer Premium (compras en la app y la persona aún no lo tiene). */
   onPremium?: () => void;
   /** La app ya ve Premium para esta cuenta. */
@@ -952,7 +1065,7 @@ function UserMessage({
               Estamos confirmando tu suscripción. Inténtalo de nuevo en unos minutos.
             </AppText>
           </View>
-          <TextButton label="Reintentar" icon="refresh" onPress={onRetry} disabled={!canRetry} align="flex-end" />
+          <TextButton label="Reintentar" icon="refresh" onPress={() => onRetry(message.id)} disabled={!canRetry} align="flex-end" />
         </View>
       ) : limit ? (
         <Card tone="warning" elevated={false} style={[styles.fullWidth, { gap: theme.spacing.sm }]}>
@@ -983,14 +1096,16 @@ function UserMessage({
               {message.errorMessage || 'No se ha podido enviar la pregunta.'}
             </AppText>
           </View>
-          <TextButton label="Reintentar" icon="refresh" onPress={onRetry} disabled={!canRetry} align="flex-end" />
+          <TextButton label="Reintentar" icon="refresh" onPress={() => onRetry(message.id)} disabled={!canRetry} align="flex-end" />
         </View>
       ) : null}
     </View>
   );
 }
 
-function EmergencyReply({
+const UserMessage = memo(UserMessageBase);
+
+function EmergencyReplyBase({
   message,
   onOpenEmergency,
   onNotifyCaregiver,
@@ -1054,7 +1169,12 @@ function EmergencyReply({
   );
 }
 
+const EmergencyReply = memo(EmergencyReplyBase);
+
 const styles = StyleSheet.create({
+  // Botón «Ir al último mensaje»: flota sobre la conversación, justo encima de la caja de escribir.
+  latestWrap: { position: 'absolute', left: 0, right: 0, bottom: 10, alignItems: 'center' },
+  latestBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 22, paddingVertical: 10 },
   speedRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   repeatBtn: { marginTop: 10 },
   speedBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, gap: 2 },
