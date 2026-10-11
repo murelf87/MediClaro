@@ -84,8 +84,8 @@ export default function VerifyScreen() {
           await AuthService.verifyPhoneLink(phone, value);
           busy.current = false;
           setVerifying(false);
-          await showAlert('Teléfono guardado', 'Tu cuenta ya está protegida con tu número. Si cambias de móvil, entra con él.');
-          router.replace('/(tabs)');
+          // Registro Premium completo: ahora se le da su código MediClaro para entrar en otro móvil sin SMS.
+          router.replace('/my-access-code');
           return;
         }
         await AuthService.verifyOtp(phone, value);

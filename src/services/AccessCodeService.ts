@@ -60,15 +60,15 @@ export const AccessCodeService = {
     } catch (e) {
       throw toAppError(e, 'offline');
     }
-    const data = (await r.json().catch(() => ({}))) as { tokenHash?: string; error?: string; code?: string };
-    if (!r.ok || !data.tokenHash) {
+    const data = (await r.json().catch(() => ({}))) as { phone?: string; password?: string; error?: string; code?: string };
+    if (!r.ok || !data.phone || !data.password) {
       if (r.status === 404) throw new AppError('not_configured', 'El acceso con código todavía no está activado.');
       if (r.status === 429) throw new AppError('rate_limited', data.error || 'Demasiados intentos. Espera unos minutos.');
       if (data.code === 'PREMIUM_INACTIVE') throw new AppError('conflict', data.error || 'Tu Premium no está en vigor.', { code: data.code });
       if (data.code === 'CODE_INVALID') throw new AppError('invalid_input', INVALID, { code: data.code });
       throw new AppError('unknown', 'No hemos podido entrar. Inténtalo de nuevo.');
     }
-    const { error } = await supabase.auth.verifyOtp({ token_hash: data.tokenHash, type: 'magiclink' });
+    const { error } = await supabase.auth.signInWithPassword({ phone: data.phone, password: data.password });
     if (error) throw new AppError('unknown', 'No hemos podido abrir tu sesión. Inténtalo de nuevo.');
   },
 };

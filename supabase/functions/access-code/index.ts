@@ -4,11 +4,11 @@
  *  - action 'status' (con sesión): ¿tiene ya un código?
  *  - action 'issue'  (con sesión, teléfono verificado y Premium en vigor; los propietarios también): crea un código
  *    nuevo (el anterior deja de valer) y lo devuelve UNA vez. Solo se guarda su huella.
- *  - action 'login'  (sin sesión): con el código correcto y el Premium en vigor, devuelve un token de un solo uso
- *    con el que la app abre la sesión de esa persona (sin SMS). Intentos limitados por origen.
+ *  - action 'login'  (sin sesión): con el código correcto y el Premium en vigor, devuelve una clave de un solo uso
+ *    con la que la app abre la sesión de esa persona (sin SMS ni correo). Intentos limitados por origen.
  * Si olvida el código: entra con su teléfono (SMS) y crea uno nuevo en Perfil → Cuenta.
- * Requisitos: el proveedor «Email» de Supabase Auth activado (no se envía ningún correo). Opcional:
- * ACCESS_CODE_PEPPER (secreto) para reforzar la huella.
+ * Sin correo electrónico: la sesión se abre con el teléfono de la cuenta y una clave aleatoria de un solo uso.
+ * Opcional: ACCESS_CODE_PEPPER (secreto) para reforzar la huella.
  */
 import { admin, cors, fail, getUser, HttpError, json, rateLimit } from '../_shared/common.ts';
 import { entitlementFor, requirePremium } from '../_shared/entitlements.ts';
@@ -44,19 +44,17 @@ async function login(req: Request, body: any): Promise<Response> {
   }
 
   const { data: found, error: userError } = await admin.auth.admin.getUserById(row.user_id);
-  if (userError || !found?.user) return fail('Ese código no es correcto.', 400, 'CODE_INVALID');
-  let email = found.user.email ?? '';
-  if (!email) {
-    // Dirección interna (nunca recibe correos) solo para poder abrir la sesión con un enlace de un solo uso.
-    email = `u-${row.user_id}@acceso.mediclaro.app`;
-    const { error: upd } = await admin.auth.admin.updateUserById(row.user_id, { email, email_confirm: true });
-    if (upd) throw upd;
-  }
-  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
-  const tokenHash = link?.properties?.hashed_token;
-  if (linkError || !tokenHash) throw linkError ?? new Error('no token');
+  if (userError || !found?.user?.phone) return fail('Ese código no es correcto.', 400, 'CODE_INVALID');
+  // Sin correo: se pone una clave aleatoria de un solo uso a la cuenta (teléfono + clave) y la app abre la sesión con
+  // ella. Nadie la conoce y cambia en cada entrada con código.
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const password = btoa(String.fromCharCode(...bytes)).replace(/[^A-Za-z0-9]/g, '').slice(0, 40) + 'Mc9!';
+  const { error: upd } = await admin.auth.admin.updateUserById(row.user_id, { password });
+  if (upd) throw upd;
   await admin.from('premium_access_codes').update({ last_used_at: new Date().toISOString() }).eq('user_id', row.user_id);
-  return json({ tokenHash });
+  const phone = found.user.phone.startsWith('+') ? found.user.phone : `+${found.user.phone}`;
+  return json({ phone, password });
 }
 
 Deno.serve(async (req) => {

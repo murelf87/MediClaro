@@ -19,7 +19,7 @@ import {
   TextField,
 } from '../../components';
 import { useAppTheme } from '../../hooks';
-import { AccessCodeService, formatAccessCodeInput, normalizeAccessCode, AppError } from '../../services';
+import { AccessCodeService, PostAuthRoute, formatAccessCodeInput, normalizeAccessCode, AppError } from '../../services';
 import { AuthErrorBanner, asAppError } from './parts';
 
 export default function AccessCodeScreen() {
@@ -92,12 +92,16 @@ export default function AccessCodeScreen() {
         <InfoBanner
           tone="info"
           title="¿Has olvidado tu código?"
-          message="Entra con tu teléfono: te enviaremos un SMS. Si tu Premium está en vigor, entrarás y podrás crear un código nuevo en Perfil → Cuenta."
+          message="Entra con tu teléfono y el código que te llegará por SMS. Si tu Premium está en vigor, entrarás y te daremos un código MediClaro nuevo."
         />
         <TextButton
           label="He olvidado mi código"
           icon="call-outline"
-          onPress={() => router.push('/login')}
+          onPress={() => {
+            // Tras entrar con el teléfono y el SMS, se le da un código nuevo (como al registrarse).
+            PostAuthRoute.set('/my-access-code');
+            router.push('/login');
+          }}
           accessibilityHint="Entra con tu número de teléfono y un código por SMS"
           testID="access-code-forgot"
         />
