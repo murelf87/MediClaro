@@ -32,8 +32,11 @@
       - La build no cambia: los productos y la comprobación los da el servidor.
    2. **Política de privacidad y URL de soporte que funcionen** (App Store Connect › Información de la app).
       - La de Supabase (`public-info`) no se ve como página: Supabase muestra el código en vez de la web, en su dominio no deja servir páginas.
-      - Hay que publicarla en otra dirección; yo la puedo dejar en GitHub Pages, gratis, con los mismos textos de la app.
-      - Para eso necesito los datos del titular: nombre o empresa, NIF, domicilio y correo. No se inventan.
+      - Ya están hechas en el repositorio (`docs/`), con los mismos textos de la app. Falta activarlas (GitHub no me deja desde aquí): GitHub › murelf87/MediClaro › Settings › Pages › «Deploy from a branch» › main › /docs › Save.
+      - Direcciones para App Store Connect:
+        - privacidad: https://murelf87.github.io/MediClaro/privacidad.html
+        - soporte: https://murelf87.github.io/MediClaro/soporte.html
+      - Faltan los datos del titular: nombre o empresa, NIF, domicilio y correo. No se inventan; con ellos regenero las páginas (`node scripts/build-legal-pages.mjs`) y los pongo también en la app (variables `EXPO_PUBLIC_COMPANY_*` y `EXPO_PUBLIC_SUPPORT_EMAIL` del entorno production de EAS).
    3. **Cuenta de prueba para Apple** (se entra por SMS), con Premium. Cualquiera de estas dos:
       - un teléfono de prueba con código fijo (Supabase › Authentication › Phone › números de prueba);
       - el código MediClaro de una cuenta de prueba (Perfil › Mi cuenta › «Tu código MediClaro»).
