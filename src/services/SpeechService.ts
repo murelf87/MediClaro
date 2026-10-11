@@ -59,6 +59,45 @@ function saveAudio(audioBase64: string): { uri: string; cleanup: () => void } {
   };
 }
 
+// ─── Pruebas de voz guardadas en el móvil ───────────────────────────────────────────────────────────────
+// Los textos de prueba son fijos: su audio se guarda la primera vez y «Probar» ya no vuelve a pedirlo al servidor.
+// Así no se gasta el límite de peticiones por minuto de Google (que también necesitan el asistente y las lecturas)
+// y suena al instante. Va en la caché del sistema: si el teléfono la vacía, se vuelve a pedir una vez.
+
+/** Tamaño mínimo para dar por buena una prueba guardada (un WAV de voz ocupa cientos de KB). */
+const MIN_CACHED_BYTES = 1024;
+const noCleanup = () => undefined;
+
+function textKey(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i += 1) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+  return `${h.toString(36)}-${text.length}`;
+}
+
+function previewFile(text: string, voice: GeminiVoice): File {
+  return new File(Paths.cache, `mediclaro-voz-prueba-${safeVoice(voice)}-${textKey(text)}.wav`);
+}
+
+function cachedPreview(text: string, voice: GeminiVoice): { uri: string; cleanup: () => void } | null {
+  try {
+    const file = previewFile(text, voice);
+    if (file.exists && (file.size ?? 0) >= MIN_CACHED_BYTES) return { uri: file.uri, cleanup: noCleanup };
+  } catch {
+    // Sin caché: se pide al servidor.
+  }
+  return null;
+}
+
+function storePreview(text: string, voice: GeminiVoice, audioBase64: string): { uri: string; cleanup: () => void } {
+  try {
+    const file = previewFile(text, voice);
+    file.write(audioBase64, { encoding: 'base64' });
+    return { uri: file.uri, cleanup: noCleanup };
+  } catch {
+    return saveAudio(audioBase64);
+  }
+}
+
 function splitForTts(text: string, max = 2800): string[] {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (!clean) return [];
@@ -163,9 +202,11 @@ export const SpeechService = {
     if (purpose === 'preview' || (purpose === 'assistant' && isDemoClientActive())) {
       const exact = text.replace(/\s+/g, ' ').trim();
       if (!exact) throw new Error('Texto vacío');
+      const cached = cachedPreview(exact, voice);
+      if (cached) return cached;
       const response = await publicPreview(exact, voice);
       if (!response?.audioBase64) throw new Error('Audio vacío');
-      return saveAudio(response.audioBase64);
+      return storePreview(exact, voice, response.audioBase64);
     }
 
     const clean = prepareSpeechText(text);
@@ -185,9 +226,11 @@ export const SpeechService = {
   ): Promise<{ uri: string; cleanup: () => void }> {
     // Modo demostración: no hay cuenta real que pueda generar audio nuevo; se reproduce una muestra fija de la voz.
     if (isDemoClientActive() && purpose === 'reading') {
+      const cached = cachedPreview(DEMO_VOICE_SAMPLE, voice);
+      if (cached) return cached;
       const response = await publicPreview(DEMO_VOICE_SAMPLE, voice);
       if (!response?.audioBase64) throw new Error('Audio vacío');
-      return saveAudio(response.audioBase64);
+      return storePreview(DEMO_VOICE_SAMPLE, voice, response.audioBase64);
     }
 
     const segments = packContinuousSegments(parts);

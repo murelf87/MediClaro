@@ -13,14 +13,17 @@ jest.mock('../../lib/supabase', () => ({
   SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_ANON_KEY: 'public-anon-key-for-tests',
 }));
+// Disco simulado: lo que se escribe queda guardado (para probar las pruebas de voz guardadas en el móvil).
+const mockDisk = new Map<string, number>();
 jest.mock('expo-file-system', () => ({
   Paths: { cache: 'cache' },
   File: class {
     uri: string;
-    exists = true;
     constructor(_dir: string, name: string) { this.uri = `file:///cache/${name}`; }
-    write() { /* noop */ }
-    delete() { /* noop */ }
+    get exists() { return mockDisk.has(this.uri); }
+    get size() { return mockDisk.get(this.uri) ?? null; }
+    write(data: string) { mockDisk.set(this.uri, Math.floor((data.length * 3) / 4)); }
+    delete() { mockDisk.delete(this.uri); }
   },
 }), { virtual: true });
 
@@ -29,6 +32,7 @@ import { DEMO_VOICE_SAMPLE, SpeechService, packContinuousSegments } from '../Spe
 const fetchMock = jest.fn();
 
 beforeEach(() => {
+  mockDisk.clear();
   mockDemo = false;
   mockInvoke.mockReset().mockResolvedValue({ audioBase64: 'UklGRg==' });
   fetchMock.mockReset().mockResolvedValue({ ok: true, json: async () => ({ audioBase64: 'UklGRg==' }) });
@@ -108,4 +112,30 @@ test('la prueba de voz nunca espera para siempre: a los 30 s se corta la conexi�
 test('si el servidor rechaza la prueba de voz, se dice el código (para saber qué falla)', async () => {
   fetchMock.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ error: 'Servicio no disponible' }) });
   await expect(SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Sulafat', 'preview')).rejects.toThrow('Servicio no disponible (HTTP 503)');
+});
+
+test('la prueba de voz se guarda en el móvil: «Probar» solo la pide al servidor la primera vez', async () => {
+  const wav = 'UklGR' + 'A'.repeat(4000);
+  fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ audioBase64: wav }) });
+  const first = await SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Achird', 'preview');
+  first.cleanup(); // al terminar de sonar NO se borra la prueba guardada
+  const second = await SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Achird', 'preview');
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(second.uri).toBe(first.uri);
+  // Otra voz es otra grabación.
+  await SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Sulafat', 'preview');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test('una prueba guardada incompleta no se usa: se vuelve a pedir', async () => {
+  fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ audioBase64: 'UklGRg==' }) });
+  await SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Sulafat', 'preview');
+  await SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Sulafat', 'preview');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test('las lecturas y el asistente nunca usan audio guardado (cada texto es distinto)', async () => {
+  await SpeechService.synthesize('Paracetamol 500 mg.', 'Sulafat', 'reading');
+  await SpeechService.synthesize('Paracetamol 500 mg.', 'Sulafat', 'reading');
+  expect(mockInvoke).toHaveBeenCalledTimes(2);
 });
