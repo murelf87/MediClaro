@@ -31,6 +31,8 @@ jobs:
             fs.writeFileSync('app.json',JSON.stringify(j,null,2));
             console.log('runtimeVersion',j.expo.runtimeVersion);
           "
+      - name: Canal fijo expo-go (el mismo QR abre siempre la ultima version)
+        run: npx eas-cli@latest channel:create expo-go --non-interactive || echo "El canal expo-go ya existe"
       - name: Publicar actualizacion
         run: |
           npx eas-cli@latest update --branch expo-go --platform all --non-interactive \
