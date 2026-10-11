@@ -1,9 +1,7 @@
 /**
  * 3 · Acceso con TELÉFONO + CÓDIGO SMS (sin email ni contraseña).
  *
- * Incluye el acceso TEMPORAL "Entrar sin verificar" pedido por el propietario para
- * probar toda la app mientras el SMS no está activo. Solo aparece si
- * DemoMode.available() (se desactiva en las compilaciones de tienda).
+ * Sin accesos de prueba: el botón «Entrar sin verificar» se quitó por decisión del propietario (11/10/2026).
  */
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -15,32 +13,23 @@ import {
   MediClaroLogo,
   PhoneInput,
   PrimaryButton,
-  SecondaryButton,
   TextButton,
 } from '../../components';
 import { useAppTheme } from '../../hooks';
-import { AuthService, DemoMode, AppError } from '../../services';
+import { AuthService, AppError } from '../../services';
 import { DEFAULT_PHONE_COUNTRY, type PhoneCountry } from '../../config/countries';
 import { PHONE_ERROR_MESSAGES, validateNationalPhone } from '../../utils/format';
-import { AuthErrorBanner, LegalConsent, OrDivider, asAppError, useEnterApp } from './parts';
+import { AuthErrorBanner, LegalConsent, asAppError } from './parts';
 
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useAppTheme();
-  const demoAvailable = DemoMode.available();
 
   const [country, setCountry] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
   const [digits, setDigits] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<AppError | null>(null);
-  const [entering, setEntering] = useState(false);
-  const [enterError, setEnterError] = useState<AppError | null>(null);
-
-  const enterApp = useEnterApp(() => {
-    setEntering(false);
-    setEnterError(new AppError('unknown', 'No hemos podido abrir la sesión. Inténtalo de nuevo.'));
-  });
 
   const clearErrors = () => {
     setPhoneError(null);
@@ -48,7 +37,7 @@ export default function LoginScreen() {
   };
 
   const sendCode = async () => {
-    if (sending || entering) return;
+    if (sending) return;
     const check = validateNationalPhone(digits, country);
     if (!check.ok) {
       setPhoneError(PHONE_ERROR_MESSAGES[check.reason]);
@@ -63,20 +52,6 @@ export default function LoginScreen() {
       setSendError(asAppError(e));
     } finally {
       setSending(false);
-    }
-  };
-
-  const enterWithoutVerification = async () => {
-    if (entering || sending) return;
-    setEntering(true);
-    setEnterError(null);
-    try {
-      await AuthService.enterWithoutVerification();
-      // Seguimos mostrando "cargando" hasta que el Inicio aparece.
-      enterApp();
-    } catch (e) {
-      setEnterError(asAppError(e));
-      setEntering(false);
     }
   };
 
@@ -122,17 +97,12 @@ export default function LoginScreen() {
         }}
         error={phoneError}
         onSubmit={sendCode}
-        disabled={sending || entering}
+        disabled={sending}
       />
 
       {sendError ? (
         <AuthErrorBanner
           error={sendError}
-          extra={
-            sendError.kind === 'not_configured' && demoAvailable
-              ? 'Mientras tanto, puedes usar «Entrar sin verificar» (más abajo).'
-              : undefined
-          }
         />
       ) : null}
 
@@ -142,31 +112,12 @@ export default function LoginScreen() {
         iconPosition="right"
         onPress={sendCode}
         loading={sending}
-        disabled={digits.length === 0 || entering}
+        disabled={digits.length === 0}
         accessibilityHint="Te enviamos un SMS con un código de 6 cifras"
         style={{ marginTop: theme.spacing.lg }}
         testID="login-send"
       />
 
-      {demoAvailable ? (
-        <View>
-          <OrDivider />
-          <SecondaryButton
-            label="Entrar sin verificar"
-            variant="outline"
-            icon="flash"
-            onPress={enterWithoutVerification}
-            loading={entering}
-            disabled={sending}
-            accessibilityHint="Acceso temporal para probar la app sin recibir el SMS"
-            testID="login-bypass"
-          />
-          <AppText variant="caption" color="textSecondary" align="center" style={{ marginTop: theme.spacing.xs }}>
-            Temporal: para probar la app sin recibir el SMS. Si el servidor no está conectado verás datos de ejemplo.
-          </AppText>
-          {enterError ? <AuthErrorBanner error={enterError} title="No hemos podido entrar" /> : null}
-        </View>
-      ) : null}
 
       <LegalConsent
         onTerms={() => router.push({ pathname: '/legal', params: { section: 'terms' } })}

@@ -3,7 +3,7 @@
  *
  *  - Arriba, el logo de MediClaro (el del corazón) y la frase; debajo, la foto de homenaje a la familia
  *    (src/content/homenaje.ts), fundida con el fondo. Sin fotos, en la versión de las tiendas no sale.
- *  - Después, la guía saludando y lo que hace la app.
+ *  - Después, lo que hace la app (sin el personaje de la guía desde el 11/10/2026, por decisión del propietario).
  *  - «Conocer MediClaro» → explicación con voz y ejemplos, SIN registrarse.
  *  - «Empezar gratis · Básico» y «Soy cuidador/a · gratis» → cuenta sin teléfono ni SMS. El teléfono NO se pide en la
  *    entrada: solo después de pagar Premium (así quien no paga no gasta verificaciones). «Restaurar compra» sigue
@@ -28,7 +28,6 @@ import {
   type IconName,
 } from '../../components';
 import { FadeIn, Pulse, stagger } from '../../components/Motion';
-import { GuideIllustration } from '../../components/Guide';
 import { useAppTheme, useEntitlement, usePreferences, useSession } from '../../hooks';
 import { FONT_SIZE_LABELS, type FontSizePreference } from '../../theme';
 import { BrandSplash } from '../auth/BrandSplash';
@@ -124,12 +123,9 @@ export default function WelcomeScreen() {
   if (status === 'loading' || !ready) return <BrandSplash />;
 
   const columnWidth = Math.min(width, theme.layout.maxContentWidth) - theme.layout.screenPaddingH * 2;
-  const bigText = theme.fontSize === 'muy_grande';
   const photo = hasTributePhoto();
   // La foto con su forma (3:2), sin recortar caras, debajo del logo.
   const photoHeight = Math.round(Math.min(columnWidth / 1.49, height * 0.32, 300));
-  // Con la foto, la guía se hace algo más pequeña para no alargar tanto la entrada.
-  const guideSize = Math.round(Math.min(columnWidth * 0.62, height * (bigText ? 0.2 : photo ? 0.21 : 0.26), 240));
 
   return (
     <Screen gradient="premium" testID="welcome-screen">
@@ -150,9 +146,6 @@ export default function WelcomeScreen() {
         </FadeIn>
       ) : null}
 
-      <FadeIn from="scale" delay={120} style={[styles.center, { marginVertical: theme.spacing.sm }]}>
-        <GuideIllustration size={guideSize} />
-      </FadeIn>
 
       <View style={[styles.features, { gap: theme.spacing.xs }]}>
         {FEATURES.map((f, i) => (
