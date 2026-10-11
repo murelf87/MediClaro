@@ -583,7 +583,45 @@ export const OwnerAdminService = {
     VoiceSettings.apply(saved);
     return saved;
   },
+
+  // ─── Tope mensual de la voz natural ────────────────────────────────────────────────────────────────────
+  /** Tope y gasto estimado de este mes. Si el servidor aún no tiene la migración del tope, falla con un error normal. */
+  async voiceBudget(): Promise<VoiceBudget> {
+    return parseVoiceBudget(await call<unknown>('budget_get', {}, 'owner_settings'));
+  },
+  /** Cambia el tope mensual (en dólares). 0 = voz natural apagada (siempre la del teléfono). */
+  async setVoiceBudget(limitUsd: number): Promise<VoiceBudget> {
+    return parseVoiceBudget(await call<unknown>('budget_set', { limitUsd }, 'owner_settings'));
+  },
 };
+
+export interface VoiceBudget {
+  /** Tope mensual en dólares. */
+  limitUsd: number;
+  /** Gasto estimado de este mes en dólares. */
+  spentUsd: number;
+  /** Caracteres leídos con la voz natural este mes. */
+  chars: number;
+  /** Veces que este mes se leyó con la voz del teléfono por haber llegado al tope. */
+  blocked: number;
+  /** Mes en curso («2026-10»). */
+  month: string;
+}
+
+export function parseVoiceBudget(value: unknown): VoiceBudget {
+  const v = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const num = (x: unknown, fallback: number) => {
+    const n = typeof x === 'string' ? Number(x) : x;
+    return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : fallback;
+  };
+  return {
+    limitUsd: num(v.limitUsd, 25),
+    spentUsd: num(v.spentUsd, 0),
+    chars: Math.round(num(v.chars, 0)),
+    blocked: Math.round(num(v.blocked, 0)),
+    month: typeof v.month === 'string' ? v.month : '',
+  };
+}
 
 /** CSV para Excel/Números (separador «;», comillas y BOM para los acentos). */
 export function toCsv(data: OwnerExport): string {

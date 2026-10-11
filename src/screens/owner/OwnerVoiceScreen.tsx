@@ -10,10 +10,10 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ErrorState, SkeletonList } from '../../components';
 import { useAsync } from '../../hooks';
-import { OwnerAdminService } from '../../services/OwnerAdminService';
+import { OwnerAdminService, type VoiceBudget } from '../../services/OwnerAdminService';
 import type { VoiceMode } from '../../services/VoiceSettings';
 import { toAppError } from '../../api/errors';
-import { OButton, ONote, ORadioCard, OSection, OwnerScreen } from './OwnerKit';
+import { OButton, OChips, ONote, ORadioCard, OSection, OwnerScreen } from './OwnerKit';
 import { sayOnDevice, testNaturalVoice, type CheckResult } from './reviewChecks';
 
 const OPTIONS: { value: VoiceMode; label: string; description: string }[] = [
@@ -31,6 +31,14 @@ const OPTIONS: { value: VoiceMode; label: string; description: string }[] = [
   },
 ];
 
+/** Topes que se ofrecen (dólares al mes). 0 = voz natural apagada. */
+export const BUDGET_CHOICES = [0, 10, 20, 25, 30, 50];
+const BUDGET_OPTIONS = BUDGET_CHOICES.map((n) => ({ value: String(n), label: n === 0 ? 'Apagada' : `${n} $` }));
+
+export function budgetText(b: VoiceBudget): string {
+  return `Este mes (${b.month || 'en curso'}): ${b.spentUsd.toFixed(2).replace('.', ',')} $ gastados (estimado) de ${b.limitUsd} $.`;
+}
+
 export const VOICE_MODE_LABEL: Record<VoiceMode, string> = { natural: 'Voz natural', device: 'Voz del teléfono' };
 
 export default function OwnerVoiceScreen() {
@@ -40,6 +48,38 @@ export default function OwnerVoiceScreen() {
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ tone: 'green' | 'amber'; text: string } | null>(null);
   const loaded = useRef(false);
+  const budget = useAsync(() => OwnerAdminService.voiceBudget(), []);
+  const [limit, setLimit] = useState('25');
+  const [savingBudget, setSavingBudget] = useState(false);
+  const [budgetResult, setBudgetResult] = useState<{ tone: 'green' | 'amber'; text: string } | null>(null);
+  const budgetLoaded = useRef(false);
+
+  useEffect(() => {
+    if (budgetLoaded.current || budget.status !== 'success' || !budget.data) return;
+    budgetLoaded.current = true;
+    setLimit(String(budget.data.limitUsd));
+  }, [budget.data, budget.status]);
+
+  const saveBudget = async () => {
+    if (savingBudget) return;
+    setSavingBudget(true);
+    setBudgetResult(null);
+    try {
+      const saved = await OwnerAdminService.setVoiceBudget(Number(limit));
+      budget.setData(saved);
+      setBudgetResult({
+        tone: 'green',
+        text:
+          saved.limitUsd === 0
+            ? 'Guardado: voz natural apagada, todas las personas oirán la voz del teléfono.'
+            : `Guardado: tope de ${saved.limitUsd} $ al mes. Al llegar, la app lee con la voz del teléfono hasta el mes siguiente.`,
+      });
+    } catch (e) {
+      setBudgetResult({ tone: 'amber', text: toAppError(e).message });
+    } finally {
+      setSavingBudget(false);
+    }
+  };
 
   useEffect(() => {
     if (loaded.current || data.status !== 'success' || !data.data) return;
@@ -105,6 +145,37 @@ export default function OwnerVoiceScreen() {
           <ORadioCard title="Para todas las personas" options={OPTIONS} value={mode} onChange={setMode} testIDPrefix="owner-voice" />
           {saved ? <ONote>Ahora mismo: {VOICE_MODE_LABEL[saved].toLowerCase()}.</ONote> : null}
           {result ? <ONote tone={result.tone}>{result.text}</ONote> : null}
+
+          <OSection title="Tope de gasto de la voz natural" />
+          {budget.status === 'success' && budget.data ? (
+            <>
+              <ONote testID="owner-voice-budget-spent">{budgetText(budget.data)}</ONote>
+              <OChips options={BUDGET_OPTIONS} value={limit} onChange={setLimit} fill />
+              <OButton
+                label="Guardar el tope"
+                icon="speedometer-outline"
+                variant="outline"
+                onPress={() => void saveBudget()}
+                loading={savingBudget}
+                disabled={savingBudget || Number(limit) === budget.data.limitUsd}
+                testID="owner-voice-budget-save"
+              />
+              {budget.data.blocked > 0 ? (
+                <ONote tone="amber">
+                  Este mes se ha leído {budget.data.blocked} {budget.data.blocked === 1 ? 'vez' : 'veces'} con la voz del teléfono por llegar al tope.
+                </ONote>
+              ) : null}
+              {budgetResult ? <ONote tone={budgetResult.tone}>{budgetResult.text}</ONote> : null}
+            </>
+          ) : budget.status === 'error' ? (
+            <ONote tone="amber">
+              {budget.error ? 'El tope de gasto todavía no está activado en el servidor (falta aplicar su migración).' : ''}
+            </ONote>
+          ) : null}
+          <ONote>
+            El gasto es una estimación por caracteres: Google factura por uso, así que pon el tope algo por debajo de lo que quieras gastar.
+            Cada mes empieza de cero.
+          </ONote>
 
           <OSection title="Escuchar en este móvil" />
           <View style={styles.actions}>

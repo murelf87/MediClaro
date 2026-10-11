@@ -11,7 +11,7 @@ jest.mock('../../lib/supabase', () => ({
 }));
 jest.mock('../../api/functions', () => ({ assertBackendConfigured: () => undefined, invokeFunction: jest.fn() }));
 
-import { OwnerAdminService, OWNER_NOT_DEPLOYED, ownerError, toCsv } from '../OwnerAdminService';
+import { OwnerAdminService, OWNER_NOT_DEPLOYED, ownerError, parseVoiceBudget, toCsv } from '../OwnerAdminService';
 import { OwnerPreview } from '../OwnerPreview';
 import { VoiceSettings } from '../VoiceSettings';
 import { createDemoOwner } from '../../mocks/demoOwner';
@@ -215,4 +215,21 @@ test('voz de la app sin activar en el servidor: se dice exactamente qué falta',
   );
   await expect(OwnerAdminService.voiceMode()).rejects.toMatchObject({ kind: 'not_configured', message: expect.stringMatching(/elección de la voz/) });
   expect(OwnerAdminService.isUnlocked()).toBe(true);
+});
+
+test('tope de la voz natural: se lee y se cambia con el panel abierto, con valores seguros si el servidor no dice algo', async () => {
+  let limit = 25;
+  mockRpc.mockImplementation(async (name: string, args: { p_action: string; p_payload: Record<string, unknown> }) => {
+    if (name !== 'owner_settings') return owner.rpc(name, args);
+    expect(String(args.p_payload.session)).toMatch(/^[0-9a-f]{64}$/);
+    if (args.p_action === 'budget_set') limit = Number(args.p_payload.limitUsd);
+    return { data: { limitUsd: limit, usdPerMillion: 30, month: '2026-10', chars: 400_000, blocked: 2, spentUsd: '12' }, error: null };
+  });
+  await expect(OwnerAdminService.voiceBudget()).rejects.toMatchObject({ code: 'OWNER_LOCKED' });
+  await OwnerAdminService.setupPin('482913', false);
+  expect(await OwnerAdminService.voiceBudget()).toEqual({ limitUsd: 25, spentUsd: 12, chars: 400000, blocked: 2, month: '2026-10' });
+  expect((await OwnerAdminService.setVoiceBudget(30)).limitUsd).toBe(30);
+  expect(limit).toBe(30);
+  expect(parseVoiceBudget(null)).toEqual({ limitUsd: 25, spentUsd: 0, chars: 0, blocked: 0, month: '' });
+  expect(parseVoiceBudget({ limitUsd: -5, spentUsd: 'x' }).limitUsd).toBe(25);
 });

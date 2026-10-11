@@ -1,4 +1,5 @@
 /** Public, tightly-scoped natural voice previews for Explore MediClaro. */
+import { reserveVoiceBudget, TTS_BUDGET_CODE, TTS_BUDGET_MESSAGE } from '../_shared/voiceBudget.ts';
 const KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const MODEL = Deno.env.get('GEMINI_TTS_MODEL') ?? 'gemini-3.8-flash-tts';
 const VOICES = new Set(['Sulafat', 'Achird', 'Aoede']);
@@ -61,6 +62,7 @@ Deno.serve(async (req) => {
   if (!ALLOWED.has(text)) return out({ error: 'Vista previa no permitida' }, 403);
   if (!KEY) return out({ error: 'La voz natural no está configurada.', code: 'TTS_DOWN' }, 503);
   const voice = typeof body?.voice === 'string' && VOICES.has(body.voice) ? body.voice : 'Sulafat';
+  if (!(await reserveVoiceBudget(text.length))) return out({ error: TTS_BUDGET_MESSAGE, code: TTS_BUDGET_CODE }, 503);
 
   const requestModel = (model: string) => {
     const legacy = model.startsWith('gemini-2.5') || model.startsWith('gemini-3.1');

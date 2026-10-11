@@ -190,6 +190,13 @@ export function describeAudit(row: OwnerAuditRow): { icon: IconName; color: Tile
         title: 'Voz de la app cambiada',
         detail: str('to') === 'device' ? 'Ahora: voz del teléfono' : 'Ahora: voz natural',
       };
+    case 'owner_voice_budget':
+      return {
+        icon: 'speedometer-outline',
+        color: 'blue',
+        title: 'Tope de la voz natural cambiado',
+        detail: `Ahora: ${typeof d.to === 'number' ? d.to : '?'} $ al mes`,
+      };
     case 'admin_config_changed':
       return { icon: 'settings-outline', color: 'teal', title: 'Configuración cambiada', detail: '' };
     default:

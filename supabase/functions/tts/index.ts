@@ -7,6 +7,7 @@
  */
 import { fail, handler, json } from '../_shared/common.ts';
 import { requirePremium } from '../_shared/entitlements.ts';
+import { reserveVoiceBudget, TTS_BUDGET_CODE, TTS_BUDGET_MESSAGE } from '../_shared/voiceBudget.ts';
 
 const KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const MODEL = Deno.env.get('GEMINI_TTS_MODEL') ?? 'gemini-3.8-flash-tts';
@@ -182,6 +183,10 @@ Deno.serve(handler({ bucket: 'tts', maxPerMinute: 12, maxBodyBytes: 40_000 }, as
   }
 
   const voice = typeof body?.voice === 'string' && ALLOWED_VOICES.has(body.voice) ? body.voice : 'Sulafat';
+  // Tope mensual fijado en el panel: si ya se ha llegado, no se pide nada a Google (la app lee con la voz del teléfono).
+  if (!(await reserveVoiceBudget(segments.reduce((n: number, s: string) => n + s.length, 0)))) {
+    return fail(TTS_BUDGET_MESSAGE, 503, TTS_BUDGET_CODE);
+  }
   const wavs: string[] = [];
   const models: string[] = [];
   for (const segment of segments) {

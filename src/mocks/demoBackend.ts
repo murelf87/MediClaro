@@ -533,6 +533,19 @@ export function createDemoBackend(opts: DemoBackendOptions = {}) {
           else rows.push({ key: 'voice', value: { mode } });
           return { data: { mode }, error: null };
         }
+        // Tope mensual de la voz natural (la demostración no gasta nada: el gasto es 0).
+        if (args.p_action === 'budget_get' || args.p_action === 'budget_set') {
+          const brow = rows.find((r) => r.key === 'voice_budget');
+          let limit = Number((brow?.value as { limit_usd?: number } | undefined)?.limit_usd ?? 25);
+          if (args.p_action === 'budget_set') {
+            const next = Number(args.p_payload?.limitUsd);
+            if (!Number.isFinite(next) || next < 0 || next > 9999) return { data: null, error: { message: 'INVALID_REQUEST' } };
+            limit = next;
+            if (brow) brow.value = { limit_usd: limit, usd_per_million_chars: 30 };
+            else rows.push({ key: 'voice_budget', value: { limit_usd: limit, usd_per_million_chars: 30 } });
+          }
+          return { data: { limitUsd: limit, usdPerMillion: 30, month: '2026-10', chars: 0, blocked: 0, spentUsd: 0 }, error: null };
+        }
         return { data: null, error: { message: 'INVALID_REQUEST' } };
       }
       // «Notifícanos un error» (Ayuda): con y sin cuenta; llega a la bandeja del panel de la demostración.
