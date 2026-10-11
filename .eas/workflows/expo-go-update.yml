@@ -16,7 +16,8 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: https://ldonnvkysjalpmystoeq.supabase.co
       EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf
       EXPO_PUBLIC_DEMO_ACCESS: 'on'
-      EXPO_PUBLIC_PAYMENTS_MODE: store
+      # Como el perfil «preview»: en Expo Go no hay compras de Apple, así que se muestran los planes con pago por tarjeta (Stripe).
+      EXPO_PUBLIC_PAYMENTS_MODE: store,stripe
     steps:
       - uses: eas/checkout
       - uses: eas/install_node_modules
