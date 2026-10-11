@@ -19,3 +19,9 @@ test('cancelled request never starts device speech',async()=>{
  await speakOnDevice('hola',0.85,()=>false,{});
  expect(Speech.speak).not.toHaveBeenCalled();
 });
+
+test('premium voices (reported by iOS as Default) win over enhanced ones',async()=>{
+ jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([voice('com.apple.voice.enhanced.es-ES.Monica','es-ES','Enhanced'),voice('com.apple.voice.premium.es-ES.Marisol','es-ES'),voice('com.apple.voice.compact.es-ES.Jorge','es-ES')]);
+ await speakOnDevice('hola',0.85,()=>true,{});
+ expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'com.apple.voice.premium.es-ES.Marisol'}));
+});
