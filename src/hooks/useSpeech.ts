@@ -153,6 +153,8 @@ import { configureAudioForSpeech } from '../utils/audio';
 import { naturalPlaybackRate } from '../utils/playbackRate';
 import { showAlert } from '../utils/dialogs';
 import { isVoicePreviewText } from '../config/voicePreviews';
+import { speakOnDevice } from '../utils/deviceSpeech';
+import { prepareSpeechText } from '../utils/speechText';
 
 /** Si el reproductor no arranca en este tiempo, se avisa (nunca se queda «Preparando…» para siempre). */
 const PLAYER_STARTUP_MS = 15_000;
@@ -571,11 +573,34 @@ export function useGeminiSimpleSpeech() {
       releaseGeminiPlayer(playerRef);
       pendingCleanup?.();
       pendingCleanup = undefined;
+      // Respuestas del asistente: si la voz natural falla, la respuesta se lee igualmente con la mejor voz en
+      // español instalada en el teléfono (sin avisos que interrumpan). Las pruebas de voz (Sulafat/Achird) no se
+      // sustituyen, para no hacer creer que esa es la voz elegida.
+      const deviceText = purpose === 'assistant' && !localPreviewSource ? prepareSpeechText(text) : '';
+      if (deviceText) {
+        setLoadingId(null);
+        setSpeakingId(id);
+        const done = () => finish();
+        void speakOnDevice(deviceText, Math.max(0.6, Math.min(1.1, rate)), current, {
+          onDone: done,
+          onStopped: done,
+          onError: () => {
+            finish();
+            void showAlert('Voz no disponible', NATURAL_VOICE_UNAVAILABLE);
+          },
+        }).catch(() => {
+          finish();
+          void showAlert('Voz no disponible', NATURAL_VOICE_UNAVAILABLE);
+        });
+        return;
+      }
       finish();
       void showAlert('Voz natural no disponible', inDemoMode() ? DEMO_VOICE_UNAVAILABLE : NATURAL_VOICE_UNAVAILABLE);
     };
     // Las respuestas largas se generan por frases en el servidor (un único audio): necesitan más tiempo.
-    preparationRef.current = setTimeout(fallback, text.length > 2800 ? 120_000 : 35_000);
+    // Asistente: si la voz natural tarda demasiado, se pasa antes a la voz del teléfono (la persona no espera en silencio).
+    const preparationMs = text.length > 2800 ? 120_000 : purpose === 'assistant' ? 20_000 : 35_000;
+    preparationRef.current = setTimeout(fallback, preparationMs);
     void (async () => {
       try {
         await configureAudioForSpeech();

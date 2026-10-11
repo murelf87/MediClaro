@@ -49,16 +49,22 @@ describe('Natural speech lifecycle',()=>{
  test('simple voice preparation does not claim playback',async()=>{
   mockSynthesize.mockResolvedValue({uri:'a.wav',cleanup:jest.fn()});await mount({simple:true});await act(async()=>output.speak('x','hello',0.85,'Achird'));expect(output.loadingId).toBe('x');expect(output.speakingId).toBeNull();await act(async()=>mockListener({playing:true}));expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
  });
- test('simple synthesis failure never falls back to the robotic device voice',async()=>{
+ test('assistant reply is still read with the best installed Spanish voice when natural synthesis fails',async()=>{
   mockSynthesize.mockRejectedValue(new Error('offline'));await mount({simple:true});await act(async()=>output.speak('x','hola'));
+  expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'es-premium',language:'es-ES'}));
+  expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
+  const opts=(Speech.speak as jest.Mock).mock.calls[0][1];await act(async()=>opts.onDone());expect(output.speakingId).toBeNull();
+ });
+ test('voice previews are never replaced by the device voice',async()=>{
+  mockSynthesize.mockRejectedValue(new Error('offline'));await mount({simple:true});await act(async()=>output.speak('x','hola',0.85,'Sulafat','preview'));
   expect(Speech.speak).not.toHaveBeenCalled();
   expect(output.speakingId).toBeNull();expect(output.loadingId).toBeNull();
  });
- test('native playback error releases natural audio without robotic fallback',async()=>{
+ test('native playback error releases natural audio and reads with the device voice',async()=>{
   const cleanup=jest.fn();mockSynthesize.mockResolvedValue({uri:'bad.wav',cleanup});await mount({simple:true});
   await act(async()=>output.speak('x','hola'));await act(async()=>mockListener({error:'decode failed'}));
-  expect(mockPlayer.remove).toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);expect(Speech.speak).not.toHaveBeenCalled();
-  expect(output.speakingId).toBeNull();expect(output.loadingId).toBeNull();
+  expect(mockPlayer.remove).toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);expect(Speech.speak).toHaveBeenCalledTimes(1);
+  expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
  });
  test('stop during natural synthesis prevents late playback',async()=>{
   let resolve:any;const cleanup=jest.fn();mockSynthesize.mockReturnValue(new Promise(r=>resolve=r));
@@ -66,17 +72,17 @@ describe('Natural speech lifecycle',()=>{
   await act(async()=>resolve({uri:'late.wav',cleanup}));
   expect(Speech.speak).not.toHaveBeenCalled();expect(mockPlayer.play).not.toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);
  });
- test('slow synthesis times out without switching to the device voice',async()=>{
+ test('slow synthesis switches to the device voice and ignores late audio',async()=>{
   jest.useFakeTimers();let resolve:any;const cleanup=jest.fn();mockSynthesize.mockReturnValue(new Promise(r=>resolve=r));
-  await mount({simple:true});await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(35000));
-  expect(Speech.speak).not.toHaveBeenCalled();expect(output.loadingId).toBeNull();
+  await mount({simple:true});await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(20000));
+  expect(Speech.speak).toHaveBeenCalledTimes(1);expect(output.loadingId).toBeNull();
   await act(async()=>resolve({uri:'late.wav',cleanup}));
   expect(cleanup).toHaveBeenCalledTimes(1);expect(mockPlayer.play).not.toHaveBeenCalled();
  });
- test('silent natural player startup stops instead of falling back to a robotic voice',async()=>{
+ test('silent natural player startup switches to the device voice',async()=>{
   jest.useFakeTimers();const cleanup=jest.fn();mockSynthesize.mockResolvedValue({uri:'silent.wav',cleanup});await mount({simple:true});
   await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(10000));
-  expect(Speech.speak).not.toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);expect(output.speakingId).toBeNull();
+  expect(Speech.speak).toHaveBeenCalledTimes(1);expect(cleanup).toHaveBeenCalledTimes(1);expect(output.speakingId).toBe('x');
  });
  test('medication reading retries natural TTS after an error',async()=>{
   mockSynthesize.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({uri:'retry.wav',cleanup:jest.fn()});
