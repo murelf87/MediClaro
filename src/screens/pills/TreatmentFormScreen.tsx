@@ -15,7 +15,7 @@ import { AppHeader, AppText, Chip, Icon, InfoBanner, PrimaryButton, Screen, Seco
 import { useAppTheme } from '../../hooks';
 import { usePillPlan } from '../../hooks/usePillPlan';
 import { MedicationPlanService, MedicinePhotoService, PillReminders, isAppError, requestReminderPermission } from '../../services';
-import { addDays, normalizeTimes, type DoseUnit, type Frequency } from '../../domain/medication';
+import { HOUR_INTERVALS, addDays, normalizeTimes, timesEveryHours, type DoseUnit, type Frequency } from '../../domain/medication';
 import { withPremium } from '../premium/PremiumGate';
 import { AmountStepper, DayChips, FormSection, PillPhoto, TimeEditor, dayTitle, todayDate } from './parts';
 
@@ -79,6 +79,24 @@ function TreatmentFormScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // «Cada X horas»: se elige el intervalo y la hora de la primera toma, y la app calcula todas las horas del día.
+  const [hourly, setHourly] = useState<number | null>(null);
+  const pickHourly = (h: number) => {
+    const next = hourly === h ? null : h;
+    setHourly(next);
+    if (next) {
+      const first = sortedTimes[0] ?? '08:00';
+      setTimes(timesEveryHours(next, first));
+    }
+  };
+  const changeTime = (i: number, v: string) => {
+    if (hourly && i === 0) setTimes(timesEveryHours(hourly, v));
+    else {
+      if (hourly) setHourly(null);
+      setTimes(times.map((x, j) => (j === i ? v : x)));
+    }
+  };
 
   const endDate = endMode === 'days' ? addDays(startDate, durationDays - 1) : null;
   const sortedTimes = useMemo(() => normalizeTimes(times), [times]);
@@ -221,14 +239,25 @@ function TreatmentFormScreen() {
         ) : null}
       </FormSection>
 
-      <FormSection title="¿A qué horas?" hint="Puedes poner varias horas para el mismo medicamento." testID="pills-form-times">
+      <FormSection title="¿A qué horas?" hint="Elige «Cada X horas» o pon tú las horas. Cada medicamento tiene sus propios avisos." testID="pills-form-times">
+        <AppText variant="bodyStrong" color="heading">Calcular las horas por mí</AppText>
+        <View style={styles.chips} testID="pills-form-hourly">
+          {HOUR_INTERVALS.map((h) => (
+            <Chip key={h} label={`Cada ${h} horas`} selected={hourly === h} onPress={() => pickHourly(h)} />
+          ))}
+        </View>
+        {hourly ? (
+          <AppText variant="caption" color="textSecondary" testID="pills-form-hourly-hint">
+            {`Pon la hora de la primera toma y te avisaremos cada ${hourly} horas: ${sortedTimes.join(', ')}.`}
+          </AppText>
+        ) : null}
         {times.map((time, i) => (
           <TimeEditor
             key={i}
             index={i}
             value={time}
-            onChange={(v) => setTimes(times.map((x, j) => (j === i ? v : x)))}
-            onRemove={times.length > 1 ? () => setTimes(times.filter((_, j) => j !== i)) : undefined}
+            onChange={(v) => changeTime(i, v)}
+            onRemove={times.length > 1 && !hourly ? () => setTimes(times.filter((_, j) => j !== i)) : undefined}
           />
         ))}
         {errors.times ? (
@@ -238,7 +267,7 @@ function TreatmentFormScreen() {
         ) : null}
         <View style={styles.chips}>
           {PRESET_TIMES.filter(([, v]) => !times.includes(v)).map(([label, v]) => (
-            <Chip key={v} label={`${label} · ${v}`} icon="add" onPress={() => setTimes([...times, v].slice(0, 8))} />
+            <Chip key={v} label={`${label} · ${v}`} icon="add" onPress={() => { setHourly(null); setTimes([...times, v].slice(0, 8)); }} />
           ))}
         </View>
       </FormSection>

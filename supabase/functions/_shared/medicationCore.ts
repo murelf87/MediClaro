@@ -162,6 +162,25 @@ export function normalizeTimes(times: string[]): string[] {
   return [...new Set(times.filter(isValidTime))].sort();
 }
 
+/** Intervalos que ofrece la app para «cada X horas». */
+export const HOUR_INTERVALS = [4, 6, 8, 12] as const;
+
+/**
+ * Horas de las tomas de un medicamento que se toma «cada X horas» a partir de la primera toma del día.
+ * Ej.: cada 8 h desde las 07:00 → 07:00, 15:00, 23:00. Cruza la medianoche sin problema (cada 6 h desde las 22:00 →
+ * 04:00, 10:00, 16:00, 22:00). Devuelve [] si el intervalo o la hora no son válidos.
+ */
+export function timesEveryHours(hours: number, firstTime: string): string[] {
+  if (!Number.isInteger(hours) || hours < 1 || hours > 12 || 24 % hours !== 0 || !isValidTime(firstTime)) return [];
+  const start = timeToMinutes(firstTime);
+  const out: string[] = [];
+  for (let i = 0; i < 24 / hours; i += 1) {
+    const m = (start + i * hours * 60) % 1440;
+    out.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  }
+  return normalizeTimes(out);
+}
+
 // ─── Zona horaria ─────────────────────────────────────────────────────────────────────────────────────────
 
 export interface LocalParts {

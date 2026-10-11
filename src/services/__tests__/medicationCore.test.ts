@@ -4,6 +4,7 @@
  */
 import {
   addDays,
+  timesEveryHours,
   answerMedicationQuestion,
   classifyNewDose,
   deviceZone,
@@ -330,5 +331,23 @@ describe('preguntas al asistente sobre las tomas', () => {
     expect(wantsPlanContext('¿Puedo tomar ibuprofeno con mis pastillas?')).toBe(true);
     expect(wantsPlanContext('¿Para qué sirve el ibuprofeno?')).toBe(false);
     expect(planContextLines([t])).toEqual(['- Metformina 850 mg, 1 comprimido: todos los días a las 15:45, 21:00']);
+  });
+});
+
+describe('cada X horas', () => {
+  test('calcula las horas del día a partir de la primera toma', () => {
+    expect(timesEveryHours(8, '07:00')).toEqual(['07:00', '15:00', '23:00']);
+    expect(timesEveryHours(6, '08:00')).toEqual(['02:00', '08:00', '14:00', '20:00']);
+    expect(timesEveryHours(4, '06:30')).toEqual(['02:30', '06:30', '10:30', '14:30', '18:30', '22:30']);
+    expect(timesEveryHours(12, '09:00')).toEqual(['09:00', '21:00']);
+  });
+  test('cruza la medianoche y respeta el máximo de 8 horas al día del servidor', () => {
+    expect(timesEveryHours(6, '22:00')).toEqual(['04:00', '10:00', '16:00', '22:00']);
+    expect(timesEveryHours(3, '00:00')).toHaveLength(8);
+  });
+  test('valores no válidos no producen avisos', () => {
+    expect(timesEveryHours(5, '08:00')).toEqual([]);
+    expect(timesEveryHours(8, '25:00')).toEqual([]);
+    expect(timesEveryHours(0, '08:00')).toEqual([]);
   });
 });
