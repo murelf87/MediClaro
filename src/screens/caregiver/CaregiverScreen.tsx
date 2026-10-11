@@ -17,6 +17,7 @@ import { confirmAsync, showAlert } from '../../utils/dialogs';
 import { GuideIllustration } from '../../components/Guide';
 import { CareHowItWorks } from './CareHowItWorks';
 import { isDrillIncident, startCareDrill, type CareDrill } from '../../services/careDrill';
+import { directionsUrl, placeUrl } from '../../utils/maps';
 import { CareChatService } from '../../services/CareChatService';
 import { useCareChatSummary } from '../../hooks/useCareChat';
 import { ChatBubble, ChatComposer } from '../../components/CareChat';
@@ -242,7 +243,9 @@ export default function CaregiverScreen(){
    {caregiver&&!(inDrill&&incident.members?.some(m=>m.acknowledgedAt))?<PrimaryButton label="Estoy atendiendo este aviso" disabled={busy} onPress={()=>inDrill?drill?.acknowledge():void run(()=>CaregiverService.acknowledge(incident.id))} testID="caregiver-acknowledge" />:null}
    {inDrill?<AppText variant="caption" color="textSecondary">En un aviso real verías aquí la ubicación del paciente, si la ha permitido. En el simulacro no se comparte ninguna ubicación.</AppText>:incident.latitude!==null&&incident.longitude!==null?<>
     <AppText>Ubicación {locationFresh(incident.location_at)?'reciente':'sin actualización reciente'} · {incident.location_at?new Date(incident.location_at).toLocaleTimeString():''} · precisión aproximada {Math.round(incident.accuracy??999)} m</AppText>
-    <SecondaryButton label="Ver ubicación en el mapa" icon="map-outline" onPress={()=>void Linking.openURL('https://maps.google.com/?q='+incident.latitude+','+incident.longitude).catch(()=>setError('No se ha podido abrir el mapa.'))} />
+    {/* Ir hasta la persona: ruta paso a paso con Google Maps desde donde está el cuidador/a. */}
+    <PrimaryButton label="Cómo llegar (Google Maps)" icon="navigate" onPress={()=>void Linking.openURL(directionsUrl(incident.latitude!,incident.longitude!)).catch(()=>setError('No se ha podido abrir Google Maps.'))} testID="caregiver-directions" />
+    <SecondaryButton label="Ver ubicación en el mapa" icon="map-outline" onPress={()=>void Linking.openURL(placeUrl(incident.latitude!,incident.longitude!)).catch(()=>setError('No se ha podido abrir el mapa.'))} />
    </>:<AppText variant="caption" color="textSecondary">Ubicación no disponible o no autorizada.</AppText>}
    {inDrill?null:<AppText variant="caption" color="textSecondary">La ubicación se actualiza mientras el paciente mantiene MediClaro abierta. Si está bloqueada, sin conexión o sin permiso, se mostrará la última actualización.</AppText>}
    {inDrill?<AppText variant="caption" color="textSecondary">En un aviso real también podéis hablar con una llamada de voz por internet desde aquí.</AppText>

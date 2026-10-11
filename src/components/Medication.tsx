@@ -8,13 +8,16 @@ import { Icon } from './Icon';
 import { MedicineBoxArt } from './Illustrations';
 import { useAppTheme } from '../providers/PreferencesProvider';
 import { MedicinePhotoService } from '../services/MedicinePhotoService';
+import { fullSizeOfficialPhoto, photoCandidates } from '../utils/medicinePhoto';
 
 /** ¿La clave es un nº de registro (de CIMA) y no un nombre? */
 const isMedicineId = (key: string | undefined): key is string => !!key && /^[0-9A-Za-z-]{1,20}$/.test(key);
 
+
 /**
- * Foto del envase: la oficial cuando existe; si no, la foto de su caja que la persona eligió guardar (solo en su
- * teléfono); y si tampoco, un envase ilustrado (nunca un cuadrado vacío). Con `preferOwn` (Mis pastillas) se
+ * Foto del envase: la oficial cuando existe (a tamaño completo si se ve grande); si no, la foto de su caja que la
+ * persona eligió guardar (solo en su teléfono) o la que acaba de hacer para identificarlo; y si tampoco, un envase
+ * ilustrado (nunca un cuadrado vacío). Con `preferOwn` (Mis pastillas) se
  * enseña primero la foto propia, porque es SU caja la que tiene que reconocer.
  */
 export function MedicationImage({
@@ -28,6 +31,7 @@ export function MedicationImage({
   accessibilityLabel,
   ownPhotoKeys,
   preferOwn = false,
+  fallbackUri,
 }: {
   uri: string | null | undefined;
   /** Carga perezosa de la imagen si no se conoce (la aporta la pantalla). */
@@ -43,10 +47,20 @@ export function MedicationImage({
   ownPhotoKeys?: string[];
   /** Enseñar primero la foto propia (Mis pastillas). */
   preferOwn?: boolean;
+  /**
+   * Foto de la caja que la persona acaba de hacer para identificarlo (solo en memoria): se enseña cuando no hay foto
+   * oficial ni foto guardada, para ver SU caja real en vez del dibujo.
+   */
+  fallbackUri?: string | null;
 }) {
   const theme = useAppTheme();
-  const [src, setSrc] = useState<string | null>(uri ?? null);
-  const [failed, setFailed] = useState(false);
+  // Tamaño en pantalla: a partir de ~120 pt la miniatura oficial se vería borrosa → foto oficial a tamaño completo.
+  const large = (typeof width === 'number' ? width : 999) > 120 || height > 100;
+  const officialSize = (u: string) => (large ? fullSizeOfficialPhoto(u) : u);
+  // Fotos posibles, en orden; si una no carga se pasa a la siguiente (al final, el envase ilustrado).
+  const [candidates, setCandidates] = useState<string[]>(() => (uri && !preferOwn ? [officialSize(uri)] : []));
+  const [attempt, setAttempt] = useState(0);
+  const src = candidates[attempt] ?? null;
   const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
   // La función de carga puede cambiar en cada render: la guardamos en una ref.
   const loadRef = useRef(loadUri);
@@ -58,36 +72,29 @@ export function MedicationImage({
   // Cambia cuando se guarda o se quita una foto propia: así se ve al momento.
   const photosVersion = useSyncExternalStore(MedicinePhotoService.subscribe, MedicinePhotoService.version, MedicinePhotoService.version);
 
+  const fallbackRef = useRef(fallbackUri ?? null);
+  fallbackRef.current = fallbackUri ?? null;
+  const fallbackId = fallbackUri ? `${fallbackUri.length}:${fallbackUri.slice(-24)}` : '';
+
   useEffect(() => {
     let cancelled = false;
-    setSrc(preferOwn ? null : uri ?? null);
-    setFailed(false);
+    setCandidates(uri && !preferOwn ? [officialSize(uri)] : []);
+    setAttempt(0);
     const own = () => (keysRef.current.length ? MedicinePhotoService.get(keysRef.current) : Promise.resolve(null));
     const official = async () => uri ?? (loadRef.current ? await loadRef.current().catch(() => null) : null);
     void (async () => {
-      const first = preferOwn ? await own() : await official();
-      const found = first ?? (preferOwn ? await official() : await own());
-      if (!cancelled) setSrc(found ?? null);
+      const [officialUri, ownUri] = await Promise.all([official(), own()]);
+      const list = photoCandidates({ official: officialUri, own: ownUri, fallback: fallbackRef.current, preferOwn, large });
+      if (!cancelled) {
+        setCandidates(list);
+        setAttempt(0);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [uri, imageKey, keysId, preferOwn, photosVersion]);
-
-  // Si la foto oficial no carga (sin conexión, enlace roto), se prueba con la propia antes que con el dibujo.
-  useEffect(() => {
-    if (!failed || !keysRef.current.length) return undefined;
-    let cancelled = false;
-    void MedicinePhotoService.get(keysRef.current).then((own) => {
-      if (!cancelled && own && own !== src) {
-        setSrc(own);
-        setFailed(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [failed, src]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uri, imageKey, keysId, preferOwn, photosVersion, fallbackId, large]);
 
   const boxWidth = typeof width === 'number' ? width : measuredWidth ?? 160;
   const artWidth = boxWidth * 0.82;
@@ -99,19 +106,20 @@ export function MedicationImage({
       style={[
         styles.imageBox,
         // Las fotos oficiales de CIMA tienen fondo blanco: el marco también, para que la caja se vea limpia.
-        { width, height, borderRadius: radius ?? theme.radius.sm, backgroundColor: src && !failed ? '#FFFFFF' : theme.colors.surfaceAlt },
+        { width, height, borderRadius: radius ?? theme.radius.sm, backgroundColor: src ? '#FFFFFF' : theme.colors.surfaceAlt },
         style,
       ]}
       accessible={!!accessibilityLabel}
       accessibilityRole="image"
       accessibilityLabel={accessibilityLabel}
     >
-      {src && !failed ? (
+      {src ? (
         <Image
+          key={src}
           source={{ uri: src }}
           style={styles.image}
           resizeMode="contain"
-          onError={() => setFailed(true)}
+          onError={() => setAttempt((n) => n + 1)}
           accessibilityIgnoresInvertColors
         />
       ) : (

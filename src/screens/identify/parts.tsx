@@ -282,11 +282,17 @@ export function HeroMedicationImage({
   loadUri,
   height = 180,
   accessibilityLabel,
+  imageKey,
+  fallbackUri,
 }: {
   uri: string | null;
   loadUri?: () => Promise<string | null>;
   height?: number;
   accessibilityLabel?: string;
+  /** Nº de registro: para enseñar la foto de su caja si la guardó. */
+  imageKey?: string;
+  /** La foto de la caja que acaba de hacer (si no hay foto oficial). */
+  fallbackUri?: string | null;
 }) {
   const theme = useAppTheme();
   const [width, setWidth] = useState<number | null>(null);
@@ -301,6 +307,8 @@ export function HeroMedicationImage({
       <MedicationImage
         uri={uri}
         loadUri={loadUri}
+        imageKey={imageKey}
+        fallbackUri={fallbackUri}
         width={width ?? '100%'}
         height={height}
         radius={theme.radius.lg}

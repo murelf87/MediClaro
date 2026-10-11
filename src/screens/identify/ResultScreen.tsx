@@ -44,6 +44,13 @@ export default function ResultScreen() {
     () => (medId ? MedicationService.getMedicationImage(medId) : Promise.resolve(null)),
     [medId],
   );
+  // La foto de SU caja que acaba de hacer (solo en memoria): se ve si CIMA no tiene foto oficial de este envase.
+  const [scanPhoto] = useState(() => {
+    if (!resolved) return null;
+    const raw = MedicationService.getLastScanImage();
+    if (!raw) return null;
+    return raw.startsWith('data:') ? raw : `data:image/jpeg;base64,${raw}`;
+  });
 
   const header = <AppHeader right={med ? <FavoriteButton state={saved} /> : undefined} />;
 
@@ -93,7 +100,14 @@ export default function ResultScreen() {
 
   return (
     <Screen header={header}>
-      <HeroMedicationImage uri={med.imageUrl} loadUri={loadImage} height={184} accessibilityLabel={`Envase de ${med.name}`} />
+      <HeroMedicationImage
+        uri={med.imageUrl}
+        loadUri={loadImage}
+        imageKey={med.id}
+        fallbackUri={scanPhoto}
+        height={184}
+        accessibilityLabel={`Envase de ${med.name}`}
+      />
 
       <View style={{ marginTop: theme.spacing.md }}>
         {picked ? (
