@@ -6,6 +6,7 @@
  * permanente solo se hace mediante la acción explícita de privacidad del usuario.
  */
 import { invokeFunction, requireUserId, supabase, toAppError } from '../api';
+import { AppError } from '../api/errors';
 import { MedicationPlanService } from './MedicationPlanService';
 import { answerMedicationQuestion, detectMedicationIntent, deviceZone } from '../domain/medication';
 
@@ -35,6 +36,10 @@ type Listener = (messages: AssistantMessage[]) => void;
 
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_MESSAGE_LENGTH = 1000;
+
+/** Fotos de documentos pendientes de explicar (solo en memoria, hasta que llega la respuesta; nunca se guardan). */
+const pendingDocs = new Map<string, string[]>();
+export const MAX_DOCUMENT_PHOTOS = 3;
 
 const conversations = new Map<string, AssistantMessage[]>();
 const listeners = new Map<string, Set<Listener>>();
@@ -146,11 +151,13 @@ export const AssistantService = {
   },
 
   clearConversation(key: string): void {
+    for (const m of conversations.get(key) ?? []) pendingDocs.delete(m.id);
     conversations.delete(key);
     emit(key);
   },
 
   clearAll(): void {
+    pendingDocs.clear();
     const keys = [...conversations.keys()];
     conversations.clear();
     keys.forEach(emit);
@@ -173,8 +180,66 @@ export const AssistantService = {
     await AssistantService.deliver(key, userMsg.id, ctx);
   },
 
+  /** «Explicar un documento» (clip del chat): manda 1–3 fotos ya preparadas (base64 JPEG). Nunca lanza. */
+  async sendDocument(key: string, images: string[]): Promise<void> {
+    const photos = images.filter((i) => typeof i === 'string' && i.length > 0).slice(0, MAX_DOCUMENT_PHOTOS);
+    if (!photos.length) return;
+    const userMsg: AssistantMessage = {
+      id: newId(),
+      role: 'user',
+      text: photos.length === 1 ? '📎 Documento enviado (1 foto)' : `📎 Documento enviado (${photos.length} fotos)`,
+      createdAt: new Date().toISOString(),
+      status: 'sending',
+    };
+    pendingDocs.set(userMsg.id, photos);
+    update(key, (list) => [...list, userMsg]);
+    if (!key.startsWith('med:')) AssistantThreads.touch(key, 'Documento enviado');
+    await AssistantService.deliverDocument(key, userMsg.id);
+  },
+
+  async deliverDocument(key: string, messageId: string): Promise<void> {
+    const images = pendingDocs.get(messageId);
+    try {
+      if (!images) throw new AppError('unknown', 'Las fotos ya no están en el teléfono. Vuelve a enviarlas con el clip.');
+      await requireUserId();
+      await AiConsentService.assertGranted();
+      const res = await invokeFunction<{ reply: string; sourceUrl?: string | null; messageId?: string }>(
+        'explain-document',
+        { images, conversationKey: key, clientMessageId: messageId },
+        { timeoutMs: 80_000 },
+      );
+      pendingDocs.delete(messageId);
+      if (!(conversations.get(key) ?? []).some((m) => m.id === messageId)) return;
+      const reply: AssistantMessage = {
+        id: res.messageId ?? newId(),
+        role: 'assistant',
+        text: normalizeAssistantText(res.reply ?? '') || 'No he podido leer el documento. Prueba con otra foto, con más luz y más cerca.',
+        createdAt: new Date().toISOString(),
+        sourceUrl: res.sourceUrl ?? null,
+      };
+      update(key, (l) => {
+        const next = l.map((m) => (m.id === messageId ? { ...m, status: 'sent' as const } : m));
+        next.splice(next.findIndex((m) => m.id === messageId) + 1, 0, reply);
+        return next;
+      });
+    } catch (e) {
+      const err = toAppError(e);
+      if (!(conversations.get(key) ?? []).some((m) => m.id === messageId)) return;
+      update(key, (l) =>
+        l.map((m) => (m.id === messageId ? { ...m, status: 'error', errorKind: err.kind, errorCode: err.code, errorMessage: err.message } : m)),
+      );
+    }
+  },
+
   /** Reintenta un mensaje que falló. */
   async retryMessage(key: string, messageId: string, ctx?: AssistantContext): Promise<void> {
+    if (pendingDocs.has(messageId)) {
+      update(key, (list) =>
+        list.map((m) => (m.id === messageId ? { ...m, status: 'sending', errorKind: undefined, errorCode: undefined, errorMessage: undefined } : m)),
+      );
+      await AssistantService.deliverDocument(key, messageId);
+      return;
+    }
     update(key, (list) =>
       list.map((m) => (m.id === messageId ? { ...m, status: 'sending', errorKind: undefined, errorCode: undefined, errorMessage: undefined } : m)),
     );

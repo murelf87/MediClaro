@@ -52,6 +52,8 @@ export type EdgeFunctionName =
   | 'identify-medicine'
   | 'medicine-detail'
   | 'chat'
+  /** Clip del chat: explica con palabras sencillas la foto de un informe, receta o analítica. */
+  | 'explain-document'
   | 'tts'
   | 'tts-preview'
   | 'voice-transcribe'

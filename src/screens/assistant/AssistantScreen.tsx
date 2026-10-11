@@ -67,6 +67,8 @@ import {
   useKeyboardVisible,
 } from './parts';
 import { ConversationsSheet } from './ConversationsSheet';
+import { DocumentSheet } from './DocumentSheet';
+import { pickDocumentPhotos, type DocumentSource } from './documentPhotos';
 import { AssistantSpeed, ASSISTANT_SPEEDS, assistantRate, type AssistantSpeedKey } from '../../services/AssistantSpeed';
 import { AssistantThreads, type AssistantThread } from '../../services/AssistantThreads';
 
@@ -154,7 +156,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   );
   const shortName = medicationName ? shortMedicationName(medicationName) : null;
 
-  const { messages, sending, send, retry } = useAssistantConversation(ctx);
+  const { messages, sending, send, sendDocument, retry } = useAssistantConversation(ctx);
   const { speakingId, loadingId, speak, stop } = useGeminiSimpleSpeech();
   // Velocidad de lectura de las respuestas (caracol, tortuga, conejo): se recuerda y se usa también al leerlas solas.
   const speed = useSyncExternalStore(AssistantSpeed.subscribe, AssistantSpeed.get, AssistantSpeed.get);
@@ -162,6 +164,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
   const rate = assistantRate(speed);
   // Conversaciones: abrir una nueva (las anteriores se conservan) o volver a una anterior. Solo en el chat general.
   const [chatsOpen, setChatsOpen] = useState(false);
+  const [docOpen, setDocOpen] = useState(false);
+  const [docBusy, setDocBusy] = useState(false);
   const [threads, setThreads] = useState<AssistantThread[]>(() => AssistantThreads.list());
   const [activeThread, setActiveThread] = useState(() => AssistantThreads.activeKey());
   useEffect(() => {
@@ -319,6 +323,31 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
     initialAsked.current = true;
     void submit(initialQuestion);
   }, [initialQuestion, sending, submit]);
+
+  // Clip: foto(s) de un informe, receta o analítica para que el asistente las explique con palabras sencillas.
+  const attachDocument = useCallback(
+    async (source: DocumentSource) => {
+      if (docBusy || sending) return;
+      setDocBusy(true);
+      try {
+        // Permiso explícito antes de mandar nada a la IA (si no lo da, no se abre ni la cámara).
+        if (!(await AiConsentService.ensure())) return;
+        setDocOpen(false);
+        const photos = await pickDocumentPhotos(source);
+        if (!photos.length) return;
+        autoSpeakAfterRef.current = Date.now();
+        stickToBottom.current = true;
+        void sendDocument(photos);
+        scrollToEnd();
+      } catch (e) {
+        setDocOpen(false);
+        await showAlert('No se ha podido añadir la foto', (e as Error).message || 'Inténtalo de nuevo.');
+      } finally {
+        setDocBusy(false);
+      }
+    },
+    [docBusy, sending, sendDocument, scrollToEnd],
+  );
 
   const beginVoiceMessage = useCallback(async () => {
     if (sending || processingVoice || recordingRef.current) return;
@@ -561,6 +590,7 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
           onClose={() => setChatsOpen(false)}
         />
       ) : null}
+      <DocumentSheet visible={docOpen} busy={docBusy} onCamera={() => void attachDocument('camera')} onLibrary={() => void attachDocument('library')} onClose={() => setDocOpen(false)} />
       <View ref={wrapRef} style={styles.flex} onLayout={measureWrap} collapsable={false}>
         <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
           {medicationName ? (
@@ -659,6 +689,17 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
                   ]}
                   testID="assistant-input"
                 />
+                <View style={styles.sendWrap}>
+                  <IconButton
+                    icon="attach"
+                    variant="tonal"
+                    size={24}
+                    accessibilityLabel="Adjuntar la foto de un documento"
+                    onPress={() => setDocOpen(true)}
+                    disabled={sending || recordingVoice || processingVoice}
+                    testID="assistant-attach"
+                  />
+                </View>
                 <View style={styles.sendWrap}>
                   <IconButton
                     icon="paper-plane"

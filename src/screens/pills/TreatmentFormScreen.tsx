@@ -81,7 +81,12 @@ function TreatmentFormScreen() {
   const [serverError, setServerError] = useState<string | null>(null);
 
   // «Cada X horas»: se elige el intervalo y la hora de la primera toma, y la app calcula todas las horas del día.
-  const [hourly, setHourly] = useState<number | null>(null);
+  const [hourly, setHourly] = useState<number | null>(() => {
+    // Al cambiar una pauta que ya iba «cada X horas», el botón sigue encendido.
+    const t = normalizeTimes(existing?.times ?? []);
+    if (t.length < 2) return null;
+    return HOUR_INTERVALS.find((h) => timesEveryHours(h, t[0]).join() === t.join()) ?? null;
+  });
   const pickHourly = (h: number) => {
     const next = hourly === h ? null : h;
     setHourly(next);

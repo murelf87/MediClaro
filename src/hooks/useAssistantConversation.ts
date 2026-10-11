@@ -23,8 +23,9 @@ export function useAssistantConversation(ctx?: AssistantContext) {
   const sending = messages.some((m) => m.status === 'sending');
 
   const send = useCallback((text: string) => AssistantService.sendMessage(key, text, ctx), [key, ctx?.medicationId]);
+  const sendDocument = useCallback((images: string[]) => AssistantService.sendDocument(key, images), [key]);
   const retry = useCallback((id: string) => AssistantService.retryMessage(key, id, ctx), [key, ctx?.medicationId]);
   const clear = useCallback(() => AssistantService.clearConversation(key), [key]);
 
-  return { messages, sending, send, retry, clear };
+  return { messages, sending, send, sendDocument, retry, clear };
 }
