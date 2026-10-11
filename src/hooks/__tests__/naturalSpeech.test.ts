@@ -20,7 +20,7 @@ import { __resetVoiceDiagnostics, clearVoiceFailure, lastVoiceFailure } from '..
 let output:any;let tree:any;
 const sections=[{id:'a',title:'A',text:'one'},{id:'b',title:'B',text:'two'}];
 const readingParts=['Qué es. Un analgésico.','Para qué sirve. Para el dolor.'];
-function Probe({voice='Sulafat',simple=false,continuous=false}:any){output=continuous?useGeminiContinuousSpeech(readingParts,0.85,voice):simple?useGeminiSimpleSpeech():useGeminiSectionSpeech(sections,0.85,voice);return null;}
+function Probe({voice='Sulafat',simple=false,continuous=false,phone}:any){output=continuous?useGeminiContinuousSpeech(readingParts,0.85,voice,phone):simple?useGeminiSimpleSpeech():useGeminiSectionSpeech(sections,0.85,voice);return null;}
 async function mount(props:any={}){await act(async()=>{tree=create(React.createElement(Probe,props));});}
 beforeEach(()=>{jest.spyOn(Speech, 'speak').mockImplementation(()=>undefined as any);jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue([{identifier:'es-premium',name:'Spanish',language:'es-ES',quality:'Enhanced' as any}]);(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;mockSynthesize.mockReset();mockConfigure.mockReset().mockResolvedValue(undefined);mockReport.mockClear();__resetVoiceDiagnostics();[mockPlayer.play,mockPlayer.pause,mockPlayer.remove,mockPlayer.addListener,mockPlayer.setPlaybackRate].forEach((f:any)=>f.mockClear());});
 beforeEach(async()=>{await clearVoiceFailure();});
@@ -186,5 +186,18 @@ describe('Natural speech lifecycle',()=>{
   expect((Speech.speak as jest.Mock).mock.calls.at(-1)[1].voice).toBe('com.apple.voice.premium.es-ES.Marisol');
   await act(async()=>output.speak('y','adiós',0.85,'Achird','assistant'));
   expect((Speech.speak as jest.Mock).mock.calls.at(-1)[1].voice).toBe('com.apple.voice.compact.es-ES.Jorge');
+ });
+ test('lectura de un medicamento: si Google falla, se lee entera con la voz del teléfono (no se queda en un aviso)',async()=>{
+  mockSynthesize.mockRejectedValue(new Error('HTTP 503'));await mount({continuous:true});await act(async()=>output.play());
+  expect(Speech.speak).toHaveBeenCalled();expect(output.status).toBe('speaking');
+  const first=(Speech.speak as jest.Mock).mock.calls[0];expect(first[0]).toContain('Qué es');expect(first[1].voice).toBe('es-premium');
+  await act(async()=>output.stop?.());
+ });
+ test('lectura de un medicamento con el respaldo del teléfono: respeta la voz de hombre que eligió la persona',async()=>{
+  jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([
+   {identifier:'com.apple.voice.premium.es-ES.Marisol',name:'Marisol',language:'es-ES',quality:'Default' as any},
+   {identifier:'com.apple.voice.compact.es-ES.Jorge',name:'Jorge',language:'es-ES',quality:'Default' as any}]);
+  mockSynthesize.mockRejectedValue(new Error('HTTP 429'));await mount({continuous:true,phone:'Achird'});await act(async()=>output.play());
+  expect((Speech.speak as jest.Mock).mock.calls[0][1].voice).toBe('com.apple.voice.compact.es-ES.Jorge');
  });
 });

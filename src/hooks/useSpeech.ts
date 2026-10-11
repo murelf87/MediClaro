@@ -199,7 +199,7 @@ function releaseGeminiPlayer(ref: { current: GeminiPlayerRef | null }) {
 }
 
 /** Reproducción continua: genera toda la explicación y la reproduce como un único audio. */
-export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: GeminiVoice = 'Sulafat') {
+export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: GeminiVoice = 'Sulafat', phoneVoiceOf?: GeminiVoice) {
   const [status, setStatus] = useState<SpeechStatus>('idle');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -208,10 +208,13 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
   const partsRef = useRef(parts);
   const rateRef = useRef(rate);
   const voiceRef = useRef(voice);
+  // Mujer u hombre para la voz del teléfono (por defecto, el de la voz natural que se pide).
+  const phoneVoiceRef = useRef<GeminiVoice | undefined>(phoneVoiceOf);
   const statusRef = useRef<SpeechStatus>('idle');
   partsRef.current = parts;
   rateRef.current = rate;
   voiceRef.current = voice;
+  phoneVoiceRef.current = phoneVoiceOf;
   statusRef.current = status;
 
   const setSpeechStatus = useCallback((next: SpeechStatus) => {
@@ -228,13 +231,48 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
     readerRef.current = null;
   };
 
+  // Lectura con la voz del teléfono: sin pedir nada al servidor, apartado por apartado.
+  const startDevice = useCallback(async (my: number, cleanParts: string[]) => {
+    const spoken = cleanParts.map((p) => prepareSpeechText(p)).filter(Boolean);
+    await configureAudioForSpeech();
+    if (my !== token.current) return;
+    const reader = createDeviceReader(spoken, () => deviceRate(rateRef.current), {
+      onProgress: (seconds) => {
+        if (my === token.current) setCurrentTime(seconds);
+      },
+      onSpeaking: () => {
+        if (my === token.current) setSpeechStatus('speaking');
+      },
+      onFinished: () => {
+        if (my === token.current) setSpeechStatus('finished');
+      },
+      onError: () => {
+        if (my !== token.current) return;
+        releaseReader();
+        setSpeechStatus('error');
+        void showAlert('Voz no disponible', 'No se ha podido leer con la voz del teléfono. Vuelve a intentarlo.');
+      },
+    }, genderOfVoice(phoneVoiceRef.current ?? voiceRef.current));
+    readerRef.current = reader;
+    durationRef.current = reader.total;
+    setDuration(reader.total);
+    reader.play();
+  }, [setSpeechStatus]);
+
+  // Si la voz natural no llega (sin internet, límite de Google o tope mensual), la explicación no se queda en un
+  // aviso: se lee con la mejor voz del teléfono, del tipo (mujer u hombre) que la persona eligió.
   const fail = useCallback((my: number, message: string, reason?: string) => {
     if (my !== token.current) return;
     traceRef.current?.fail(reason ?? message);
     releaseGeminiPlayer(playerRef);
-    setSpeechStatus('error');
-    void showAlert(`${voiceRef.current} no está disponible`, message);
-  }, [setSpeechStatus]);
+    if (inDemoMode()) {
+      setSpeechStatus('error');
+      void showAlert(`${voiceRef.current} no está disponible`, message);
+      return;
+    }
+    setSpeechStatus('loading');
+    void startDevice(my, partsRef.current.map((p) => p.trim()).filter(Boolean));
+  }, [setSpeechStatus, startDevice]);
 
   const prepareAndPlay = useCallback(async () => {
     const cleanParts = partsRef.current.map((p) => p.trim()).filter(Boolean);
@@ -248,31 +286,7 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
     setDuration(0);
     setSpeechStatus('loading');
     if (VoiceSettings.mode() === 'device') {
-      // Voz del teléfono: sin pedir nada al servidor, apartado por apartado.
-      const spoken = cleanParts.map((p) => prepareSpeechText(p)).filter(Boolean);
-      await configureAudioForSpeech();
-      if (my !== token.current) return;
-      const reader = createDeviceReader(spoken, () => deviceRate(rateRef.current), {
-        onProgress: (seconds) => {
-          if (my === token.current) setCurrentTime(seconds);
-        },
-        onSpeaking: () => {
-          if (my === token.current) setSpeechStatus('speaking');
-        },
-        onFinished: () => {
-          if (my === token.current) setSpeechStatus('finished');
-        },
-        onError: () => {
-          if (my !== token.current) return;
-          releaseReader();
-          setSpeechStatus('error');
-          void showAlert('Voz no disponible', 'No se ha podido leer con la voz del teléfono. Vuelve a intentarlo.');
-        },
-      }, genderOfVoice(voiceRef.current));
-      readerRef.current = reader;
-      durationRef.current = reader.total;
-      setDuration(reader.total);
-      reader.play();
+      await startDevice(my, cleanParts);
       return;
     }
     const trace = startVoiceTrace('lectura', voiceRef.current);
@@ -332,7 +346,7 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
     } catch (e) {
       fail(my, NATURAL_VOICE_UNAVAILABLE, `${trace.last() === 'servidor' ? 'el servidor no ha devuelto la voz' : 'error'}: ${errorText(e)}`);
     }
-  }, [fail, setSpeechStatus]);
+  }, [fail, setSpeechStatus, startDevice]);
 
   const play = useCallback(() => {
     const reader = readerRef.current;

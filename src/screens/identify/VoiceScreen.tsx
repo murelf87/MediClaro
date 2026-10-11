@@ -71,7 +71,7 @@ export default function VoiceScreen() {
   // Voz natural: siempre Sulafat (la más clara). Voz del teléfono (si el propietario la eligió para toda la app): de
   // mujer o de hombre, como la que eligió la persona en Accesibilidad.
   const deviceVoice = useSyncExternalStore(VoiceSettings.subscribe, VoiceSettings.mode, VoiceSettings.mode) === 'device';
-  const speech = useGeminiContinuousSpeech(audioParts, prefs.speechRate, deviceVoice ? prefs.assistantVoice : 'Sulafat');
+  const speech = useGeminiContinuousSpeech(audioParts, prefs.speechRate, deviceVoice ? prefs.assistantVoice : 'Sulafat', prefs.assistantVoice);
 
   const playing = speech.status === 'speaking';
   const loading = speech.status === 'loading';
@@ -140,7 +140,7 @@ export default function VoiceScreen() {
         Lectura en voz alta
       </AppText>
       <AppText variant="captionStrong" color="textSecondary">
-        Voz natural: Sulafat
+        {deviceVoice ? 'Voz del teléfono' : 'Voz natural: Sulafat'}
       </AppText>
 
       <View style={[styles.medRow, { marginTop: theme.spacing.md, gap: theme.spacing.md }]}>
