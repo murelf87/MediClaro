@@ -25,3 +25,13 @@ test('premium voices (reported by iOS as Default) win over enhanced ones',async(
  await speakOnDevice('hola',0.85,()=>true,{});
  expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'com.apple.voice.premium.es-ES.Marisol'}));
 });
+test('never picks robotic Eloquence voices; prefers the normal Spanish voice over them',async()=>{
+ jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([voice('com.apple.eloquence.es-ES.Eddy','es-ES'),voice('com.apple.eloquence.es-ES.Flo','es-ES'),voice('com.apple.voice.compact.es-ES.Monica','es-ES')]);
+ await speakOnDevice('hola',0.85,()=>true,{});
+ expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'com.apple.voice.compact.es-ES.Monica'}));
+});
+test('only robotic voices installed: lets the system choose its default Spanish voice',async()=>{
+ jest.spyOn(Speech,'getAvailableVoicesAsync').mockResolvedValue([voice('com.apple.eloquence.es-ES.Eddy','es-ES')]);
+ await speakOnDevice('hola',0.85,()=>true,{});
+ expect((Speech.speak as jest.Mock).mock.calls[0][1].voice).toBeUndefined();
+});

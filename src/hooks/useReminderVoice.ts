@@ -12,7 +12,7 @@ import * as Speech from 'expo-speech';
 import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
 import { DemoMode, SpeechService, type GeminiVoice } from '../services';
 import { configureAudioForSpeech } from '../utils/audio';
-import { naturalPlaybackRate } from '../utils/playbackRate';
+import { applyPlaybackRate, naturalPlaybackRate } from '../utils/playbackRate';
 
 /* eslint-disable-next-line @typescript-eslint/no-require-imports */
 const ALARM = require('../../assets/sounds/mediclaro_alarma.wav');
@@ -91,8 +91,7 @@ export function useReminderVoice() {
           return;
         }
         const p = createAudioPlayer(audio.uri, { updateInterval: 250 });
-        p.playbackRate = naturalPlaybackRate(rate);
-        p.shouldCorrectPitch = true;
+        applyPlaybackRate(p, naturalPlaybackRate(rate));
         player.current = p;
         cleanup.current = audio.cleanup;
         p.play();

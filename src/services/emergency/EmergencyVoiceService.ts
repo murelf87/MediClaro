@@ -15,6 +15,7 @@ import { generateVerbalSummary } from './EmergencyReportService';
 import { SpeechService } from '../SpeechService';
 import { PreferencesService } from '../PreferencesService';
 import { configureAudioForSpeech } from '../../utils/audio';
+import { applyPlaybackRate } from '../../utils/playbackRate';
 
 export class ExpoSpeechEmergencyVoiceService implements EmergencyVoiceProvider {
   private currentLanguage = 'es-ES';
@@ -69,8 +70,7 @@ export class ExpoSpeechEmergencyVoiceService implements EmergencyVoiceProvider {
       }
 
       const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
-      player.playbackRate = this.playbackRate();
-      player.shouldCorrectPitch = true;
+      applyPlaybackRate(player, this.playbackRate());
       this.player = player;
       this.cleanupFile = audio.cleanup;
 

@@ -3,7 +3,10 @@ import { act, create } from 'react-test-renderer';
 const mockSynthesize=jest.fn();
 const mockConfigure=jest.fn(async()=>undefined);
 let mockListener: (s:any)=>void;
-const mockPlayer={play:jest.fn(),pause:jest.fn(),remove:jest.fn(),addListener:jest.fn((_:string,fn:any)=>{mockListener=fn;return {remove:jest.fn()};})};
+// Igual que el reproductor real de expo-audio 57: «playbackRate» es SOLO DE LECTURA (asignarlo lanza un error) y la
+// velocidad se cambia con setPlaybackRate(). Así una regresión vuelve a fallar aquí y no solo en el teléfono.
+const mockPlayer:any={play:jest.fn(),pause:jest.fn(),remove:jest.fn(),setPlaybackRate:jest.fn(),shouldCorrectPitch:false,addListener:jest.fn((_:string,fn:any)=>{mockListener=fn;return {remove:jest.fn()};})};
+Object.defineProperty(mockPlayer,'playbackRate',{get:()=>1,enumerable:true});
 jest.mock('../../services',()=>({SpeechService:{synthesize:(...a:any[])=>mockSynthesize(...a)}}));
 jest.mock('../../utils/audio',()=>({configureAudioForSpeech:()=>mockConfigure()}));
 jest.mock('../../utils/dialogs',()=>({showAlert:jest.fn(async()=>undefined)}));
@@ -14,7 +17,7 @@ let output:any;let tree:any;
 const sections=[{id:'a',title:'A',text:'one'},{id:'b',title:'B',text:'two'}];
 function Probe({voice='Sulafat',simple=false}:any){output=simple?useGeminiSimpleSpeech():useGeminiSectionSpeech(sections,0.85,voice);return null;}
 async function mount(props:any={}){await act(async()=>{tree=create(React.createElement(Probe,props));});}
-beforeEach(()=>{jest.spyOn(Speech, 'speak').mockImplementation(()=>undefined as any);jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue([{identifier:'es-premium',name:'Spanish',language:'es-ES',quality:'Enhanced' as any}]);(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;mockSynthesize.mockReset();mockConfigure.mockReset().mockResolvedValue(undefined);[mockPlayer.play,mockPlayer.pause,mockPlayer.remove,mockPlayer.addListener].forEach(f=>f.mockClear());});
+beforeEach(()=>{jest.spyOn(Speech, 'speak').mockImplementation(()=>undefined as any);jest.spyOn(Speech, 'getAvailableVoicesAsync').mockResolvedValue([{identifier:'es-premium',name:'Spanish',language:'es-ES',quality:'Enhanced' as any}]);(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;mockSynthesize.mockReset();mockConfigure.mockReset().mockResolvedValue(undefined);[mockPlayer.play,mockPlayer.pause,mockPlayer.remove,mockPlayer.addListener,mockPlayer.setPlaybackRate].forEach((f:any)=>f.mockClear());});
 afterEach(async()=>{if(tree)await act(async()=>tree.unmount());tree=null;jest.restoreAllMocks();jest.useRealTimers();});
 describe('Natural speech lifecycle',()=>{
  test('preparation is loading; speaking requires real playback',async()=>{
@@ -91,4 +94,18 @@ describe('Natural speech lifecycle',()=>{
   expect(Speech.speak).not.toHaveBeenCalled();
  });
 
+ test('natural assistant voice really plays (speed set with setPlaybackRate, never by assignment)',async()=>{
+  mockSynthesize.mockResolvedValue({uri:'ok.wav',cleanup:jest.fn()});await mount({simple:true});
+  await act(async()=>output.speak('x','hola',0.85,'Sulafat'));
+  expect(mockPlayer.setPlaybackRate).toHaveBeenCalledWith(1);
+  expect(mockPlayer.play).toHaveBeenCalled();
+  expect(Speech.speak).not.toHaveBeenCalled();
+  await act(async()=>mockListener({playing:true}));
+  expect(output.speakingId).toBe('x');expect(Speech.speak).not.toHaveBeenCalled();
+ });
+ test('medication reading plays the natural voice too',async()=>{
+  mockSynthesize.mockResolvedValue({uri:'a.wav',cleanup:jest.fn()});await mount();await act(async()=>output.play());
+  expect(mockPlayer.setPlaybackRate).toHaveBeenCalled();expect(mockPlayer.play).toHaveBeenCalled();
+  await act(async()=>mockListener({playing:true}));expect(output.status).toBe('speaking');
+ });
 });

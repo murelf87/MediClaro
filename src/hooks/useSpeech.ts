@@ -150,7 +150,7 @@ export function useSimpleSpeech() {
 import { createAudioPlayer, type AudioPlayer, type AudioSource, type AudioStatus } from 'expo-audio';
 import { DemoMode, SpeechService, type GeminiVoice } from '../services';
 import { configureAudioForSpeech } from '../utils/audio';
-import { naturalPlaybackRate } from '../utils/playbackRate';
+import { applyPlaybackRate, naturalPlaybackRate } from '../utils/playbackRate';
 import { showAlert } from '../utils/dialogs';
 import { isVoicePreviewText } from '../config/voicePreviews';
 import { speakOnDevice } from '../utils/deviceSpeech';
@@ -236,8 +236,7 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
       if (my !== token.current) { audio.cleanup(); return; }
 
       const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
-      player.playbackRate = playbackRate(rateRef.current);
-      player.shouldCorrectPitch = true;
+      applyPlaybackRate(player, playbackRate(rateRef.current));
       const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
         if (my !== token.current) return;
         if (s.error) {
@@ -316,8 +315,7 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: 
 
   useEffect(() => {
     if (!playerRef.current) return;
-    playerRef.current.player.playbackRate = playbackRate(rate);
-    playerRef.current.player.shouldCorrectPitch = true;
+    applyPlaybackRate(playerRef.current.player, playbackRate(rate));
   }, [rate]);
 
   useEffect(() => {
@@ -418,8 +416,7 @@ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number, 
       const player = createAudioPlayer(audio.uri, { updateInterval: 200 });
       playerRef.current = { player, subscription: { remove: () => undefined }, cleanupFile: audio.cleanup };
       pendingCleanup = undefined;
-      player.playbackRate = playbackRate(rateRef.current);
-      player.shouldCorrectPitch = true;
+      applyPlaybackRate(player, playbackRate(rateRef.current));
       const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
         if (my !== token.current) return;
         if (s.error) {
@@ -485,8 +482,7 @@ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number, 
   const restartWithNewRate = useCallback((newRate?: number) => {
     if (typeof newRate === 'number') rateRef.current = newRate;
     if (playerRef.current) {
-      playerRef.current.player.playbackRate = playbackRate(rateRef.current);
-      playerRef.current.player.shouldCorrectPitch = true;
+      applyPlaybackRate(playerRef.current.player, playbackRate(rateRef.current));
     } else if (statusRef.current === 'speaking') {
       token.current += 1;
       Speech.stop();
@@ -618,8 +614,7 @@ export function useGeminiSimpleSpeech() {
         const player = createAudioPlayer(source, { updateInterval: 200 });
         playerRef.current = { player, subscription: { remove: () => undefined }, cleanupFile: cleanup };
         pendingCleanup = undefined;
-        player.playbackRate = playbackRate(rate);
-        player.shouldCorrectPitch = true;
+        applyPlaybackRate(player, playbackRate(rate));
         const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
           if (!current() || fallbackStarted) return;
           if (s.error) { fallback(); return; }
