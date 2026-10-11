@@ -58,3 +58,6 @@ verify_jwt = false
 
 [functions.caregiver-rtc-config]
 verify_jwt = false
+
+[functions.access-code]
+verify_jwt = false

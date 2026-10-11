@@ -1,5 +1,6 @@
 /**
  * Foto de homenaje de la entrada, con nuestro estilo y sin que destaque demasiado:
+ *  - Con `bleed` (la entrada, desde el 11/10/2026): de borde a borde, sin marco, fundida con el fondo arriba y abajo.
  *  - La foto entera, con esquinas redondeadas, un borde blanco fino y una sombra suave (sin marco grueso), justo
  *    debajo del logo y la frase de MediClaro.
  *  - Una foto: fija. Varias: cambian solas cada 6 s con un fundido suave (sin movimiento si el teléfono pide
@@ -22,6 +23,14 @@ import { DEMO_ACCESS_ENABLED } from '../config/app';
 const ROTATE_MS = 6000;
 const FADE_MS = 900;
 const NATIVE = Platform.OS !== 'web';
+
+/** «#EDF4FF» + 0.5 → «rgba(237,244,255,0.5)» (para los fundidos; los colores del fondo son siempre #RRGGBB). */
+function withAlpha(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return alpha === 0 ? 'transparent' : hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
 
 /** ¿Hay algo que mostrar? (fotos, o el marco de prueba fuera de la versión de las tiendas). */
 export function hasTributePhoto(fotos: HomenajeFoto[] = HOMENAJE.fotos): boolean {
@@ -50,10 +59,16 @@ export function TributePhoto({
   height,
   fotos = HOMENAJE.fotos,
   dedicatoria = HOMENAJE.dedicatoria,
+  bleed,
+  fade,
 }: {
   height: number;
   fotos?: HomenajeFoto[];
   dedicatoria?: string | null;
+  /** De borde a borde de la pantalla: margen lateral de la pantalla que la foto «come» (sin marco ni esquinas). */
+  bleed?: number;
+  /** Colores del fondo arriba y abajo de la foto, para fundirla con la pantalla. */
+  fade?: { top: string; bottom: string };
 }) {
   const theme = useAppTheme();
   const reduce = useReduceMotion();
@@ -100,6 +115,36 @@ export function TributePhoto({
 
   const current = fotos[Math.min(index, fotos.length - 1)];
   const radius = theme.radius.xxl;
+
+  if (bleed !== undefined) {
+    // Integrada en la pantalla: de borde a borde, sin marco, y fundida con el fondo arriba y abajo.
+    const top = fade?.top ?? theme.colors.background;
+    const bottom = fade?.bottom ?? theme.colors.background;
+    return (
+      <View
+        style={{ height, marginHorizontal: -bleed, overflow: 'hidden' }}
+        testID="tribute-photo"
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={current.descripcion}
+      >
+        {fotos.map((foto, i) => (
+          <Animated.View key={i} style={[StyleSheet.absoluteFill, { opacity: opacities[i] ?? (i === 0 ? 1 : 0) }]}>
+            <Image source={foto.source} style={styles.image} resizeMode="cover" accessibilityIgnoresInvertColors />
+          </Animated.View>
+        ))}
+        <LinearGradient colors={[top, withAlpha(top, 0)]} style={styles.fadeTop} pointerEvents="none" />
+        <LinearGradient colors={[withAlpha(bottom, 0), withAlpha(bottom, 0.85), bottom]} locations={[0, 0.6, 1]} style={styles.fadeBottom} pointerEvents="none" />
+        {dedicatoria ? (
+          <View style={[styles.caption, { left: bleed + 4, right: bleed + 4 }]} pointerEvents="none">
+            <Icon name="heart" size={16} color="primary" />
+            <AppText variant="bodyStrong" color="heading" numberOfLines={2} style={styles.flex}>{dedicatoria}</AppText>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.photoShadow, { height, borderRadius: radius }]}>
       <View
@@ -139,6 +184,9 @@ const styles = StyleSheet.create({
   shadowBox: { width: '100%' },
   frame: { flex: 1, overflow: 'hidden', borderWidth: 4 },
   image: { width: '100%', height: '100%' },
+  flex: { flex: 1 },
+  fadeTop: { position: 'absolute', left: 0, right: 0, top: 0, height: '22%' },
+  fadeBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%' },
   photoShadow: {
     width: '100%',
     backgroundColor: '#FFFFFF',

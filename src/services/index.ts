@@ -54,3 +54,4 @@ export { PostAuthRoute } from './PostAuthRoute';
 export { AiConsentService, AI_CONSENT_REQUIRED, useAiConsentStatus, type AiConsentStatus } from './AiConsentService';
 export { AppError, isAppError, PREMIUM_REQUIRED_CODE } from '../api/errors';
 export { QUICK_SYMPTOMS, type QuickSymptomId, type ActivationMode } from './emergency/types';
+export { AccessCodeService, normalizeAccessCode, formatAccessCodeInput } from './AccessCodeService';

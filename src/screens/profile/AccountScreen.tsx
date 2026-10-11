@@ -33,6 +33,7 @@ import { errorMessage } from '../premium/parts';
 import { useAccountActions } from './accountActions';
 import { FadeIn } from '../../components/Motion';
 import { InfoRow, UsageBar } from './parts';
+import { AccessCodeCard } from './AccessCodeCard';
 
 const NAME_MAX = 60;
 
@@ -343,6 +344,8 @@ export default function AccountScreen() {
       >
         {details}
       </View>
+
+      {session?.mode === 'verified' && entitlement.isPremium ? <AccessCodeCard /> : null}
 
       <View style={{ marginTop: theme.spacing.lg }}>
         <SectionHeader title="Tus datos" />

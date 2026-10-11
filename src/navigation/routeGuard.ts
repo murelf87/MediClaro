@@ -20,6 +20,8 @@ export const PUBLIC_ROUTES = new Set([
   'onboarding',
   'login',
   'verify',
+  // «Ya soy Premium»: entrar con el código MediClaro.
+  'premium-login',
   'legal',
   'help',
   'premium',

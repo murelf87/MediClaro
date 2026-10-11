@@ -66,7 +66,9 @@ export type EdgeFunctionName =
   /** «Que pague mi familiar o cuidador/a»: crea el enlace de pago (migración 20261009100000). */
   | 'family-pay'
   /** Credenciales temporales para las llamadas de voz por internet entre paciente y cuidador/a. */
-  | 'caregiver-rtc-config';
+  | 'caregiver-rtc-config'
+  /** «Ya soy Premium»: código MediClaro personal (migración 20261011120000). */
+  | 'access-code';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 

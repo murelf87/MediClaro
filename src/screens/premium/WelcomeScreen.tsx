@@ -8,6 +8,7 @@
  *  - «Empezar gratis · Básico» y «Soy cuidador/a · gratis» → cuenta sin teléfono ni SMS. El teléfono NO se pide en la
  *    entrada: solo después de pagar Premium (así quien no paga no gasta verificaciones). «Restaurar compra» sigue
  *    en Premium y en el pago.
+ *  - «Ya soy Premium · entrar con mi código» → /premium-login (código MediClaro, sin SMS; también propietarios).
  *  - Siempre visible: acceso a emergencias (112), que nunca requiere pagar ni registrarse.
  *  - Sin accesos de prueba ni perfiles de revisión: la misma entrada en todas las compilaciones (09/10, 21:08).
  *  - «Aa»: tamaño de letra al momento, antes de tener cuenta (personas mayores).
@@ -125,7 +126,9 @@ export default function WelcomeScreen() {
   const columnWidth = Math.min(width, theme.layout.maxContentWidth) - theme.layout.screenPaddingH * 2;
   const photo = hasTributePhoto();
   // La foto con su forma (3:2), sin recortar caras, debajo del logo.
-  const photoHeight = Math.round(Math.min(columnWidth / 1.49, height * 0.32, 300));
+  // De borde a borde (sin marco), con su forma 3:2 y fundida con el fondo; sin recortar caras.
+  const fullWidth = columnWidth + theme.layout.screenPaddingH * 2;
+  const photoHeight = Math.round(Math.min(fullWidth / 1.49, height * 0.36, 340));
 
   return (
     <Screen gradient="premium" testID="welcome-screen">
@@ -141,8 +144,8 @@ export default function WelcomeScreen() {
       </FadeIn>
 
       {photo ? (
-        <FadeIn from="scale" delay={80} style={{ marginTop: theme.spacing.sm }}>
-          <TributePhoto height={photoHeight} />
+        <FadeIn delay={80} style={{ marginTop: theme.spacing.xs }}>
+          <TributePhoto height={photoHeight} bleed={theme.layout.screenPaddingH} fade={{ top: '#E6EFFF', bottom: '#EEF4FF' }} />
         </FadeIn>
       ) : null}
 
@@ -181,6 +184,14 @@ export default function WelcomeScreen() {
         {purchase.notice ? (
           <InfoBanner tone={purchase.notice.tone} title={purchase.notice.title} message={purchase.notice.message} action={purchase.notice.action} />
         ) : null}
+        <SecondaryButton
+          label="Ya soy Premium"
+          variant="outline"
+          icon="key"
+          onPress={() => router.push('/premium-login')}
+          accessibilityHint="Entra con tu código MediClaro, sin teléfono ni SMS"
+          testID="welcome-premium-login"
+        />
         <SecondaryButton
           label="Empezar gratis · Básico"
           variant="outline"

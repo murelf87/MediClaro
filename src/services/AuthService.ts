@@ -51,6 +51,13 @@ export function mapAuthError(e: unknown, stage: 'request' | 'verify'): AppError 
   if (code === 'otp_expired' || /expired|invalid.*(otp|token)|token has expired/i.test(msg)) {
     return new AppError('invalid_input', 'El código no es correcto o ha caducado.', { code: 'otp_invalid' });
   }
+  if (stage === 'request' && (code === 'otp_disabled' || code === 'signup_disabled' || /signups not allowed/i.test(msg))) {
+    return new AppError(
+      'not_found',
+      'Este teléfono no tiene MediClaro Premium. El teléfono se registra después de contratar Premium.',
+      { code: 'phone_not_registered' },
+    );
+  }
   if (code === 'signup_disabled' || /signups not allowed/i.test(msg)) {
     return new AppError('not_configured', 'Ahora mismo no se pueden crear cuentas nuevas.', { code: 'signup_disabled' });
   }
@@ -73,7 +80,9 @@ export const AuthService = {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         phone: phoneE164,
-        options: { shouldCreateUser: true, channel: 'sms' },
+        // Solo números que ya existen (registrados DESPUÉS de pagar Premium, y los propietarios): quien no ha pagado
+        // no recibe SMS ni gasta verificaciones. El teléfono nuevo se añade tras el pago (requestPhoneLink).
+        options: { shouldCreateUser: false, channel: 'sms' },
       });
       if (error) throw error;
     } catch (e) {
