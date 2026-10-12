@@ -152,7 +152,9 @@ Deno.test('R-19: la eliminación queda registrada antes de borrar y sobrevive a 
   const inserts = callsTo('billing_requests', 'insert');
   assert.equal(inserts.length, 1);
   assert.equal(inserts[0].payload.kind, 'account_deletion');
-  assert.equal(inserts[0].payload.user_ref, ME, 'el identificador se copia para poder localizarla luego');
+  const meRef = await userRefFor(ME);
+  assert.equal(inserts[0].payload.user_ref, meRef, 'se guarda el hash del identificador, no el id en claro');
+  assert.notEqual(inserts[0].payload.user_ref, ME);
   assert.equal(inserts[0].payload.status, 'pending');
   // Nunca datos de salud ni de contacto en el registro.
   const text = JSON.stringify(inserts[0].payload);
@@ -198,3 +200,8 @@ Deno.test('acción desconocida → 400', async () => {
   seed();
   assert.equal((await call(patched, { action: 'otra' })).status, 400);
 });
+
+async function userRefFor(id: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id));
+  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, '0')).join('');
+}

@@ -93,7 +93,7 @@ Deno.serve(handler({ bucket: 'account', maxPerMinute: 3 }, async (_req, user, bo
     // `on delete set null`), porque puede quedar pendiente una devolución por desistimiento.
     const { error: reqError } = await admin.from('billing_requests').insert({
       user_id: user.id,
-      user_ref: user.id,
+      user_ref: await userRef(user.id),
       kind: 'account_deletion',
       provider: p?.billing_provider ?? null,
       store_subscription_active: storeSubscriptionActive,
@@ -122,7 +122,7 @@ Deno.serve(handler({ bucket: 'account', maxPerMinute: 3 }, async (_req, user, bo
       .single();
     const { error } = await admin.from('billing_requests').insert({
       user_id: user.id,
-      user_ref: user.id,
+      user_ref: await userRef(user.id),
       kind,
       provider: p?.billing_provider ?? null,
       plan_id: typeof body.planId === 'string' ? body.planId : null,
@@ -134,3 +134,10 @@ Deno.serve(handler({ bucket: 'account', maxPerMinute: 3 }, async (_req, user, bo
 
   return fail('Acción no válida');
 }));
+
+/** Identificador interno de la solicitud: SHA-256 del id de usuario. No se guarda el id en claro. */
+export async function userRef(userId: string): Promise<string> {
+  const bytes = new TextEncoder().encode(userId);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}

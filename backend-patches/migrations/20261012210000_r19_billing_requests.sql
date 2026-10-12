@@ -17,7 +17,7 @@ create table if not exists public.billing_requests (
   -- Se pone a null cuando se elimina la cuenta: la fila se queda, sin apuntar ya a un usuario que no existe.
   user_id uuid references auth.users(id) on delete set null,
   -- Copia del identificador para poder localizar la solicitud después del borrado (no se borra en cascada).
-  user_ref text not null,
+  user_ref text not null, -- SHA-256 (hex) del id de usuario; no se guarda el id en claro
   -- withdrawal = desistimiento (14 días) · cancel_renewal = no renovar · account_deletion = eliminar la cuenta
   kind text not null check (kind in ('withdrawal', 'cancel_renewal', 'account_deletion')),
   requested_at timestamptz not null default now(),
@@ -47,7 +47,7 @@ create policy "mis solicitudes" on public.billing_requests
 
 drop policy if exists "pedir" on public.billing_requests;
 create policy "pedir" on public.billing_requests
-  for insert with check (auth.uid() = user_id and user_ref = auth.uid()::text);
+  for insert with check (auth.uid() = user_id and user_ref = encode(sha256(convert_to(auth.uid()::text, 'UTF8')), 'hex'));
 
 comment on table public.billing_requests is
   'Solicitudes de desistimiento, cancelación y eliminación. Se conservan tras eliminar la cuenta (prueba de una obligación económica): solo qué se pidió, cuándo, el plan, quién cobra y un identificador interno.';
