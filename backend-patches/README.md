@@ -17,9 +17,25 @@ parche lo corrige sin abrir permisos (resultados abajo).
 | `migrations/20260928090300_r09_r10_account_status.sql` | R-09, R-10 | `get_account_status()` añade `chats_today`, `chat_per_day`, `chats_left_today` y `cancel_at_period_end`. El día del asistente empieza a las 00:00 de España y los mensajes derivados a emergencia no gastan preguntas (igual en el límite `can_chat`). | Compatible con la app publicada (mantiene todos los campos). |
 | `functions/stripe-webhook/index.ts` + `mapping.ts` (`stripe-webhook.diff`) | **R-01**, R-10 | Escribe `sub_state` y `cancel_at_period_end`. Corrige además dos pérdidas de eventos: un error al registrar el evento se respondía 200 (Stripe no reintentaba) y un fallo al guardar el cliente de Stripe se ignoraba. | **Sí.** «Premium sigue activo hasta el … No se renovará.» aparece solo. |
 | `functions/account/index.ts` (`account.diff`) | R-06 | «Descargar mis datos» no incluía el perfil de emergencia (datos de salud). Añade perfil de emergencia, cuidadores, teléfono de acceso, actividad y registro de seguridad; si una consulta falla responde error en vez de un archivo incompleto. | **Sí.** La app ya usa el perfil de emergencia del servidor cuando viene. |
+| `migrations/20261012210000_r19_billing_requests.sql` + `functions/account/index.ts` | **R-19 (P0)** | Al eliminar la cuenta, si la cancelación en Stripe fallaba el error solo se anotaba en la consola y la cuenta se borraba igualmente: la persona se quedaba **sin cuenta y con la suscripción renovándose**, sin forma de pararla. Ahora no se borra si no se ha podido parar el cobro (409 `CANCEL_FAILED`), no se llama a Stripe con identificadores que no son suyos (`bizum-…`, `courtesy-…`) y queda constancia de la solicitud en `billing_requests`, que **sobrevive al borrado** para poder atender una devolución por desistimiento. Añade la acción `request` (desistir o dejar de renovar sin eliminar la cuenta). | **Sí.** La app ya registra el desistimiento y lo ofrece dentro de los 14 días. |
 
 R-01 queda corregido por **dos vías independientes** (la migración y el webhook). Se recomiendan ambas: la migración
 cubre cualquier otro proceso que escriba el estado (p. ej., una futura compra de Apple/Google).
+
+`functions/public-info/index.ts` es la propuesta **R-20**: una sola política de privacidad. Esa función
+servía un texto propio, escrito a mano y congelado en septiembre, y era justo el que abría la app de
+producción (`EXPO_PUBLIC_PRIVACY_URL` apuntaba allí), mientras la web publicaba otro distinto y al día.
+Ahora redirige a la web, que queda como único documento fuente. Desplegar solo cuando la web responda;
+en el siguiente build la app ya apunta directamente a ella.
+
+**R-19 requiere su migración ANTES de desplegar la función**: sin la tabla `billing_requests`, el borrado de
+cuenta responde error (y no borra, que es el comportamiento seguro, pero deja la acción inservible). Orden:
+migración → `supabase functions deploy account`.
+
+Una suscripción de Apple o de Google Play **no impide** eliminar la cuenta: lo exigen tanto la norma 5.1.1(v)
+de Apple como el derecho de supresión. El servidor solo registra que seguía activa y lo devuelve en
+`storeSubscriptionActive`; avisar a la persona de que ese cobro continúa es cosa de la app, que lo hace con
+dos confirmaciones antes de llamar aquí.
 
 ## Resultados de las pruebas (28-09-2026)
 

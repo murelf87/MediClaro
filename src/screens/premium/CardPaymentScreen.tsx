@@ -11,15 +11,15 @@
  * nunca ve ni guarda la tarjeta, el IBAN ni la contraseña de PayPal.
  * Antes de salir al pago se muestra el aviso obligatorio de Apple/Google cuando corresponde (UE/EEE).
  */
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AppText, Card, EmptyState, ErrorState, Icon, InfoBanner, PrimaryButton, Screen, TextButton, type IconName } from '../../components';
+import { AppText, Card, Checkbox, EmptyState, ErrorState, Icon, InfoBanner, PrimaryButton, Screen, TextButton, type IconName } from '../../components';
 import { FadeIn } from '../../components/Motion';
 import { FALLBACK_OVERAGE_CENTS } from '../../config/plans';
 import { CARD_PAYMENTS_ENABLED } from '../../config/app';
 import { useAppTheme, useAsync, useEntitlement } from '../../hooks';
-import { DemoMode, PurchaseService } from '../../services';
+import { DemoMode, ImmediateStartConsentService, PurchaseService } from '../../services';
 import { formatPrice } from '../../utils/format';
 import type { HostedPaymentMethod, PurchaseOffer } from '../../types';
 import { BrandHeader, CardBrands, OneTimeNote, PlanSummary, PremiumSkeleton, RenewalNote, SecureNote, StatusHero, periodSpan } from './parts';
@@ -61,6 +61,12 @@ function CardPaymentScreen() {
   const offer = useAsync(() => PurchaseService.getOffer(), []);
   const purchase = usePurchase();
   const entitlement = useEntitlement();
+  /**
+   * Petición expresa de empezar a usar Premium en el momento del pago. Nunca viene marcada: la persona la
+   * marca, y hasta entonces no se puede pagar. Es lo que permite descontar la parte ya disfrutada si
+   * después desiste; sin ella habría que devolver el importe completo.
+   */
+  const [immediateStart, setImmediateStart] = useState(false);
 
   const entry = offer.data?.plans.find((o) => o.plan.id === planId && o.channels.includes(method)) ?? null;
   const provider = providerOf(offer.data ?? null, method);
@@ -181,6 +187,16 @@ function CardPaymentScreen() {
             {overage}
           </AppText>
         ) : null}
+        <FadeIn delay={200}>
+          <Checkbox
+            label={ImmediateStartConsentService.text}
+            hint="Marca esta casilla para poder pagar. Tienes 14 días para cambiar de opinión: si lo haces, te devolvemos lo pagado menos los días que ya hayas tenido Premium."
+            checked={immediateStart}
+            onChange={setImmediateStart}
+            disabled={!!purchase.busy}
+            testID="payment-immediate-start"
+          />
+        </FadeIn>
       </View>
     );
     footer = (
@@ -188,11 +204,20 @@ function CardPaymentScreen() {
         <PrimaryButton
           label={copy.payLabel(entry.displayPrice)}
           icon="lock-closed"
-          onPress={() => void purchase.pay(method, entry.plan.id)}
+          onPress={() => {
+            // Se guarda la aceptación (con su fecha) ANTES de salir a la página de pago.
+            void ImmediateStartConsentService.accept(entry.plan.id, method);
+            void purchase.pay(method, entry.plan.id);
+          }}
           loading={purchase.busy === method}
-          disabled={!!purchase.busy}
+          disabled={!!purchase.busy || !immediateStart}
           testID="payment-pay"
         />
+        {!immediateStart ? (
+          <AppText variant="caption" color="textSecondary" align="center" testID="payment-pay-blocked">
+            Marca la casilla de arriba para continuar.
+          </AppText>
+        ) : null}
         {method === 'bizum' ? <OneTimeNote offer={entry} /> : <RenewalNote offer={entry} />}
         <SecureNote text={`Powered by ${provider} · Pago seguro y encriptado`} />
       </>

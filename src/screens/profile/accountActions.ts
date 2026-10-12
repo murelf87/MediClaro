@@ -8,7 +8,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useEntitlement, useSession } from '../../hooks';
-import { ProfileService, PurchaseService } from '../../services';
+import { BillingRequestService, ImmediateStartConsentService, ProfileService, PurchaseService } from '../../services';
 import { confirmAsync, showAlert } from '../../utils/dialogs';
 import { shareOrDownloadText } from '../../utils/device';
 import { errorMessage } from '../premium/parts';
@@ -69,17 +69,41 @@ export function useAccountActions() {
     if (await blockedByOwnerPreview()) return;
     busy.current = true;
     try {
-      // Una suscripción de Apple o Google Play NO se cancela al borrar la cuenta: la tienda sigue cobrando hasta que la
-      // persona la cancela allí. Se avisa antes y se ofrece abrir la gestión de la tienda (norma de Apple).
       const sub = entitlement.subscription;
       const storeName = sub?.provider === 'apple' ? 'Apple' : sub?.provider === 'google' ? 'Google Play' : null;
       const renewingStoreSub = !!sub?.isPremium && !!storeName && !sub.cancelsAtPeriodEnd && sub.status !== 'canceled';
+
+      // 1) Desistimiento: eliminar la cuenta NO quita el derecho a recuperar el dinero dentro de los 14 días.
+      //    Si aún está en plazo (pagos que cobra MediClaro a través de Stripe), se ofrece tramitarlo ANTES de borrar.
+      if (await ImmediateStartConsentService.withinWithdrawalPeriod(sub)) {
+        const wantsRefund = await confirmAsync({
+          title: 'Aún puedes recuperar tu dinero',
+          message:
+            'Pagaste hace menos de 14 días, así que puedes desistir: te devolvemos lo pagado menos los días que ya hayas tenido Premium. Eliminar tu cuenta no te quita ese derecho, pero es mejor pedirlo ahora.',
+          confirmText: 'Pedir la devolución',
+          cancelText: 'No, gracias',
+        });
+        if (wantsRefund) {
+          const saved = await BillingRequestService.record('withdrawal', { provider: sub?.provider ?? null });
+          await showAlert(
+            'Hemos anotado tu solicitud',
+            saved
+              ? 'Queda registrada con la fecha de hoy. Te devolveremos el dinero por el mismo medio con el que pagaste, dentro de los 14 días siguientes.'
+              : 'No hemos podido registrarla ahora mismo y lo volveremos a intentar solos. Para asegurarte, escríbenos desde Perfil › Ayuda indicando que quieres desistir.',
+          );
+        }
+      }
+
+      // 2) Una suscripción de Apple o Google Play NO se cancela al borrar la cuenta: la cobra la tienda. Eliminar la
+      //    cuenta es un derecho y no se condiciona a cancelarla antes (lo piden tanto la norma 5.1.1(v) de Apple como
+      //    el derecho de supresión), pero nunca se borra sin avisar de que ese cobro seguiría: se ofrece ir a
+      //    cancelarla y hay que confirmar expresamente haberlo entendido.
       if (renewingStoreSub && sub) {
         const manage = await confirmAsync({
-          title: 'Tu suscripción sigue activa',
-          message: `Tu MediClaro Premium se paga con ${storeName} y se seguirá cobrando aunque elimines tu cuenta. Cancélala antes en la gestión de suscripciones de ${storeName}.`,
-          confirmText: 'Gestionar suscripción',
-          cancelText: 'Seguir sin cancelar',
+          title: 'Atención: te seguirán cobrando',
+          message: `Tu MediClaro Premium lo cobra ${storeName} y seguirá cobrándose aunque elimines tu cuenta. Solo se puede cancelar en la gestión de suscripciones de ${storeName}. Te recomendamos cancelarlo primero.`,
+          confirmText: 'Cancelar la suscripción',
+          cancelText: 'Eliminar de todas formas',
         });
         if (manage) {
           await PurchaseService.manage(sub).catch(async (e: unknown) => {
@@ -87,14 +111,24 @@ export function useAccountActions() {
           });
           return;
         }
+        const understood = await confirmAsync({
+          title: '¿Seguro que sigues sin cancelar?',
+          message: `Si continúas, ${storeName} te seguirá cobrando MediClaro Premium y no podremos evitarlo desde aquí, porque tu cuenta ya no existirá. Tendrás que cancelarlo tú en ${storeName}.`,
+          confirmText: 'Lo entiendo, continuar',
+          cancelText: 'Volver',
+          destructive: true,
+        });
+        if (!understood) return;
       }
+
+      // 3) Eliminar la cuenta: definitivo, y distinto de cancelar la renovación.
       const first = await confirmAsync({
         title: '¿Eliminar tu cuenta?',
-        message: storeName && sub?.isPremium
-          ? `Se borrarán tus datos. No se puede deshacer. Tu suscripción de ${storeName} no se cancela desde aquí.`
+        message: renewingStoreSub
+          ? `Se borrarán tu cuenta y tus datos de forma definitiva. Tu suscripción de ${storeName} no se cancela desde aquí.`
           : sub?.isPremium
-            ? 'Se borrarán tu cuenta y tus datos ahora mismo. Tu Premium también se pierde, aunque te queden días pagados. Si quieres usarlo hasta el final, cancélalo antes.'
-            : 'Se borrarán tus datos. No se puede deshacer.',
+            ? 'Se borrarán tu cuenta y tus datos de forma definitiva, ahora mismo. Ojo: esto no es lo mismo que cancelar la renovación. Si solo quieres dejar de pagar y seguir usando Premium hasta el final del periodo, usa «Gestionar suscripción» y no elimines la cuenta.'
+            : 'Se borrarán tu cuenta y tus datos de forma definitiva. No se puede deshacer.',
         confirmText: 'Eliminar',
         cancelText: 'Cancelar',
         destructive: true,
@@ -109,6 +143,12 @@ export function useAccountActions() {
       });
       if (!second) return;
       setDeleting(true);
+      // Queda constancia de la solicitud (y de si se avisó de una suscripción de tienda que seguirá cobrándose)
+      // ANTES de borrar: después ya no habría cuenta desde la que registrarlo.
+      await BillingRequestService.record('account_deletion', {
+        provider: sub?.provider ?? null,
+        storeSubscriptionActive: renewingStoreSub,
+      });
       const outcome = await ProfileService.deleteAccount();
       if (outcome.scheduled) {
         // Premium activo: la cuenta sigue hasta el fin del periodo pagado. Se mantiene la sesión.

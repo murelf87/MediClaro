@@ -37,6 +37,12 @@ export const stripe: any = {
       return sub ? Promise.resolve(structuredClone(sub)) : Promise.reject(new Error(`No existe la suscripción ${id}`));
     },
     cancel(id: string) {
+      // Permite probar qué ocurre cuando Stripe no responde: state.failNext['stripe:cancel'].
+      const planned = state.failNext['stripe:cancel'];
+      if (planned) {
+        delete state.failNext['stripe:cancel'];
+        return Promise.reject(new Error(planned.message));
+      }
       state.canceledSubscriptions.push(id);
       return Promise.resolve({ id, status: 'canceled' });
     },

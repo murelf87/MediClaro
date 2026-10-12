@@ -24,7 +24,25 @@ export interface LegalContext {
   planLines: string[];
 }
 
-export const LEGAL_UPDATED = '9 de octubre de 2026';
+/**
+ * Versión y fecha de entrada en vigor de los textos legales. Es la MISMA para la app y para la web
+ * (scripts/build-legal-pages.mjs las copia en las páginas publicadas), para que nunca haya dos versiones
+ * distintas circulando. Al cambiar un texto hay que subir la versión: el script se niega a sobrescribir
+ * una versión publicada posterior a esta, y así un cambio aprobado no se pierde al regenerar las páginas.
+ */
+export const LEGAL_VERSION = '2026-10-12.2';
+export const LEGAL_UPDATED = '12 de octubre de 2026';
+
+/**
+ * Versión del texto que la persona acepta al pagar para empezar a usar Premium en ese momento
+ * (petición expresa de inicio inmediato). Se registra con su fecha: es lo que permite descontar la parte
+ * ya disfrutada si después desiste. Si cambia el texto de `IMMEDIATE_START_CONSENT`, sube esta versión.
+ */
+export const IMMEDIATE_START_VERSION = 'desistimiento-2026-10';
+
+/** Texto exacto de esa casilla. Se guarda junto a la versión para poder demostrar qué se aceptó. */
+export const IMMEDIATE_START_CONSENT =
+  'Quiero empezar a usar MediClaro Premium ahora mismo, sin esperar los 14 días que tengo para desistir. Entiendo que, si desisto, se me devolverá lo pagado descontando la parte del tiempo que ya haya tenido Premium.';
 
 function titular(ctx: LegalContext): string {
   return ctx.company.name ? ctx.company.name : 'el titular de MediClaro';
@@ -153,9 +171,25 @@ export function termsBlocks(ctx: LegalContext): LegalBlock[] {
     {
       p: 'Nada de lo anterior limita la responsabilidad que la ley no permite limitar, como la derivada de dolo o culpa grave, de los daños personales causados por negligencia, ni los derechos que te reconoce la normativa de consumidores.',
     },
-    { h: '13. Baja y suspensión' },
+    { h: '13. Cancelar la renovación, desistir o eliminar tu cuenta' },
     {
-      p: 'Puedes eliminar tu cuenta cuando quieras desde Perfil › Datos de cuenta › Eliminar mi cuenta. La cuenta y tus datos se eliminan en ese momento. Si tienes Premium pagado con tarjeta o Bizum, se cancela a la vez y el acceso que te quede pagado deja de estar disponible: si quieres usarlo hasta el final del periodo, cancélalo antes y elimina la cuenta cuando termine. Si lo cobra Apple o Google Play, cancélalo antes en la tienda: mientras la suscripción siga activa, la app no permite eliminar la cuenta. Podemos suspender o cerrar una cuenta, avisando antes cuando sea posible, si hay un incumplimiento grave de estas condiciones, fraude o un riesgo para la seguridad de otras personas o del servicio.',
+      p: 'Son tres cosas distintas y conviene no confundirlas. Puedes hacer cualquiera de ellas cuando quieras:',
+    },
+    {
+      list: [
+        'Cancelar la renovación: dejas de pagar. Sigues con Premium hasta el final del periodo que ya has pagado y después pasas al perfil Básico. Tu cuenta y tus datos se quedan como están.',
+        'Desistir: si has contratado con tarjeta, Bizum o domiciliación bancaria y no han pasado 14 días naturales, puedes echarte atrás y recuperar tu dinero en los términos del apartado «Derecho de desistimiento y devoluciones». No tienes que dar explicaciones.',
+        'Eliminar tu cuenta: se borran tu cuenta y tus datos de forma definitiva. Esto no se puede deshacer, y es independiente de lo que hayas pagado.',
+      ],
+    },
+    {
+      p: 'Eliminar tu cuenta, o borrar la app, no cancela por sí solo una suscripción de Apple o de Google Play: esa la cobra la tienda y solo se cancela allí. Nunca eliminaremos tu cuenta sin avisarte antes de que esa suscripción seguiría cobrándose: la app te lo dice con claridad, te ofrece ir a cancelarla y te pide que confirmes que lo has entendido. Eliminar la cuenta es tu derecho y no te lo condicionamos a nada, pero queremos que nadie se quede pagando por algo que ya no usa.',
+    },
+    {
+      p: 'Si eliminas tu cuenta cuando aún estás dentro de los 14 días para desistir, puedes pedir la devolución que te corresponda: la app te lo ofrece antes de borrar, y también puedes pedirla después escribiéndonos. Eliminar la cuenta no te quita ese derecho. Para poder devolverte el dinero conservamos únicamente el justificante de tu solicitud y del pago, no tus datos de salud.',
+    },
+    {
+      p: 'Para eliminar tu cuenta: Perfil › Datos de cuenta › Eliminar mi cuenta. Podemos suspender o cerrar una cuenta, avisando antes cuando sea posible, si hay un incumplimiento grave de estas condiciones, fraude o un riesgo para la seguridad de otras personas o del servicio.',
     },
     { h: '14. Ley aplicable y reclamaciones' },
     {
@@ -186,6 +220,8 @@ export function privacyBlocks(ctx: LegalContext): LegalBlock[] {
         'Llamadas de voz con tu cuidador/a: la voz va directamente de un móvil al otro, cifrada; MediClaro no la graba ni la guarda. Solo queda en vuestro chat el registro de la llamada (quién llamó, cuándo y cuánto duró).',
         'Premium de regalo: si el titular de MediClaro te regala Premium, se guarda tu número de teléfono (para activarlo cuando entres con él) y hasta cuándo dura.',
         'Pagos: el plan y el estado de tu suscripción. Los datos de la tarjeta, de Bizum, de la cuenta bancaria (domiciliación) o de las tiendas los tratan Stripe, Apple o Google: MediClaro nunca los ve.',
+        'Tu confirmación, al pagar, de que quieres empezar a usar Premium en ese momento, con la fecha y la versión del texto que aceptaste. Sirve para calcular la devolución si después desistes.',
+        'Tus solicitudes de cancelación, de desistimiento y de eliminación de la cuenta: qué pediste y cuándo. Se guardan como justificante, para poder atenderlas y demostrar que se atendieron.',
         'Datos técnicos mínimos para que el servicio funcione y sea seguro (por ejemplo, registros de acceso y de errores).',
       ],
     },
@@ -199,6 +235,7 @@ export function privacyBlocks(ctx: LegalContext): LegalBlock[] {
         'Tratar tus datos de salud y enviar tus fotos y preguntas a la inteligencia artificial: tu consentimiento explícito, que te pedimos antes y puedes retirar cuando quieras en Perfil › Privacidad y datos.',
         'Compartir datos con tu cuidador/a o en una emergencia: lo que tú autorizas en «Qué compartir en una emergencia» y, si no puedes dar tu consentimiento, la protección de tu interés vital.',
         'Facturación y obligaciones fiscales: cumplimiento de obligaciones legales.',
+        'Atender tus solicitudes de cancelación, desistimiento o eliminación, calcular la devolución que te corresponda y poder acreditar que se atendieron: ejecución del contrato, cumplimiento de obligaciones legales y, para conservar el justificante, nuestro interés legítimo en defendernos de una reclamación.',
         'Seguridad, prevención de fraudes y abusos y mejora técnica del servicio: interés legítimo.',
         'Gestionar el servicio desde el panel privado del titular (cuentas, planes y regalos de Premium): interés legítimo.',
       ],
@@ -233,6 +270,7 @@ export function privacyBlocks(ctx: LegalContext): LegalBlock[] {
     {
       list: [
         'Mientras tengas tu cuenta. Al eliminarla, se borran tus datos, salvo los que la ley obligue a conservar (por ejemplo, los de facturación, durante los plazos fiscales y mercantiles), que se guardan bloqueados.',
+        'El justificante de tus solicitudes de cancelación, desistimiento o eliminación, y tu confirmación de inicio inmediato de Premium: se conservan aunque elimines la cuenta, con un identificador interno y sin tus datos de salud, el tiempo necesario para atender la devolución y para responder de ella (los plazos de reclamación que marca la ley).',
         `Las conversaciones con ${ASSISTANT_NAME}, hasta que las borres o elimines tu cuenta.`,
         '«Mis pastillas», hasta que la borres (Mis pastillas › Ajustes › «Borrar todos mis datos de medicación») o elimines tu cuenta.',
         'Las fotos que envías para identificar una caja y los mensajes de voz no se guardan. Google puede conservar lo que se le envía hasta 55 días solo para detectar abusos y no lo usa para mejorar sus productos.',
@@ -262,6 +300,69 @@ export function privacyBlocks(ctx: LegalContext): LegalBlock[] {
     { h: '9. Cambios en esta política' },
     {
       p: 'Si cambiamos esta política de forma importante, te avisaremos en la app antes de aplicarla.',
+    },
+  ];
+}
+
+/**
+ * Página «Eliminar tu cuenta». Google Play exige una dirección web pública donde se explique cómo pedir la
+ * eliminación, qué se borra y qué se conserva. Vive aquí, con el resto de los textos, para que la web y la
+ * app digan exactamente lo mismo: `scripts/build-legal-pages.mjs` genera con esto `docs/eliminar-cuenta.html`.
+ */
+export function accountDeletionBlocks(ctx: LegalContext): LegalBlock[] {
+  return [
+    {
+      p: 'Puedes pedir que eliminemos tu cuenta y tus datos de MediClaro en cualquier momento, y no te pedimos ningún motivo. Antes de hacerlo, conviene distinguir tres cosas que suelen confundirse:',
+    },
+    {
+      list: [
+        'Cancelar la renovación: dejas de pagar, sigues con Premium hasta el final del periodo pagado y después pasas al perfil Básico. Tu cuenta y tus datos se quedan.',
+        'Desistir: si pagaste con tarjeta, Bizum o domiciliación hace menos de 14 días, puedes recuperar tu dinero (menos los días que ya hayas tenido Premium). Tu cuenta sigue existiendo.',
+        'Eliminar tu cuenta: se borra todo de forma definitiva. Esto es lo que se explica en esta página.',
+      ],
+    },
+    { h: 'Desde la app' },
+    {
+      list: [
+        'Abre MediClaro y entra con tu número de teléfono.',
+        'En Perfil, toca tu nombre (en la tarjeta de arriba) para abrir «Datos de cuenta». También la encuentras en Perfil › Privacidad y datos. Pulsa «Eliminar mi cuenta».',
+        'Confirma dos veces. La cuenta y tus datos se eliminan en ese momento.',
+      ],
+    },
+    { h: 'Sin la app' },
+    {
+      p: `Escríbenos ${contact(ctx)} con el asunto «Eliminar mi cuenta de MediClaro» e indícanos el número de teléfono con el que entras en la app. Podremos pedirte una comprobación para asegurarnos de que la cuenta es tuya. Te confirmaremos la eliminación en el plazo máximo de un mes, como marca el Reglamento General de Protección de Datos.`,
+    },
+    { h: 'Si tienes Premium pagado' },
+    {
+      p: 'Eliminar tu cuenta no te quita el derecho a recuperar tu dinero si estás dentro de los 14 días: la app te ofrece pedir la devolución antes de borrar, y también puedes pedirla después escribiéndonos. Si ya han pasado los 14 días, el tiempo que no llegues a usar no se devuelve; si lo que quieres es aprovecharlo, cancela la renovación y pide la eliminación cuando termine el periodo.',
+    },
+    {
+      list: [
+        'Con tarjeta o domiciliación (Stripe): al eliminar la cuenta se cancela la suscripción a la vez. Si no pudiéramos cancelarla, no eliminamos la cuenta y te lo decimos, para que no te sigan cobrando sin poder evitarlo.',
+        'Con Bizum: no se renueva nunca, así que no hay nada que cancelar.',
+        'Con Apple o Google Play: la cobra la tienda y solo se cancela allí. Eliminar la cuenta no la cancela, así que cancélala primero en la gestión de suscripciones de Apple o de Google Play. La app te lo avisa y te pide que lo confirmes antes de borrar, pero no te impide eliminar tu cuenta.',
+      ],
+    },
+    { h: 'Qué se borra' },
+    {
+      list: [
+        'Tu cuenta y tu número de teléfono.',
+        'Tu perfil, tus medicamentos y tu historial de identificaciones.',
+        '«Mis pastillas», tus tomas y tus avisos.',
+        `Tus conversaciones con ${ASSISTANT_NAME}.`,
+        'Tu perfil de emergencia y tus vinculaciones de cuidador/a.',
+        'Los chats con tu cuidador/a.',
+      ],
+    },
+    { h: 'Qué se conserva' },
+    {
+      list: [
+        'Las facturas y los datos de cobro que la ley obliga a guardar durante los plazos fiscales y mercantiles. Los guarda Stripe, el servicio de pagos, y no se usan para nada más.',
+        'El justificante de lo que pediste (desistir, cancelar o eliminar) y de tu confirmación de inicio inmediato de Premium, con un identificador interno y sin tus datos de salud: es lo que permite devolverte el dinero y acreditar que se atendió.',
+        'Registros técnicos de seguridad (por ejemplo, que se eliminó una cuenta), con un identificador interno, y contadores de uso anónimos.',
+        'Si alguien te regaló Premium, el registro del regalo, con tu número de teléfono, hasta que termine su duración.',
+      ],
     },
   ];
 }
@@ -359,8 +460,11 @@ export function subscriptionBlocks(ctx: LegalContext): LegalBlock[] {
     { h: 'Derecho de desistimiento y devoluciones' },
     {
       list: [
-        `Si contratas con tarjeta, Bizum o domiciliación bancaria, tienes 14 días naturales para desistir ${contact(ctx)}. Como Premium empieza a funcionar en cuanto pagas porque así lo pides, si desistes te devolveremos el importe descontando la parte proporcional del tiempo ya usado.`,
-        'Las compras hechas con Apple o Google Play se reembolsan según sus condiciones: se piden a Apple o a Google.',
+        `Si contratas con tarjeta, Bizum o domiciliación bancaria, tienes 14 días naturales desde el pago para desistir, sin dar explicaciones, ${contact(ctx)}. También puedes pedirlo desde la app, en Perfil › MediClaro Premium.`,
+        'Al pagar te pedimos que confirmes expresamente que quieres empezar a usar Premium en ese momento, sin esperar esos 14 días. Es necesario para poder activártelo al instante, y queda guardado con su fecha.',
+        'Por eso, si desistes, te devolvemos lo pagado descontando la parte proporcional al tiempo que ya hayas tenido Premium. Por ejemplo: en un plan anual de 39,99 € desistido a los diez días, se descuentan esos diez días y se devuelve el resto. Te lo devolvemos por el mismo medio con el que pagaste, dentro de los 14 días siguientes a tu solicitud.',
+        'Pasados los 14 días no se devuelve el tiempo que no llegues a usar: puedes cancelar la renovación y seguir usando Premium hasta el final del periodo pagado. Esto no afecta a tus derechos si el servicio no funciona como se describe aquí.',
+        'Las compras hechas con Apple o Google Play las reembolsan ellos según sus propias condiciones: se piden a Apple o a Google, no a MediClaro.',
         'Si cambias de teléfono, entra con tu número («Ya soy Premium») o pulsa «Restaurar compra».',
       ],
     },

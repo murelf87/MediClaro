@@ -14,6 +14,8 @@ import { DemoMode } from './DemoMode';
 import { EmergencyService } from './EmergencyService';
 import { NotificationService } from './NotificationService';
 import { AiConsentService } from './AiConsentService';
+import { ImmediateStartConsentService } from './ImmediateStartConsentService';
+import { BillingRequestService } from './BillingRequestService';
 import { PreferencesService } from './PreferencesService';
 import { MedicationPlanService, PillReminders } from './MedicationPlanService';
 import { MedicinePhotoService } from './MedicinePhotoService';
@@ -231,6 +233,9 @@ export const ProfileService = {
     if (DemoMode.isActive()) {
       throw new AppError('not_available', 'En el modo demostración no hay una cuenta real que eliminar. Pulsa «Cerrar sesión» para salir.');
     }
+    // Si quedaba sin registrar la aceptación de inicio inmediato, se registra AHORA: después del borrado
+    // ya no habría cuenta donde guardarla, y es la prueba que permite calcular una devolución.
+    await ImmediateStartConsentService.flush().catch(() => undefined);
     let res: { deleted?: boolean; scheduled?: boolean; deleteAt?: string; needsStoreCancel?: boolean; provider?: string } | null = null;
     try {
       res = await invokeFunction<{ deleted?: boolean; scheduled?: boolean; deleteAt?: string; needsStoreCancel?: boolean; provider?: string }>(
@@ -250,6 +255,8 @@ export const ProfileService = {
     await EmergencyService.forgetAccountLocalData(userId).catch(() => undefined);
     await NotificationService.forgetAccountLocalData(userId).catch(() => undefined);
     await AiConsentService.forgetAccountLocalData(userId).catch(() => undefined);
+    await ImmediateStartConsentService.forgetAccountLocalData(userId).catch(() => undefined);
+    await BillingRequestService.forgetAccountLocalData(userId).catch(() => undefined);
     await PillReminders.reschedule(false).catch(() => undefined);
     await MedicationPlanService.forgetLocal(userId).catch(() => undefined);
     await MedicinePhotoService.forgetAll(userId).catch(() => undefined);

@@ -4,6 +4,7 @@
  *  - SegmentedControl: selector de 2–4 opciones (velocidad de voz, filtros...).
  *  - OtpInput: código SMS de 6 cifras (autocompletado del sistema).
  *  - PhoneInput: prefijo de país + número (España +34 por defecto).
+ *  - Checkbox: casilla que hay que marcar a propósito (aceptaciones legales).
  */
 import { forwardRef, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 import {
@@ -396,8 +397,80 @@ export function PhoneInput({
   );
 }
 
+// ─── Checkbox ─────────────────────────────────────────────────────────────────
+
+/**
+ * Casilla que la persona tiene que marcar a propósito (nunca viene marcada): se usa para las
+ * aceptaciones que deben quedar probadas, como la petición de empezar Premium en el momento del pago.
+ * Toda la fila es pulsable, para que acertar sea fácil con el dedo o con un temblor.
+ */
+export function Checkbox({
+  label,
+  checked,
+  onChange,
+  hint,
+  disabled,
+  testID,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  hint?: string;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const theme = useAppTheme();
+  const c = theme.colors;
+  return (
+    <Pressable
+      onPress={() => onChange(!checked)}
+      disabled={disabled}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked, disabled: !!disabled }}
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      testID={testID}
+      style={({ pressed }) => [
+        styles.checkboxRow,
+        {
+          backgroundColor: pressed ? c.surfaceMuted : c.surface,
+          borderColor: checked ? c.primary : c.borderStrong,
+          borderRadius: theme.radius.md,
+          opacity: disabled ? 0.6 : 1,
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.checkboxBox,
+          {
+            borderRadius: theme.radius.sm,
+            backgroundColor: checked ? c.primary : 'transparent',
+            borderColor: checked ? c.primary : c.borderStrong,
+          },
+        ]}
+      >
+        {checked ? <Icon name="checkmark" size={22} color="#FFFFFF" /> : null}
+      </View>
+      <View style={styles.checkboxTexts}>
+        <AppText variant="body" color="heading">
+          {label}
+        </AppText>
+        {hint ? (
+          <AppText variant="caption" color="textSecondary">
+            {hint}
+          </AppText>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   field: { flexDirection: 'row', gap: 10, paddingHorizontal: 14 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, borderWidth: 2, padding: 16 },
+  checkboxBox: { width: 32, height: 32, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkboxTexts: { flex: 1, gap: 4 },
   input: { flex: 1, minHeight: 44 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   segment: { flexDirection: 'row', padding: 4, gap: 4 },

@@ -105,16 +105,93 @@ Deno.test('la exportación queda registrada (data_exported)', async () => {
   assert.equal(inserts[0].payload.user_id, ME);
 });
 
-Deno.test('eliminar cuenta (sin cambios): exige «ELIMINAR», cancela el cobro y borra a la persona', async () => {
+Deno.test('eliminar cuenta: exige «ELIMINAR», cancela el cobro y borra a la persona', async () => {
   seed();
   const bad = await call(patched, { action: 'delete', confirm: 'si' });
   assert.equal(bad.status, 400);
   assert.equal(state.deletedUsers.length, 0);
   const ok = await call(patched, { action: 'delete', confirm: 'ELIMINAR' });
   assert.equal(ok.status, 200);
-  assert.deepEqual(await ok.json(), { deleted: true });
+  // R-19 añade `storeSubscriptionActive` (aquí false: la cobra Stripe, no una tienda).
+  assert.deepEqual(await ok.json(), { deleted: true, storeSubscriptionActive: false });
   assert.deepEqual(state.canceledSubscriptions, ['sub_1']);
   assert.deepEqual(state.deletedUsers, [ME]);
+});
+
+Deno.test('R-19: si Stripe no cancela, NO se borra la cuenta (el original la borraba y seguía cobrando)', async () => {
+  // El original: el fallo se anota en la consola y borra igual → sin cuenta y con la suscripción viva.
+  seed();
+  state.failNext['stripe:cancel'] = { code: 'api_error', message: 'Stripe no responde' };
+  const before = await call(original, { action: 'delete', confirm: 'ELIMINAR' });
+  assert.equal(before.status, 200, 'ORIGINAL: borra…');
+  assert.deepEqual(state.canceledSubscriptions, [], '…sin haber cancelado nada');
+  assert.deepEqual(state.deletedUsers, [ME], '…y la persona se queda sin poder pararlo');
+
+  // La propuesta: 409 y no se toca nada.
+  seed();
+  state.failNext['stripe:cancel'] = { code: 'api_error', message: 'Stripe no responde' };
+  const res = await call(patched, { action: 'delete', confirm: 'ELIMINAR' });
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, 'CANCEL_FAILED');
+  assert.deepEqual(state.deletedUsers, [], 'no se borra la cuenta');
+  assert.equal(callsTo('billing_requests', 'insert').length, 0, 'ni se registra la solicitud');
+});
+
+Deno.test('R-19: un pago con Bizum no se manda a cancelar a Stripe (no existe allí) y la cuenta se borra', async () => {
+  seed();
+  state.tables.profiles[0].subscription_id = 'bizum-cs_test_1';
+  const res = await call(patched, { action: 'delete', confirm: 'ELIMINAR' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(state.canceledSubscriptions, [], 'no se llama a Stripe con un id que no es suyo');
+  assert.deepEqual(state.deletedUsers, [ME]);
+});
+
+Deno.test('R-19: la eliminación queda registrada antes de borrar y sobrevive a la cuenta', async () => {
+  seed();
+  await call(patched, { action: 'delete', confirm: 'ELIMINAR' });
+  const inserts = callsTo('billing_requests', 'insert');
+  assert.equal(inserts.length, 1);
+  assert.equal(inserts[0].payload.kind, 'account_deletion');
+  assert.equal(inserts[0].payload.user_ref, ME, 'el identificador se copia para poder localizarla luego');
+  assert.equal(inserts[0].payload.status, 'pending');
+  // Nunca datos de salud ni de contacto en el registro.
+  const text = JSON.stringify(inserts[0].payload);
+  assert.equal(text.includes('María'), false);
+  assert.equal(text.includes('34600123456'), false);
+});
+
+Deno.test('R-19: una suscripción de tienda activa NO impide eliminar la cuenta, pero queda anotada', async () => {
+  seed();
+  Object.assign(state.tables.profiles[0], {
+    billing_provider: 'apple',
+    plan: 'premium',
+    subscription_status: 'active',
+    subscription_id: 'apple-1000000',
+  });
+  const res = await call(patched, { action: 'delete', confirm: 'ELIMINAR' });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).storeSubscriptionActive, true);
+  assert.deepEqual(state.canceledSubscriptions, [], 'Apple no se cancela desde el servidor');
+  assert.deepEqual(state.deletedUsers, [ME], 'eliminar la cuenta es un derecho: no se condiciona');
+  assert.equal(callsTo('billing_requests', 'insert')[0].payload.store_subscription_active, true);
+});
+
+Deno.test('R-19: se puede pedir el desistimiento sin eliminar la cuenta', async () => {
+  seed();
+  const res = await call(patched, { action: 'request', kind: 'withdrawal', planId: 'premium_annual' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { recorded: true });
+  const inserts = callsTo('billing_requests', 'insert');
+  assert.equal(inserts.length, 1);
+  assert.equal(inserts[0].payload.kind, 'withdrawal');
+  assert.equal(inserts[0].payload.plan_id, 'premium_annual');
+  assert.deepEqual(state.deletedUsers, [], 'desistir no borra la cuenta');
+});
+
+Deno.test('R-19: una solicitud de otro tipo se rechaza', async () => {
+  seed();
+  assert.equal((await call(patched, { action: 'request', kind: 'lo-que-sea' })).status, 400);
+  assert.equal(callsTo('billing_requests', 'insert').length, 0);
 });
 
 Deno.test('acción desconocida → 400', async () => {

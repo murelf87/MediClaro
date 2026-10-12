@@ -70,8 +70,33 @@ const PAGES = [
   { file: 'privacidad.html', nav: 'Privacidad', title: 'Política de privacidad' },
   { file: 'condiciones.html', nav: 'Condiciones', title: 'Condiciones de uso' },
   { file: 'aviso-legal.html', nav: 'Aviso legal', title: 'Aviso legal' },
+  { file: 'eliminar-cuenta.html', nav: 'Eliminar cuenta', title: 'Eliminar tu cuenta' },
   { file: 'soporte.html', nav: 'Ayuda', title: 'Ayuda y contacto' },
 ];
+
+// ── Guardia de versión ──────────────────────────────────────────────────────────────────────────────
+// Un texto legal aprobado y publicado NO se puede perder por volver a ejecutar este script. Cada página
+// lleva su versión en una etiqueta <meta>; si la que hay en disco es POSTERIOR a la de src/content/legal.ts,
+// el script no escribe nada y avisa. Para publicar un cambio nuevo, sube LEGAL_VERSION en ese archivo.
+const VERSION_META = 'mediclaro-legal-version';
+
+/** Versión publicada en un HTML ya escrito, o null si no la declara (páginas anteriores a esta guardia). */
+function publishedVersion(html) {
+  const m = html.match(new RegExp(`<meta name="${VERSION_META}" content="([^"]+)">`));
+  return m ? m[1] : null;
+}
+
+/** Compara versiones con formato `AAAA-MM-DD` o `AAAA-MM-DD.N`: <0, 0 o >0. */
+function compareVersions(a, b) {
+  const parse = (v) => {
+    const [date, rev = '0'] = String(v).split('.');
+    return { date, rev: Number.parseInt(rev, 10) || 0 };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (pa.date !== pb.date) return pa.date < pb.date ? -1 : 1;
+  return pa.rev - pb.rev;
+}
 
 const CSS = `
 :root{--bg:#f7fafc;--card:#ffffff;--text:#172033;--muted:#4b5565;--brand:#0f4c81;--line:#dce7f0;--accent:#0f6cbd}
@@ -107,6 +132,7 @@ function page({ file, title }, body) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · MediClaro</title>
 <meta name="description" content="${esc(title)} de MediClaro, la app que explica tus medicamentos con palabras sencillas.">
+<meta name="${VERSION_META}" content="${esc(legal.LEGAL_VERSION)}">
 <style>${CSS}</style>
 </head>
 <body>
@@ -123,7 +149,7 @@ function page({ file, title }, body) {
 ${body}
 </main>
 <footer class="wrap">
-  <p>Última actualización: ${esc(legal.LEGAL_UPDATED)}. Los mismos textos se pueden leer dentro de la app: Perfil › Información legal.</p>
+  <p>Versión ${esc(legal.LEGAL_VERSION)}, en vigor desde el ${esc(legal.LEGAL_UPDATED)}. Los mismos textos se pueden leer dentro de la app: Perfil › Información legal.</p>
 </footer>
 </body>
 </html>
@@ -161,6 +187,7 @@ const index = `
 <li><a href="privacidad.html">Política de privacidad</a></li>
 <li><a href="condiciones.html">Condiciones de uso y de la suscripción</a></li>
 <li><a href="aviso-legal.html">Aviso legal</a></li>
+<li><a href="eliminar-cuenta.html">Eliminar tu cuenta</a></li>
 <li><a href="soporte.html">Ayuda y contacto</a></li>
 </ul>
 <div class="note">La información de los medicamentos procede del Centro de Información online de Medicamentos (CIMA) de la AEMPS. MediClaro no sustituye a tu médico ni a tu farmacéutico. En una emergencia, llama al 112.</div>
@@ -176,11 +203,29 @@ const docs = {
     PAGES[2],
     `${blocksHtml(legal.noticeBlocks(ctx))}\n<h2>Aviso médico</h2>\n${blocksHtml(legal.medicalBlocks())}`,
   ),
-  'soporte.html': page(PAGES[3], support),
+  'eliminar-cuenta.html': page(PAGES[3], blocksHtml(legal.accountDeletionBlocks(ctx))),
+  'soporte.html': page(PAGES[4], support),
   'index.html': page({ file: 'index.html', title: 'MediClaro' }, index),
 };
 
 fs.mkdirSync(out, { recursive: true });
+
+// Guardia: nunca se pisa una versión publicada posterior a la del código.
+const blocked = [];
+for (const name of Object.keys(docs)) {
+  const dest = path.join(out, name);
+  if (!fs.existsSync(dest)) continue;
+  const current = publishedVersion(fs.readFileSync(dest, 'utf8'));
+  if (current && compareVersions(current, legal.LEGAL_VERSION) > 0) blocked.push({ name, current });
+}
+if (blocked.length) {
+  console.error('NO SE HA ESCRITO NADA: hay páginas publicadas con una versión POSTERIOR a la del código.');
+  for (const b of blocked) console.error(`  · docs/${b.name}: publicada ${b.current} · código ${legal.LEGAL_VERSION}`);
+  console.error('Esas páginas llevan un cambio aprobado que este script borraría. Revisa qué versión debe quedar y,');
+  console.error('si la del código es la correcta, sube LEGAL_VERSION en src/content/legal.ts por encima de la publicada.');
+  process.exit(1);
+}
+
 for (const [name, html] of Object.entries(docs)) fs.writeFileSync(path.join(out, name), html);
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 const missing = ['EXPO_PUBLIC_COMPANY_NAME', 'EXPO_PUBLIC_COMPANY_TAX_ID', 'EXPO_PUBLIC_COMPANY_ADDRESS', 'EXPO_PUBLIC_SUPPORT_EMAIL'].filter((k) => !env(k));

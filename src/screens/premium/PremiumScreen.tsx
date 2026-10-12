@@ -29,8 +29,8 @@ import { GuideIllustration } from '../../components/Guide';
 import { PURCHASES_ENABLED } from '../../config/app';
 import { FALLBACK_OVERAGE_CENTS } from '../../config/plans';
 import { useAppTheme, useAsync, useEntitlement, useSession } from '../../hooks';
-import { DemoMode, PurchaseService, SubscriptionService } from '../../services';
-import { showAlert } from '../../utils/dialogs';
+import { BillingRequestService, DemoMode, ImmediateStartConsentService, PurchaseService, SubscriptionService } from '../../services';
+import { confirmAsync, showAlert } from '../../utils/dialogs';
 import { formatDateLong, formatPrice } from '../../utils/format';
 import type { Subscription } from '../../types';
 import { UsageHint, UsageMeter } from '../medications/parts';
@@ -296,6 +296,37 @@ function ActivePremium({ subscription }: { subscription: Subscription }) {
     }
   };
 
+  // Desistimiento: solo se ofrece mientras consta que el pago es de hace menos de 14 días. Es distinto de
+  // cancelar la renovación, así que se presenta aparte y con sus propias palabras.
+  const [canWithdraw, setCanWithdraw] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void ImmediateStartConsentService.withinWithdrawalPeriod(subscription).then((ok) => {
+      if (alive) setCanWithdraw(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [subscription]);
+
+  const askWithdrawal = async () => {
+    const ok = await confirmAsync({
+      title: '¿Quieres desistir?',
+      message:
+        'Pagaste hace menos de 14 días, así que puedes echarte atrás. Te devolveremos lo pagado menos los días que ya hayas tenido Premium, por el mismo medio con el que pagaste. Tu cuenta y tus datos se quedan como están.',
+      confirmText: 'Pedir la devolución',
+      cancelText: 'No, seguir con Premium',
+    });
+    if (!ok) return;
+    const saved = await BillingRequestService.record('withdrawal', { provider: subscription.provider });
+    await showAlert(
+      'Hemos anotado tu solicitud',
+      saved
+        ? 'Queda registrada con la fecha de hoy. Te devolveremos el dinero dentro de los 14 días siguientes. Mientras lo tramitamos puedes seguir usando la app.'
+        : 'No hemos podido registrarla ahora mismo y lo volveremos a intentar solos. Para asegurarte, escríbenos desde Perfil › Ayuda indicando que quieres desistir.',
+    );
+  };
+
   return (
     <Screen
       gradient="premium"
@@ -321,6 +352,14 @@ function ActivePremium({ subscription }: { subscription: Subscription }) {
           ) : (
             <PrimaryButton label="Gestionar suscripción" icon="card-outline" onPress={manage} loading={managing} testID="premium-manage" />
           )}
+          {canWithdraw ? (
+            <TextButton
+              label="Desistir y pedir la devolución"
+              icon="arrow-undo-outline"
+              onPress={askWithdrawal}
+              testID="premium-withdraw"
+            />
+          ) : null}
           <TextButton label="Ayuda" icon="help-circle-outline" onPress={() => router.push('/help')} />
         </>
       }
