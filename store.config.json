@@ -25,8 +25,8 @@
           "medicación"
         ],
         "promoText": "Información de tus medicamentos explicada de forma sencilla, accesible y con fuentes oficiales.",
-        "supportUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=support",
-        "privacyPolicyUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+        "supportUrl": "https://murelf87.github.io/MediClaro/soporte.html",
+        "privacyPolicyUrl": "https://murelf87.github.io/MediClaro/privacidad.html"
       },
       "en-US": {
         "title": "MediClaro",
@@ -42,8 +42,8 @@
           "accessibility"
         ],
         "promoText": "Medicine information made clearer and easier to understand.",
-        "supportUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=support",
-        "privacyPolicyUrl": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+        "supportUrl": "https://murelf87.github.io/MediClaro/soporte.html",
+        "privacyPolicyUrl": "https://murelf87.github.io/MediClaro/privacidad.html"
       }
     },
     "advisory": {
