@@ -20,6 +20,13 @@ const SUBSCRIPTION_METHODS: Record<string, Stripe.Checkout.SessionCreateParams.P
   paypal: 'paypal',
 };
 
+/** Precio de Stripe de cada periodo. Sin precio configurado, ese plan no se cobra con tarjeta. */
+const PRICE_FOR = {
+  monthly: PRICE_BASE,
+  quarterly: Deno.env.get('STRIPE_PRICE_QUARTERLY') || undefined,
+  annual: Deno.env.get('STRIPE_PRICE_ANNUAL') || undefined,
+} as const;
+
 Deno.serve(handler({ bucket: 'checkout', maxPerMinute: 5 }, async (_req, user, body) => {
   const returnUrl = String(body.returnUrl ?? 'mediclaro://subscribe');
   if (!ALLOWED_RETURN.test(returnUrl)) return fail('URL de retorno no válida');
@@ -27,6 +34,21 @@ Deno.serve(handler({ bucket: 'checkout', maxPerMinute: 5 }, async (_req, user, b
   const method = typeof body.method === 'string' ? body.method : 'card';
   if (!bizum && method !== 'card' && !SUBSCRIPTION_METHODS[method]) return fail('Forma de pago no válida', 400, 'METHOD_NOT_AVAILABLE');
   const alternative = SUBSCRIPTION_METHODS[method] ?? null;
+
+  // Suscripción: si la app indica el plan, se cobra el precio de ESE plan (mensual, trimestral o anual); si no,
+  // el mensual, como hasta ahora. Nunca se cobra un plan distinto del elegido: si su precio no está configurado
+  // (STRIPE_PRICE_QUARTERLY / STRIPE_PRICE_ANNUAL, los mismos que usa family-pay), no se abre el pago.
+  let subPrice = PRICE_BASE;
+  let subPeriod: keyof typeof PRICE_FOR = 'monthly';
+  let subPlanId: string | null = null;
+  if (!bizum && body.planId !== undefined && body.planId !== null) {
+    const chosen = await planById(body.planId);
+    const price = chosen ? PRICE_FOR[chosen.period] : undefined;
+    if (!chosen || !price) return fail('Este plan no se puede pagar ahora mismo.', 400, 'PLAN_NOT_AVAILABLE');
+    subPrice = price;
+    subPeriod = chosen.period;
+    subPlanId = chosen.id;
+  }
 
   const { data: prof } = await admin.from('profiles').select('*').eq('id', user.id).single();
   // Con Bizum se puede pagar el periodo siguiente antes de que termine el actual (se suma al final).
@@ -78,15 +100,20 @@ Deno.serve(handler({ bucket: 'checkout', maxPerMinute: 5 }, async (_req, user, b
     mode: 'subscription',
     customer,
     client_reference_id: user.id,
-    line_items: alternative
-      ? [{ price: PRICE_BASE, quantity: 1 }] // domiciliación / PayPal: solo la cuota mensual
-      : [
-          { price: PRICE_BASE, quantity: 1 },  // cuota mensual
-          // Premium es ilimitado: el pago por uso solo se añade si el propietario define STRIPE_PRICE_METERED.
-          ...(PRICE_METERED ? [{ price: PRICE_METERED }] : []),
-        ],
+    line_items: [
+      { price: subPrice, quantity: 1 },
+      // Premium es ilimitado: el pago por uso (mensual) solo se añade al plan mensual con tarjeta y si el
+      // propietario define STRIPE_PRICE_METERED. Stripe no admite mezclar periodos en una suscripción.
+      ...(!alternative && subPeriod === 'monthly' && PRICE_METERED ? [{ price: PRICE_METERED }] : []),
+    ],
     ...(alternative ? { payment_method_types: [alternative] } : {}),
-    subscription_data: { metadata: { supabase_user_id: user.id, ...(alternative ? { payment_method: method } : {}) } },
+    subscription_data: {
+      metadata: {
+        supabase_user_id: user.id,
+        ...(alternative ? { payment_method: method } : {}),
+        ...(subPlanId ? { plan_id: subPlanId, period: subPeriod } : {}),
+      },
+    },
     allow_promotion_codes: true,
     billing_address_collection: 'auto',
     automatic_tax: { enabled: Deno.env.get('STRIPE_AUTOMATIC_TAX') === 'true' },
