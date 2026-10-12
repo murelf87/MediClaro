@@ -93,7 +93,7 @@ export function useAccountActions() {
         message: storeName && sub?.isPremium
           ? `Se borrarán tus datos. No se puede deshacer. Tu suscripción de ${storeName} no se cancela desde aquí.`
           : sub?.isPremium
-            ? 'Tu Premium no se renovará. Tu cuenta y tus datos se eliminarán al terminar el periodo que ya has pagado.'
+            ? 'Se borrarán tu cuenta y tus datos ahora mismo. Tu Premium también se pierde, aunque te queden días pagados. Si quieres usarlo hasta el final, cancélalo antes.'
             : 'Se borrarán tus datos. No se puede deshacer.',
         confirmText: 'Eliminar',
         cancelText: 'Cancelar',

@@ -155,7 +155,7 @@ export function termsBlocks(ctx: LegalContext): LegalBlock[] {
     },
     { h: '13. Baja y suspensión' },
     {
-      p: 'Puedes eliminar tu cuenta cuando quieras desde Perfil › Datos de cuenta › Eliminar mi cuenta. Si pides eliminarla y tienes Premium pagado, la cuenta se elimina al terminar el periodo que ya has pagado. Podemos suspender o cerrar una cuenta, avisando antes cuando sea posible, si hay un incumplimiento grave de estas condiciones, fraude o un riesgo para la seguridad de otras personas o del servicio.',
+      p: 'Puedes eliminar tu cuenta cuando quieras desde Perfil › Datos de cuenta › Eliminar mi cuenta. La cuenta y tus datos se eliminan en ese momento. Si tienes Premium pagado con tarjeta o Bizum, se cancela a la vez y el acceso que te quede pagado deja de estar disponible: si quieres usarlo hasta el final del periodo, cancélalo antes y elimina la cuenta cuando termine. Si lo cobra Apple o Google Play, cancélalo antes en la tienda: mientras la suscripción siga activa, la app no permite eliminar la cuenta. Podemos suspender o cerrar una cuenta, avisando antes cuando sea posible, si hay un incumplimiento grave de estas condiciones, fraude o un riesgo para la seguridad de otras personas o del servicio.',
     },
     { h: '14. Ley aplicable y reclamaciones' },
     {
