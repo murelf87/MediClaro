@@ -72,6 +72,9 @@ export interface ProfileUpdate {
 /** Exportación de datos (derecho de acceso RGPD). Estructura tal cual la devuelve el backend. */
 export type AccountExport = Record<string, unknown> & { exportedAt?: string };
 
+/** Resultado de pedir la eliminación: inmediata, o programada al terminar el Premium pagado (R-18). */
+export type DeleteAccountOutcome = { scheduled: boolean; deleteAt?: string };
+
 export const ProfileService = {
   async getSettings(): Promise<UserSettings> {
     await requireUserId();
@@ -223,17 +226,26 @@ export const ProfileService = {
    * Elimina la cuenta y todos los datos. Cancela la suscripción en el backend.
    * Después cierra la sesión local.
    */
-  async deleteAccount(): Promise<void> {
+  async deleteAccount(): Promise<DeleteAccountOutcome> {
     const userId = await requireUserId();
     if (DemoMode.isActive()) {
       throw new AppError('not_available', 'En el modo demostración no hay una cuenta real que eliminar. Pulsa «Cerrar sesión» para salir.');
     }
+    let res: { deleted?: boolean; scheduled?: boolean; deleteAt?: string; needsStoreCancel?: boolean; provider?: string } | null = null;
     try {
-      const res = await invokeFunction<{ deleted?: boolean }>('account', { action: 'delete', confirm: 'ELIMINAR' }, { timeoutMs: 45_000 });
-      if (!res?.deleted) throw new AppError('unknown', 'No hemos podido eliminar la cuenta. Inténtalo de nuevo.');
+      res = await invokeFunction<{ deleted?: boolean; scheduled?: boolean; deleteAt?: string; needsStoreCancel?: boolean; provider?: string }>(
+        'account', { action: 'delete', confirm: 'ELIMINAR' }, { timeoutMs: 45_000 },
+      );
     } catch (e) {
       throw toAppError(e);
     }
+    // R-18: con Premium activo la cuenta sigue hasta el fin del periodo pagado. No cerramos sesión aquí.
+    if (res?.scheduled) return { scheduled: true, deleteAt: res.deleteAt };
+    if (res?.needsStoreCancel) {
+      const store = res.provider === 'apple' ? 'Apple' : 'Google Play';
+      throw new AppError('unknown', `Tu Premium se paga con ${store} y sigue activo. Cancélalo en ${store}; cuando termine el periodo, vuelve a pedir la eliminación de tu cuenta.`);
+    }
+    if (!res?.deleted) throw new AppError('unknown', 'No hemos podido eliminar la cuenta. Inténtalo de nuevo.');
     // Lo que de esta cuenta solo vivía en el teléfono también se borra.
     await EmergencyService.forgetAccountLocalData(userId).catch(() => undefined);
     await NotificationService.forgetAccountLocalData(userId).catch(() => undefined);
@@ -244,5 +256,6 @@ export const ProfileService = {
     CareChatService.clear();
     OwnerAdminService.clear();
     await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    return { scheduled: false };
   },
 };

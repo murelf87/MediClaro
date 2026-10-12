@@ -37,7 +37,10 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf",
         "EXPO_PUBLIC_APP_STORE_ID": "6817669616",
         "EXPO_PUBLIC_OTP_TTL_SECONDS": "300",
-        "EXPO_PUBLIC_PRIVACY_URL": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy"
+        "EXPO_PUBLIC_PRIVACY_URL": "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/public-info?page=privacy",
+        "EXPO_PUBLIC_COMPANY_NAME": "Antonio José Manrique Fernández",
+        "EXPO_PUBLIC_COMPANY_ADDRESS": "Calle Remo n.º 30, Adra (Almería)",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "info@nexucontrol.com"
       },
       "android": {
         "buildType": "app-bundle"

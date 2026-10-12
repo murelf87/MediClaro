@@ -155,7 +155,7 @@ export function termsBlocks(ctx: LegalContext): LegalBlock[] {
     },
     { h: '13. Baja y suspensión' },
     {
-      p: 'Puedes eliminar tu cuenta cuando quieras desde Perfil › Datos de cuenta › Eliminar mi cuenta. Podemos suspender o cerrar una cuenta, avisando antes cuando sea posible, si hay un incumplimiento grave de estas condiciones, fraude o un riesgo para la seguridad de otras personas o del servicio.',
+      p: 'Puedes eliminar tu cuenta cuando quieras desde Perfil › Datos de cuenta › Eliminar mi cuenta. Si pides eliminarla y tienes Premium pagado, la cuenta se elimina al terminar el periodo que ya has pagado. Podemos suspender o cerrar una cuenta, avisando antes cuando sea posible, si hay un incumplimiento grave de estas condiciones, fraude o un riesgo para la seguridad de otras personas o del servicio.',
     },
     { h: '14. Ley aplicable y reclamaciones' },
     {
@@ -352,7 +352,7 @@ export function subscriptionBlocks(ctx: LegalContext): LegalBlock[] {
       list: [
         'Las suscripciones se renuevan solas al final de cada periodo por el mismo precio, salvo que se cancelen antes de la renovación (con Apple, al menos 24 horas antes). Sin permanencia.',
         'Para cancelar: Perfil › MediClaro Premium › Gestionar suscripción. Si la contrataste con Apple, también en Ajustes del iPhone › tu nombre › Suscripciones; con Google Play, en Google Play › Pagos y suscripciones.',
-        'Al cancelar sigues teniendo Premium hasta el final del periodo pagado. Eliminar tu cuenta o borrar la app no cancela una suscripción de Apple o de Google Play.',
+        'Al cancelar sigues teniendo Premium hasta el final del periodo pagado. Después vuelves al perfil Básico: lo que usas en Premium vuelve a bloquearse, y tus datos se quedan. Eliminar tu cuenta o borrar la app no cancela una suscripción de Apple o de Google Play.',
         'Si cambiamos el precio, te avisaremos antes y podrás cancelar sin coste antes de que se aplique.',
       ],
     },

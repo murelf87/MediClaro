@@ -93,7 +93,7 @@ export function useAccountActions() {
         message: storeName && sub?.isPremium
           ? `Se borrarán tus datos. No se puede deshacer. Tu suscripción de ${storeName} no se cancela desde aquí.`
           : sub?.isPremium
-            ? 'Se borrarán tus datos y se cancelará tu suscripción. No se puede deshacer.'
+            ? 'Tu Premium no se renovará. Tu cuenta y tus datos se eliminarán al terminar el periodo que ya has pagado.'
             : 'Se borrarán tus datos. No se puede deshacer.',
         confirmText: 'Eliminar',
         cancelText: 'Cancelar',
@@ -109,7 +109,15 @@ export function useAccountActions() {
       });
       if (!second) return;
       setDeleting(true);
-      await ProfileService.deleteAccount();
+      const outcome = await ProfileService.deleteAccount();
+      if (outcome.scheduled) {
+        // Premium activo: la cuenta sigue hasta el fin del periodo pagado. Se mantiene la sesión.
+        const when = outcome.deleteAt
+          ? new Date(outcome.deleteAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+          : 'al terminar tu periodo Premium';
+        await showAlert('Eliminación programada', `Tu Premium no se renovará. Tu cuenta y tus datos se eliminarán el ${when}. Hasta entonces puedes seguir usando la app.`);
+        return;
+      }
       // La sesión ya se ha cerrado en el servidor; limpiamos también el estado local.
       await signOut().catch(() => undefined);
       await showAlert('Cuenta eliminada', 'Hemos borrado tu cuenta y tus datos. Gracias por usar MediClaro.');
