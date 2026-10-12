@@ -81,10 +81,45 @@ const SECTIONS: { n: number; key: LeafletSection['key']; title: string }[] = [
   { n: 5, key: 'conservacion', title: 'Conservación' },
 ];
 
-const clean = (html: string) => String(html)
-  .replace(/<\/(p|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ')
-  .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
-  .replace(/&[a-z]+;/gi, ' ').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+// Códigos HTML que trae CIMA en los prospectos (`&#233;`, `&#xa0;`, `&#8220;`, `&aacute;`…). Antes solo se
+// convertían unos pocos y los numéricos llegaban tal cual a la pantalla («Qu&#233; es Vimpat»).
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: ' ', amp: '&', quot: '"', apos: "'", lt: '<', gt: '>',
+  ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', laquo: '«', raquo: '»', sbquo: '‚', bdquo: '„',
+  ndash: '–', mdash: '—', hellip: '…', bull: '•', middot: '·', deg: 'º', ordm: 'º', ordf: 'ª',
+  iexcl: '¡', iquest: '¿', micro: 'µ', plusmn: '±', times: '×', divide: '÷', frac12: '½', frac14: '¼',
+  frac34: '¾', sup2: '²', sup3: '³', copy: '©', reg: '®', trade: '™', euro: '€', shy: '', le: '≤', ge: '≥',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í',
+  Oacute: 'Ó', Uacute: 'Ú', ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', ccedil: 'ç', Ccedil: 'Ç',
+  agrave: 'à', egrave: 'è', ograve: 'ò', iuml: 'ï', ouml: 'ö', auml: 'ä', euml: 'ë',
+};
+const ENTITY = /&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]*);/gi;
+
+function codePoint(n: number): string {
+  if (!Number.isFinite(n) || n <= 0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff)) return '';
+  return String.fromCodePoint(n);
+}
+
+export function decodeEntities(text: string): string {
+  let out = text;
+  // Hasta tres pasadas: CIMA a veces los trae dobles (`&amp;#233;`).
+  for (let i = 0; i < 3; i++) {
+    const next = out.replace(ENTITY, (whole, body: string) => {
+      if (body[0] === '#') {
+        const hex = body[1] === 'x' || body[1] === 'X';
+        return codePoint(hex ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10));
+      }
+      return NAMED_ENTITIES[body] ?? NAMED_ENTITIES[body.toLowerCase()] ?? ' ';
+    });
+    if (next === out) break;
+    out = next;
+  }
+  return out.replace(/\u00a0/g, ' ');
+}
+
+const clean = (html: string) => decodeEntities(
+  String(html).replace(/<\/(p|li|h\d)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' '),
+).replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').replace(/\n\s*\n+/g, '\n').trim();
 
 /** CIMA devuelve docSegmentado/contenido como array de secciones; algunas versiones devuelven objeto. */
 function sectionText(raw: any): string {

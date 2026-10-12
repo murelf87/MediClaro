@@ -16,6 +16,7 @@ let lastReadUser = '';
 
 import { AiConsentService } from './AiConsentService';
 import { prettifyMedicineName, prettifySentence, shortMedicineName } from '../utils/medicineText';
+import { decodeHtmlEntities } from '../utils/htmlEntities';
 import type {
   HistoryMethod,
   HistoryStatus,
@@ -209,7 +210,9 @@ export function mapDetail(raw: RawDetail): MedicationDetail {
           aiAssisted: raw.simple.aiAssisted !== false,
         }
       : null,
-    leaflet: (raw.leaflet ?? []).filter((s) => s.text?.trim()).map((s) => ({ key: s.key, title: s.title, text: s.text })),
+    leaflet: (raw.leaflet ?? [])
+      .map((s) => ({ key: s.key, title: decodeHtmlEntities(s.title), text: decodeHtmlEntities(s.text) }))
+      .filter((s) => s.text),
     leafletUrl: raw.leafletUrl ?? null,
     technicalSheetUrl: raw.sheetUrl ?? null,
     source: {
