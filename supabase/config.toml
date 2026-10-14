@@ -52,6 +52,10 @@ verify_jwt = false
 [functions.cleanup-anonymous]
 verify_jwt = false
 
+# Sincroniza la copia local del catálogo de CIMA; se autentica con X-Cron-Secret, no con JWT de usuario.
+[functions.catalog-sync]
+verify_jwt = false
+
 # Internal worker authenticates with its Vault secret, never a client JWT.
 [functions.caregiver-dispatch]
 verify_jwt = false

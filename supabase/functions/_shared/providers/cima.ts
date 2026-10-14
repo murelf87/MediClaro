@@ -2,11 +2,26 @@
 import type { LeafletSection, MedicationDataProvider, MedicationSummary, Source } from './types.ts';
 import { ProviderUnavailableError } from './types.ts';
 import { cached } from '../cache.ts';
+import { catalogByCN, catalogById, searchCatalog } from '../catalog.ts';
 
 const BASE = 'https://cima.aemps.es/cima/rest';
 const TTL_H = 24 * 7; // la ficha cambia poco: 7 días; la fecha real de obtención se conserva en Source
 
-async function get(path: string): Promise<any> {
+/**
+ * Si CIMA no responde, se usa la copia local del catálogo (med_catalog), que es de la misma fuente oficial
+ * y deja su fecha en la fuente. Si la copia no tiene nada, se repite el error original: nunca se convierte una
+ * caída en un falso «no encontrado».
+ */
+async function orLocalCopy<T>(e: unknown, local: () => Promise<T>, isEmpty: (r: T) => boolean): Promise<T> {
+  if (!(e instanceof ProviderUnavailableError)) throw e;
+  let r: T;
+  try { r = await local(); } catch { throw e; }
+  if (isEmpty(r)) throw e;
+  console.error('CIMA caída: se sirve la copia local del catálogo');
+  return r;
+}
+
+export async function get(path: string): Promise<any> {
   let lastStatus = 0;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
@@ -55,7 +70,7 @@ function activeIngredients(m: any): MedicationSummary['principiosActivos'] {
   return [];
 }
 
-function map(m: any): MedicationSummary | null {
+export function map(m: any): MedicationSummary | null {
   if (!m?.nregistro || !m?.nombre) return null;
   const foto = (m.fotos ?? []).find((f: any) => f.tipo === 'materialas') ?? (m.fotos ?? [])[0];
   return {
@@ -138,18 +153,22 @@ export const cimaProvider: MedicationDataProvider = {
   async searchMedication(query, limit = 8) {
     const q = query.trim().slice(0, 80);
     if (q.length < 3) return [];
-    const d = await cached('cima', `search:${q.toLowerCase()}`, TTL_H, () => get(`/medicamentos?nombre=${encodeURIComponent(q)}&comerc=1`));
-    const raw = ((d?.resultados ?? []) as any[]).slice(0, Math.min(limit, 10));
+    try {
+      const d = await cached('cima', `search:${q.toLowerCase()}`, TTL_H, () => get(`/medicamentos?nombre=${encodeURIComponent(q)}&comerc=1`));
+      const raw = ((d?.resultados ?? []) as any[]).slice(0, Math.min(limit, 10));
 
-    // El listado de CIMA no siempre incluye todos los campos usados para la confianza.
-    // Enriquecemos cada candidato con /medicamento?nregistro=... antes de puntuarlo.
-    const full = await Promise.all(raw.map(async (item: any) => {
-      const id = String(item?.nregistro ?? '');
-      if (!id) return map(item);
-      const detailed = await cached('cima', `reg:${id}`, TTL_H, () => get(`/medicamento?nregistro=${encodeURIComponent(id)}`));
-      return map(detailed ?? item);
-    }));
-    return full.filter(Boolean).slice(0, limit) as MedicationSummary[];
+      // El listado de CIMA no siempre incluye todos los campos usados para la confianza.
+      // Enriquecemos cada candidato con /medicamento?nregistro=... antes de puntuarlo.
+      const full = await Promise.all(raw.map(async (item: any) => {
+        const id = String(item?.nregistro ?? '');
+        if (!id) return map(item);
+        const detailed = await cached('cima', `reg:${id}`, TTL_H, () => get(`/medicamento?nregistro=${encodeURIComponent(id)}`));
+        return map(detailed ?? item);
+      }));
+      return full.filter(Boolean).slice(0, limit) as MedicationSummary[];
+    } catch (e) {
+      return orLocalCopy(e, () => searchCatalog(q, limit), r => r.length === 0);
+    }
   },
 
   async findByBarcode(code) {
@@ -159,12 +178,20 @@ export const cimaProvider: MedicationDataProvider = {
 
   async findByNationalCode(cn) {
     if (!/^\d{6}$/.test(cn)) return null;
-    return map(await cached('cima', `cn:${cn}`, TTL_H, () => get(`/medicamento?cn=${encodeURIComponent(cn)}`)));
+    try {
+      return map(await cached('cima', `cn:${cn}`, TTL_H, () => get(`/medicamento?cn=${encodeURIComponent(cn)}`)));
+    } catch (e) {
+      return orLocalCopy(e, () => catalogByCN(cn), r => r === null);
+    }
   },
 
   async getMedication(id) {
     if (!/^[\w-]{1,40}$/.test(id)) return null;
-    return map(await cached('cima', `reg:${id}`, TTL_H, () => get(`/medicamento?nregistro=${encodeURIComponent(id)}`)));
+    try {
+      return map(await cached('cima', `reg:${id}`, TTL_H, () => get(`/medicamento?nregistro=${encodeURIComponent(id)}`)));
+    } catch (e) {
+      return orLocalCopy(e, () => catalogById(id), r => r === null);
+    }
   },
 
   async getLeaflet(id) {
