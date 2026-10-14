@@ -18,8 +18,8 @@ export async function caregiverPushState():Promise<PushState>{
 }
 /** Interruptor ON: pide permiso si hace falta y registra este móvil. */
 export async function turnOnCaregiverPush():Promise<string>{
- const message=await enableCaregiverNotifications(true);
- await localStore.remove(OFF_KEY);
+ await localStore.remove(OFF_KEY);  // Primero, desbloquear (si estaba apagado)
+ const message=await enableCaregiverNotifications(true);  // Luego, habilitar
  return message;
 }
 /** Interruptor OFF: este móvil deja de recibir avisos de familiares, chat y llamadas. */

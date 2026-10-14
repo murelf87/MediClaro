@@ -163,6 +163,9 @@ export default function CareChatScreen() {
       }
       right={
         <View style={styles.headerActions}>
+          {linkId && !blocked ? (
+            <CareLiveLocation linkId={linkId} patientSide={patientSide} premium={premium} name={otherFirst} />
+          ) : null}
           {patientSide ? (
             <Pressable
               onPress={callNow}
@@ -244,7 +247,6 @@ export default function CareChatScreen() {
     <Screen edges={['top']} scroll={false} padded={false} header={header} testID="care-chat-screen">
       <View ref={wrapRef} style={styles.flex} onLayout={measureWrap} collapsable={false}>
         <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
-          {!blocked && linkId ? <CareLiveLocation linkId={linkId} patientSide={patientSide} premium={premium} name={otherFirst} /> : null}
           {blocked ? (
             <View style={{ paddingHorizontal: theme.layout.screenPaddingH, paddingTop: theme.spacing.sm, gap: theme.spacing.sm }}>
               <InfoBanner tone="warning" title={chat.error?.message ?? 'Esta conversación no está disponible.'} />

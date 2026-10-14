@@ -1,16 +1,17 @@
 /**
- * Franja de «ubicación en directo» del chat de cuidado.
- *  - Persona Premium: elige cuánto tiempo compartir (15 min, 1 h, 8 h) y tiene siempre un botón grande para parar.
- *  - Persona cuidadora: ve cuándo se comparte y abre el mapa con la última posición.
+ * Icono de «ubicación en directo» del chat de cuidado.
+ *  - Persona Premium: toca para elegir cuánto tiempo compartir (15 min, 1 h, 8 h).
+ *  - Persona cuidadora: ve el icono cuando se comparte y toca para abrir el mapa.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { AppText, Icon, PrimaryButton, SecondaryButton, TextButton } from './index';
 import { useAppTheme } from '../hooks';
 import {
   LIVE_DURATIONS, getLiveLocation, liveErrorMessage, resumeSending, startSharing, stopSharing, type LiveLocation,
 } from '../services/CareLiveLocationService';
 import { placeUrl } from '../utils/maps';
+import { showAlert } from '../utils/dialogs';
 
 const POLL_MS = 10_000;
 const hhmm = (iso: string | null) =>
@@ -22,9 +23,8 @@ export function CareLiveLocation({ linkId, patientSide, premium, name }: {
   const theme = useAppTheme();
   const c = theme.colors;
   const [live, setLive] = useState<LiveLocation | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  const [modal, setModal] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -32,7 +32,6 @@ export function CareLiveLocation({ linkId, patientSide, premium, name }: {
       const r = await getLiveLocation(linkId);
       if (!alive.current) return;
       setLive(r);
-      // Si ya estaba compartiendo (p. ej. reabrió la app), se reanuda el envío.
       if (patientSide && r.active && r.mine) void resumeSending(linkId).catch(() => undefined);
     } catch {
       /* sin conexión: se conserva lo último que se vio */
@@ -47,75 +46,74 @@ export function CareLiveLocation({ linkId, patientSide, premium, name }: {
   }, [refresh]);
 
   const start = async (minutes: number) => {
-    setBusy(true); setError(null);
+    setBusy(true);
     try {
       setLive(await startSharing(linkId, minutes));
-      setChoosing(false);
+      setModal(false);
     } catch (e) {
-      setError(String((e as Error)?.message) === 'LOCATION_DENIED'
-        ? 'Permite la ubicación de MediClaro en los ajustes del teléfono para poder compartirla.'
-        : liveErrorMessage(e));
+      const msg = String((e as Error)?.message) === 'LOCATION_DENIED'
+        ? 'Permite la ubicación en los ajustes del teléfono.'
+        : liveErrorMessage(e);
+      void showAlert('Ubicación', msg);
     } finally { if (alive.current) setBusy(false); }
   };
   const stop = async () => {
-    setBusy(true); setError(null);
-    try { await stopSharing(linkId); setLive(null); } catch (e) { setError(liveErrorMessage(e)); }
+    setBusy(true);
+    try { await stopSharing(linkId); setLive(null); } catch (e) { void showAlert('Ubicación', liveErrorMessage(e)); }
     finally { if (alive.current) setBusy(false); }
   };
 
-  const box = { borderColor: c.divider, backgroundColor: c.surface, padding: theme.spacing.md, gap: theme.spacing.sm };
-
-  if (live?.active && patientSide) {
+  // Icono para persona Premium: compartiendo o listo para compartir
+  if (patientSide && premium) {
     return (
-      <View style={[styles.box, box]} testID="care-live-mine">
-        <View style={styles.row}>
-          <Icon name="location" size={22} color={c.primary} />
-          <AppText variant="bodyStrong" style={styles.flex}>Compartiendo tu ubicación hasta las {hhmm(live.expiresAt)}</AppText>
-        </View>
-        <PrimaryButton label="Dejar de compartir" icon="close-circle" onPress={() => void stop()} loading={busy} testID="care-live-stop" />
-        {error ? <AppText variant="small" color="textSecondary">{error}</AppText> : null}
-      </View>
+      <>
+        <Pressable onPress={() => setModal(true)} style={({ pressed }) => [styles.icon, { opacity: pressed ? 0.6 : 1 }]} testID="care-live-icon">
+          <Icon name={live?.active ? 'location' : 'location-outline'} size={24} color={live?.active ? c.danger : c.primary} />
+          {live?.active ? <View style={[styles.dot, { backgroundColor: c.danger }]} /> : null}
+        </Pressable>
+        <Modal visible={modal} transparent animationType="fade">
+          <Pressable style={styles.backdrop} onPress={() => setModal(false)} />
+          <View style={[styles.popover, { backgroundColor: c.surface, borderColor: c.divider }]}>
+            <AppText variant="bodyStrong" style={{ marginBottom: theme.spacing.md }}>
+              {live?.active ? `Compartiendo hasta las ${hhmm(live.expiresAt)}` : '¿Cuánto tiempo compartir?'}
+            </AppText>
+            {live?.active ? (
+              <PrimaryButton label="Dejar de compartir" icon="close-circle" onPress={() => void stop().then(() => setModal(false))} loading={busy} />
+            ) : (
+              <>
+                {LIVE_DURATIONS.map(d => (
+                  <SecondaryButton key={d.minutes} label={d.label} onPress={() => void start(d.minutes)} disabled={busy} />
+                ))}
+              </>
+            )}
+            <TextButton label="Cerrar" onPress={() => setModal(false)} />
+          </View>
+        </Modal>
+      </>
     );
   }
-  if (live?.active) {
+
+  // Icono para cuidadora: ver ubicación si está activa
+  if (!patientSide && live?.active) {
     const has = live.latitude != null && live.longitude != null;
     return (
-      <View style={[styles.box, box]} testID="care-live-theirs">
-        <View style={styles.row}>
-          <Icon name="location" size={22} color={c.primary} />
-          <AppText variant="bodyStrong" style={styles.flex}>{name} comparte su ubicación hasta las {hhmm(live.expiresAt)}</AppText>
-        </View>
-        {has ? (
-          <SecondaryButton label="Ver dónde está ahora" icon="map-outline"
-            onPress={() => void Linking.openURL(placeUrl(live.latitude!, live.longitude!)).catch(() => setError('No se ha podido abrir el mapa.'))}
-            testID="care-live-open" />
-        ) : <AppText variant="small" color="textSecondary">Esperando la primera posición…</AppText>}
-        {has && live.updatedAt ? <AppText variant="small" color="textSecondary">Última actualización a las {hhmm(live.updatedAt)}</AppText> : null}
-        {error ? <AppText variant="small" color="textSecondary">{error}</AppText> : null}
-      </View>
+      <Pressable
+        onPress={() => has && void Linking.openURL(placeUrl(live.latitude!, live.longitude!)).catch(() => undefined)}
+        style={({ pressed }) => [styles.icon, { opacity: pressed && has ? 0.6 : 1 }]}
+        disabled={!has}
+        testID="care-live-icon"
+      >
+        <Icon name="map" size={24} color={has ? c.primary : c.textSecondary} />
+      </Pressable>
     );
   }
-  if (!patientSide || !premium) return null;
-  return (
-    <View style={[styles.box, box]} testID="care-live-start">
-      {choosing ? (
-        <>
-          <AppText variant="bodyStrong">¿Cuánto tiempo quieres compartirla?</AppText>
-          {LIVE_DURATIONS.map(d => (
-            <SecondaryButton key={d.minutes} label={d.label} onPress={() => void start(d.minutes)} disabled={busy} testID={`care-live-${d.minutes}`} />
-          ))}
-          <TextButton label="Cancelar" onPress={() => setChoosing(false)} />
-        </>
-      ) : (
-        <SecondaryButton label="Compartir mi ubicación en directo" icon="location-outline" onPress={() => setChoosing(true)} testID="care-live-choose" />
-      )}
-      {error ? <AppText variant="small" color="textSecondary">{error}</AppText> : null}
-    </View>
-  );
+
+  return null;
 }
 
 const styles = StyleSheet.create({
-  box: { borderWidth: 1, borderRadius: 16, marginHorizontal: 12, marginTop: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  flex: { flex: 1 },
+  icon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  dot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  popover: { position: 'absolute', left: 24, right: 24, top: '30%', padding: 20, borderRadius: 16, borderWidth: 1, gap: 10 },
 });

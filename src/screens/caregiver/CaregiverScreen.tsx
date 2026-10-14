@@ -80,14 +80,18 @@ export default function CaregiverScreen(){
  // Por defecto ON: el host pide el permiso y registra el móvil al entrar; aquí se vuelve a leer el estado real.
  useEffect(()=>{const read=()=>void caregiverPushState().then(s=>{if(alive.current)setPushState(s);}).catch(()=>undefined);read();const t=setTimeout(read,3000);return()=>clearTimeout(t);},[]);
  const togglePush=async(on:boolean)=>{
-  if(pushBusy)return;setPushBusy(true);
+  if(pushBusy)return;setPushBusy(true);setError('');
   try{
    if(on){
     if(pushState==='blocked'){await showAlert('Avisos bloqueados','Permite las notificaciones de MediClaro en los Ajustes del teléfono y vuelve aquí.');void Linking.openSettings().catch(()=>undefined);return;}
     await turnOnCaregiverPush();
-    setPushState('on');
-   } else {await turnOffCaregiverPush();setPushState('off');}
-  }catch(e){setError((e as Error).message);setPushState(await caregiverPushState().catch(()=>'off' as PushState));}
+   } else {
+    await turnOffCaregiverPush();
+   }
+   // Releer el estado real desde el servidor y el sistema operativo
+   const newState=await caregiverPushState();
+   if(alive.current)setPushState(newState);
+  }catch(e){setError((e as Error).message);const newState=await caregiverPushState().catch(()=>'off' as PushState);if(alive.current)setPushState(newState);}
   finally{if(alive.current)setPushBusy(false);}
  };
  const pushRow=<SettingRow icon="notifications-outline" label="Avisos en este móvil"
