@@ -39,7 +39,8 @@ export function CaregiverHost(){
   });
   // Solo los avisos de familiares y del chat: los de «Mis pastillas» los abre PillReminderHost.
   void Notifications.getLastNotificationResponseAsync().then(r=>{const route=r?.notification.request.content.data?.route;if(!stopped&&r&&typeof route==='string'&&CARE_ROUTES.has(route)){navigate(r.notification);void Notifications.clearLastNotificationResponseAsync().catch(()=>undefined);}}).catch(()=>undefined);
-  void enableCaregiverNotifications(false).catch(()=>undefined);
+  // Se pide el permiso al entrar (iOS/Android solo preguntan una vez) y se registra el móvil: sin esto no llega ningún aviso.
+  void enableCaregiverNotifications(true).catch(()=>undefined);
   const poll=async()=>{
    if(stopped||busy||AppState.currentState!=='active')return;busy=true;
    try {
