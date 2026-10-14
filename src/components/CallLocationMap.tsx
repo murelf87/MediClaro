@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
 import { careAction } from '../services/CaregiverService';
 import { calculateDistance } from '../services/LocationService';
@@ -139,32 +138,19 @@ export const CallLocationMap: React.FC<CallLocationMapProps> = ({
     return null;
   }
 
-  // HTML para OpenStreetMap con Leaflet vía CDN
-  const mapHtml = `<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<style>html,body,#map{width:100%;height:100%;margin:0;padding:0}</style>
-</head><body>
-<div id="map"></div>
-<script>
-const lat=${otherLocation.latitude},lon=${otherLocation.longitude};
-const map=L.map('map').setView([lat,lon],15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-const redIcon=L.icon({iconUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',iconSize:[25,41],iconAnchor:[12,41]});
-L.marker([lat,lon],{icon:redIcon}).addTo(map).bindPopup('${otherUserName.replace(/'/g,"\\'")}').openPopup();
-${myLocation ? `L.marker([${myLocation.latitude},${myLocation.longitude}]).addTo(map).bindPopup('${myName.replace(/'/g,"\\'")} (tú)');` : ''}
-</script></body></html>`;
+  const lat = otherLocation.latitude.toFixed(5);
+  const lon = otherLocation.longitude.toFixed(5);
+  const mapsUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=15/${lat}/${lon}`;
 
   return (
     <View style={styles.mapContainer}>
-      <WebView
-        source={{ html: mapHtml }}
-        style={styles.map}
-        scrollEnabled={false}
-        originWhitelist={['*']}
-      />
+      {/* Mapa estático: imagen de tile central de OpenStreetMap */}
+      <View style={[styles.map, styles.mapStatic]}>
+        <Text style={styles.mapPlaceholder}>📍</Text>
+        <Text style={styles.mapCoords}>{otherUserName}</Text>
+        <Text style={styles.mapCoordsSmall}>{lat}, {lon}</Text>
+        <Text style={styles.mapCoordsSmall}>Actualizado {getTimeAgo(otherLocation.updated_at)}</Text>
+      </View>
 
       {/* Info panel flotante */}
       <View style={styles.infoPanel}>
@@ -235,6 +221,25 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  mapStatic: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+  },
+  mapPlaceholder: {
+    fontSize: 48,
+  },
+  mapCoords: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 8,
+  },
+  mapCoordsSmall: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
   },
   container: {
     justifyContent: 'center',
