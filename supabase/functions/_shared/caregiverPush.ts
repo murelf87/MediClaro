@@ -28,6 +28,25 @@ export function medicationAlertPushPayload(token: string, patientName?: string, 
   sound: 'default', priority: 'high', channelId: 'caregiver-alerts', data: { route: '/caregiver', kind: 'medication' }, ttl: 3600 };
 }
 /**
+ * Aviso de «Mis pastillas» entre la persona cuidada y su cuidador/a. Nunca lleva el nombre del medicamento ni la dosis:
+ * se vería en la pantalla bloqueada. Dice quién lo ha hecho y qué ha pasado, y se abre la pantalla de cuidado.
+ */
+export function medicationNoticePushPayload(token: string, kind: string, otherName?: string, actorRole?: string, scheduledTime?: string) {
+ const who = (otherName || '').trim() || (actorRole === 'caregiver' ? 'Tu cuidador/a' : 'Tu familiar');
+ const at = scheduledTime ? ` de las ${scheduledTime}` : '';
+ const text: Record<string, [string, string]> = {
+  taken: ['Toma confirmada', `${who} ha confirmado una toma${at}.`],
+  skipped: ['Toma omitida', `${who} ha marcado como omitida una toma${at}.`],
+  added: ['Tratamiento nuevo', `${who} ha añadido un tratamiento.`],
+  changed: ['Tratamiento cambiado', `${who} ha cambiado un tratamiento.`],
+  suspended: ['Tratamiento suspendido', `${who} ha suspendido un tratamiento.`],
+  deleted: ['Tratamiento eliminado', `${who} ha eliminado un tratamiento.`],
+ };
+ const [title, body] = text[kind] ?? ['Cambio en las pastillas', `${who} ha hecho un cambio en las pastillas.`];
+ return { to: token, title: `MediClaro: ${title}`, body: `${body} Ábrelo para verlo.`,
+  sound: 'default', priority: 'high', channelId: 'caregiver-alerts', data: { route: '/caregiver', kind: 'medication_notice' }, ttl: 86400 };
+}
+/**
  * Mensaje nuevo en el chat con el cuidador/a. El aviso dice QUIÉN escribe y cuántos mensajes hay sin leer, nunca el
  * texto (puede hablar de salud y se vería en la pantalla bloqueada). Al tocarlo se abre esa conversación.
  */

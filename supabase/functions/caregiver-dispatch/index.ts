@@ -1,5 +1,5 @@
 import { admin, json } from '../_shared/common.ts';
-import { careCallPushPayload, careChatPushPayload, caregiverPushPayload, caregiverLinkPushPayload, isExpoToken, medicationAlertPushPayload, sameSecret } from '../_shared/caregiverPush.ts';
+import { careCallPushPayload, careChatPushPayload, caregiverPushPayload, caregiverLinkPushPayload, isExpoToken, medicationAlertPushPayload, medicationNoticePushPayload, sameSecret } from '../_shared/caregiverPush.ts';
 
 async function sendJobs(table:string,jobs:any[],payload:(token:string,job:any)=>unknown){
  let processed=0;
@@ -80,6 +80,10 @@ Deno.serve(async req=>{
  const {data:medicationJobs,error:medicationError}=await admin.rpc('medication_claim_alert_jobs');
  if(medicationError)console.warn('medication alerts unavailable',medicationError.message);
  else processed+=await sendJobs('medication_alert_jobs',medicationJobs??[],(t,job)=>medicationAlertPushPayload(t,job.patientName,job.scheduledTime));
+ // Tomas confirmadas/omitidas y cambios de tratamiento entre la persona cuidada y su cuidador/a (opcional).
+ const {data:noticeJobs,error:noticeError}=await admin.rpc('medication_notice_claim_jobs');
+ if(noticeError)console.warn('medication notices unavailable',noticeError.message);
+ else processed+=await sendJobs('medication_notice_jobs',noticeJobs??[],(t,job)=>medicationNoticePushPayload(t,job.kind,job.otherName,job.actor_role,job.scheduledTime));
  // Chat con el cuidador/a (opcional): «X te ha escrito», sin el texto. Si la migración aún no está, no afecta a lo demás.
  const {data:chatJobs,error:chatError}=await admin.rpc('care_chat_claim_push_jobs');
  if(chatError)console.warn('care chat pushes unavailable',chatError.message);
@@ -93,6 +97,7 @@ Deno.serve(async req=>{
   updateReceipts('care_push_jobs'),
   updateReceipts('care_link_push_jobs'),
   medicationError?Promise.resolve():updateReceipts('medication_alert_jobs'),
+  noticeError?Promise.resolve():updateReceipts('medication_notice_jobs'),
   chatError?Promise.resolve():updateReceipts('care_chat_push_jobs'),
   callError?Promise.resolve():updateReceipts('care_call_push_jobs'),
  ]);
