@@ -2,6 +2,7 @@
  * Componente de mapa integrado en la pantalla de llamada.
  * Muestra la ubicación del otro usuario en tiempo real durante la llamada.
  * Similar a WhatsApp Live Location.
+ * Usa WebView + OpenStreetMap (sin react-native-maps — no instalado).
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -12,7 +13,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import MapView, { Marker, Circle } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { useFocusEffect } from '@react-navigation/native';
 import { careAction } from '../services/CaregiverService';
 import { calculateDistance } from '../services/LocationService';
@@ -138,60 +139,32 @@ export const CallLocationMap: React.FC<CallLocationMapProps> = ({
     return null;
   }
 
-  // Calcular región del mapa para mostrar ambas ubicaciones
-  const initialRegion = {
-    latitude: otherLocation.latitude,
-    longitude: otherLocation.longitude,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  };
+  // HTML para OpenStreetMap con Leaflet vía CDN
+  const mapHtml = `<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>html,body,#map{width:100%;height:100%;margin:0;padding:0}</style>
+</head><body>
+<div id="map"></div>
+<script>
+const lat=${otherLocation.latitude},lon=${otherLocation.longitude};
+const map=L.map('map').setView([lat,lon],15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+const redIcon=L.icon({iconUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',iconSize:[25,41],iconAnchor:[12,41]});
+L.marker([lat,lon],{icon:redIcon}).addTo(map).bindPopup('${otherUserName.replace(/'/g,"\\'")}').openPopup();
+${myLocation ? `L.marker([${myLocation.latitude},${myLocation.longitude}]).addTo(map).bindPopup('${myName.replace(/'/g,"\\'")} (tú)');` : ''}
+</script></body></html>`;
 
   return (
     <View style={styles.mapContainer}>
-      <MapView
+      <WebView
+        source={{ html: mapHtml }}
         style={styles.map}
-        initialRegion={initialRegion}
-        showsUserLocation={true}
-        zoomEnabled={true}
-        scrollEnabled={true}
-      >
-        {/* Marcador de la otra persona */}
-        <Marker
-          coordinate={{
-            latitude: otherLocation.latitude,
-            longitude: otherLocation.longitude,
-          }}
-          title={otherUserName}
-          description={`Actualizado hace ${getTimeAgo(otherLocation.updated_at)}`}
-          pinColor="#ef4444" // Rojo
-        />
-
-        {/* Mi marcador */}
-        {myLocation && (
-          <Marker
-            coordinate={{
-              latitude: myLocation.latitude,
-              longitude: myLocation.longitude,
-            }}
-            title={myName}
-            pinColor="#10b981" // Verde
-          />
-        )}
-
-        {/* Círculo de precisión de ubicación */}
-        {otherLocation.accuracy && (
-          <Circle
-            center={{
-              latitude: otherLocation.latitude,
-              longitude: otherLocation.longitude,
-            }}
-            radius={otherLocation.accuracy}
-            fillColor="rgba(239, 68, 68, 0.1)"
-            strokeColor="rgba(239, 68, 68, 0.3)"
-            strokeWidth={1}
-          />
-        )}
-      </MapView>
+        scrollEnabled={false}
+        originWhitelist={['*']}
+      />
 
       {/* Info panel flotante */}
       <View style={styles.infoPanel}>
