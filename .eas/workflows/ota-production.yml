@@ -1,0 +1,34 @@
+name: Actualizar la app instalada (production)
+
+# Publica el JavaScript nuevo para las apps instaladas desde una build «production» (TestFlight / tienda) con la
+# MISMA version de la app (runtime = version, p. ej. 1.0.1). No gasta builds.
+# Si cambia codigo nativo (modulos nuevos, permisos, ajustes de plataforma en app.json) hace falta una build nueva.
+# Se lanza a mano. Solo valores PUBLICOS (los mismos del perfil production de eas.json). Ningun secreto.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  ota_production:
+    name: Publicar actualizacion (production)
+    environment: production
+    env:
+      EXPO_PUBLIC_DEMO_ACCESS: 'off'
+      EXPO_PUBLIC_PAYMENTS_MODE: store
+      EXPO_PUBLIC_SUPABASE_URL: https://ldonnvkysjalpmystoeq.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf
+      EXPO_PUBLIC_APP_STORE_ID: '6817669616'
+      EXPO_PUBLIC_OTP_TTL_SECONDS: '300'
+      EXPO_PUBLIC_PRIVACY_URL: https://murelf87.github.io/MediClaro/privacidad.html
+      EXPO_PUBLIC_TERMS_URL: https://murelf87.github.io/MediClaro/condiciones.html
+      EXPO_PUBLIC_LEGAL_NOTICE_URL: https://murelf87.github.io/MediClaro/aviso-legal.html
+      EXPO_PUBLIC_COMPANY_NAME: Antonio José Manrique Fernández
+      EXPO_PUBLIC_COMPANY_ADDRESS: Calle Remo n.º 30, Adra (Almería)
+      EXPO_PUBLIC_SUPPORT_EMAIL: info@nexucontrol.com
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Publicar actualizacion
+        run: |
+          npx eas-cli@latest update --channel production --platform ios --non-interactive \
+            --message "Production $(git rev-parse --short HEAD)"
