@@ -12,6 +12,7 @@ import {
 } from '../services/CareLiveLocationService';
 import { placeUrl } from '../utils/maps';
 import { showAlert } from '../utils/dialogs';
+import { LiveMap } from './LiveMap';
 
 const POLL_MS = 10_000;
 const hhmm = (iso: string | null) =>
@@ -41,9 +42,9 @@ export function CareLiveLocation({ linkId, patientSide, premium, name }: {
   useEffect(() => {
     alive.current = true;
     void refresh();
-    const t = setInterval(() => void refresh(), POLL_MS);
+    const t = setInterval(() => void refresh(), modal ? 5_000 : POLL_MS);
     return () => { alive.current = false; clearInterval(t); };
-  }, [refresh]);
+  }, [refresh, modal]);
 
   const start = async (minutes: number) => {
     setBusy(true);
@@ -78,7 +79,12 @@ export function CareLiveLocation({ linkId, patientSide, premium, name }: {
               {live?.active ? `Compartiendo hasta las ${hhmm(live.expiresAt)}` : '¿Cuánto tiempo compartir?'}
             </AppText>
             {live?.active ? (
-              <PrimaryButton label="Dejar de compartir" icon="close-circle" onPress={() => void stop().then(() => setModal(false))} loading={busy} />
+              <>
+                {live.latitude != null && live.longitude != null
+                  ? <LiveMap latitude={live.latitude} longitude={live.longitude} height={260} name="ti" />
+                  : <AppText variant="small" color="textSecondary">Buscando tu posición…</AppText>}
+                <PrimaryButton label="Dejar de compartir" icon="close-circle" onPress={() => void stop().then(() => setModal(false))} loading={busy} />
+              </>
             ) : (
               <>
                 {LIVE_DURATIONS.map(d => (
@@ -93,18 +99,32 @@ export function CareLiveLocation({ linkId, patientSide, premium, name }: {
     );
   }
 
-  // Icono para cuidadora: ver ubicación si está activa
+  // Cuidadora: el icono abre el mapa en directo dentro de la app.
   if (!patientSide && live?.active) {
     const has = live.latitude != null && live.longitude != null;
     return (
-      <Pressable
-        onPress={() => has && void Linking.openURL(placeUrl(live.latitude!, live.longitude!)).catch(() => undefined)}
-        style={({ pressed }) => [styles.icon, { opacity: pressed && has ? 0.6 : 1 }]}
-        disabled={!has}
-        testID="care-live-icon"
-      >
-        <Icon name="map" size={24} color={has ? c.primary : c.textSecondary} />
-      </Pressable>
+      <>
+        <Pressable onPress={() => setModal(true)} accessibilityRole="button" accessibilityLabel={`Ver dónde está ${name} en directo`}
+          style={({ pressed }) => [styles.icon, { opacity: pressed ? 0.6 : 1 }]} testID="care-live-icon">
+          <Icon name="map" size={24} color={c.primary} />
+          <View style={[styles.dot, { backgroundColor: c.danger }]} />
+        </Pressable>
+        <Modal visible={modal} transparent animationType="slide" onRequestClose={() => setModal(false)}>
+          <Pressable style={styles.backdrop} onPress={() => setModal(false)} />
+          <View style={[styles.sheet, { backgroundColor: c.surface, borderColor: c.divider }]} testID="care-live-map">
+            <AppText variant="heading">{name}, en directo</AppText>
+            <AppText variant="small" color="textSecondary">
+              {has && live.updatedAt ? `Última posición a las ${hhmm(live.updatedAt)} · comparte hasta las ${hhmm(live.expiresAt)}` : 'Esperando la primera posición…'}
+            </AppText>
+            {has ? <LiveMap latitude={live.latitude!} longitude={live.longitude!} height={360} name={name} /> : null}
+            {has ? (
+              <SecondaryButton label="Cómo llegar (Google Maps)" icon="navigate-outline"
+                onPress={() => void Linking.openURL(placeUrl(live.latitude!, live.longitude!)).catch(() => undefined)} />
+            ) : null}
+            <TextButton label="Cerrar" onPress={() => setModal(false)} />
+          </View>
+        </Modal>
+      </>
     );
   }
 
@@ -115,5 +135,6 @@ const styles = StyleSheet.create({
   icon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', position: 'relative' },
   dot: { width: 10, height: 10, borderRadius: 5, position: 'absolute', bottom: 0, right: 0 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
+  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, paddingBottom: 36, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, gap: 10 },
   popover: { position: 'absolute', left: 24, right: 24, top: '30%', padding: 20, borderRadius: 16, borderWidth: 1, gap: 10 },
 });
