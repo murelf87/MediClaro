@@ -42,6 +42,7 @@ const SERVER_CODES: Record<string, { kind: AppError['kind']; message: string }> 
   CALL_BUSY: { kind: 'conflict', message: 'Ya hay una llamada en curso. Inténtalo dentro de un momento.' },
   CALL_ENDED: { kind: 'conflict', message: 'Esta llamada ya ha terminado.' },
   PREMIUM_REQUIRED: { kind: 'limit_reached', message: 'Las llamadas necesitan que la persona cuidada tenga MediClaro Premium activo.' },
+  CAREGIVER_CANNOT_CALL: { kind: 'permission_denied', message: 'Las llamadas las hace la persona que cuida con MediClaro Premium. Tú recibirás su llamada aquí.' },
   NOT_ALLOWED: { kind: 'permission_denied', message: 'Esta llamada ya no está disponible.' },
   INVALID_SDP: { kind: 'invalid_input', message: 'No se ha podido preparar el audio de la llamada.' },
   INVALID_REQUEST: { kind: 'invalid_input', message: 'No se ha podido llamar. Inténtalo de nuevo.' },

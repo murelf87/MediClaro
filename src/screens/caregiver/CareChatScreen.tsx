@@ -105,7 +105,8 @@ export default function CareChatScreen() {
   };
 
   const callNow = () => {
-    if (!linkId) return;
+    // Solo llama quien paga Premium; la persona cuidadora recibe las llamadas.
+    if (!linkId || !patientSide) return;
     if (!premium) {
       void showAlert('Llamadas en pausa', patientSide
         ? 'Para llamar necesitas MediClaro Premium activo.'
@@ -125,7 +126,7 @@ export default function CareChatScreen() {
           mine={item.mine}
           seconds={m.callSeconds}
           time={chatTime(m.createdAt)}
-          onCallBack={premium ? callNow : undefined}
+          onCallBack={premium && patientSide ? callNow : undefined}
           testID="care-chat-call-log"
         />
       );
@@ -161,16 +162,18 @@ export default function CareChatScreen() {
       }
       right={
         <View style={styles.headerActions}>
-          <Pressable
-            onPress={callNow}
-            accessibilityRole="button"
-            accessibilityLabel={`Llamar a ${other}`}
-            hitSlop={6}
-            style={({ pressed }) => [styles.callBtn, { backgroundColor: pressed ? c.primarySoft : c.primaryTint, opacity: premium ? 1 : 0.5 }]}
-            testID="care-chat-call"
-          >
-            <Icon name="call" size={22} color={c.primary} />
-          </Pressable>
+          {patientSide ? (
+            <Pressable
+              onPress={callNow}
+              accessibilityRole="button"
+              accessibilityLabel={`Llamar a ${other}`}
+              hitSlop={6}
+              style={({ pressed }) => [styles.callBtn, { backgroundColor: pressed ? c.primarySoft : c.primaryTint, opacity: premium ? 1 : 0.5 }]}
+              testID="care-chat-call"
+            >
+              <Icon name="call" size={22} color={c.primary} />
+            </Pressable>
+          ) : null}
           {patientSide ? (
             <Pressable
               onPress={() => router.push('/emergency')}

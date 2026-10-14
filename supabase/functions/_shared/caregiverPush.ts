@@ -45,8 +45,8 @@ export function careChatPushPayload(token: string, senderName?: string, unread?:
  */
 export function careCallPushPayload(token: string, callerName?: string, linkId?: string, callId?: string) {
  const who = (callerName || '').trim() || 'Tu familiar';
- return { to: token, title: 'MediClaro: llamada de voz', body: `${who} te está llamando. Abre MediClaro para contestar.`,
-  sound: 'default', priority: 'high', channelId: 'caregiver-alerts',
+ return { to: token, title: 'Llamada de MediClaro', body: `${who} te está llamando. Pulsa para contestar.`,
+  sound: 'default', priority: 'high', channelId: 'caregiver-alerts', interruptionLevel: 'time-sensitive',
   data: { route: '/caregiver-call', kind: 'care_call', linkId: linkId ?? null, callId: callId ?? null }, ttl: 45 };
 }
 export function isExpoToken(token: unknown): token is string {
