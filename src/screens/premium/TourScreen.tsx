@@ -162,7 +162,7 @@ export default function TourScreen() {
         if (router.canGoBack()) router.back();
         else router.replace('/(tabs)');
       } else {
-        router.replace('/login');
+        router.replace('/welcome');
       }
       return;
     }
@@ -181,7 +181,7 @@ export default function TourScreen() {
       if (router.canGoBack()) router.back();
       else router.replace('/(tabs)');
     } else if (!sell) {
-      router.replace('/login');
+      router.replace('/welcome');
     } else {
       router.push('/premium');
     }
