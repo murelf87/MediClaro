@@ -331,23 +331,12 @@ export function PlanPicker({
 }) {
   const theme = useAppTheme();
   const [width, setWidth] = useState(0);
-  const gap = theme.spacing.xs;
-  const scale = fontScale[theme.fontSize];
-  const n = offers.length;
-  const columns = n >= 2 && n <= 3 && width > 0 && (width - gap * (n - 1)) / n >= 104 * scale;
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
+  // Siempre en filas, una debajo de otra: así el texto no se corta con letra grande.
   return (
     <View onLayout={onLayout} accessibilityRole="radiogroup" accessibilityLabel="Elige tu plan">
-      {width === 0 ? null : columns ? (
-        <View style={[styles.columns, { gap }]}>
-          {offers.map((o, i) => (
-            <FadeIn key={o.plan.id} delay={stagger(i, 90, 120)} style={styles.flex}>
-              <PlanColumn offer={o} index={i} selected={o.plan.id === selectedId} onSelect={() => onSelect(o.plan.id)} />
-            </FadeIn>
-          ))}
-        </View>
-      ) : (
+      {width === 0 ? null : (
         <View style={{ gap: theme.spacing.sm }}>
           {offers.map((o, i) => (
             <FadeIn key={o.plan.id} delay={stagger(i, 90, 120)}>
