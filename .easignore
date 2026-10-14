@@ -11,7 +11,10 @@ android/
 *.p12
 *.key
 *.mobileprovision
-supabase/
+supabase/*
+!supabase/functions
+supabase/functions/*
+!supabase/functions/_shared
 store.config.json
 scripts/
 *.log

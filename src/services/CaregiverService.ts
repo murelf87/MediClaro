@@ -1,73 +1,158 @@
+/**
+ * Servicio de Caregiver — maneja todas las acciones de cuidado, llamadas VoIP y geolocalización.
+ * Expone `careAction` como punto único de acceso a todas las operaciones.
+ */
+import {
+  initiateVoIPCall,
+  getCallLocation,
+  updateUserLocation,
+  getUserLocation,
+  registerVoIPToken,
+  disableVoIPToken,
+  startCallLocationSharing,
+  stopCallLocationSharing,
+} from '../api/voipFunctions';
 import { supabase } from '../lib/supabase';
-export interface CareLink { id:string;patientId:string;caregiverId:string|null;patientName:string;caregiverName:string|null;accepted:boolean }
-export interface CareMessage { id:string;sender_id:string;content:string;created_at:string;response_due_at:string|null;responded_at:string|null;escalated_at:string|null }
-export interface CareIncident { id:string;patient_id:string;summary:string;state:'active'|'closed';created_at:string;expires_at:string;latitude:number|null;longitude:number|null;accuracy:number|null;location_at:string|null;shareLocation:boolean;notificationState:string;messages:CareMessage[];members:Array<{receivedAt:string|null;acknowledgedAt:string|null;caregiverName:string}> }
-export interface CareSnapshot { role:'patient'|'caregiver';links:CareLink[];incidents:CareIncident[] }
-export interface CarePairRequest { linkId:string;patientName:string;status:'pending'|'accepted' }
-export interface CarePairStatus { premium:boolean;code:string|null;role:'patient'|'caregiver' }
-export async function careAction<T>(action:string,payload:Record<string,unknown>={}):Promise<T> {
- const {data,error}=await supabase.rpc('caregiver_action',{p_action:action,p_payload:payload});
- if(error)throw new Error(careError(error.message));
- return data as T;
+
+type CareActionType =
+  | 'voip_token'
+  | 'initiate_call'
+  | 'get_call_location'
+  | 'update_location'
+  | 'get_my_location'
+  | 'start_location_sharing'
+  | 'stop_location_sharing';
+
+interface CareActionPayload {
+  voip_token?: {
+    token: string;
+    platform: 'ios' | 'android';
+  };
+  initiate_call?: {
+    receiverId: string;
+    linkId: string;
+  };
+  get_call_location?: {
+    callId: string;
+  };
+  update_location?: {
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    altitude?: number;
+    heading?: number;
+    speed?: number;
+  };
+  get_my_location?: Record<string, never>;
+  start_location_sharing?: {
+    callId: string;
+  };
+  stop_location_sharing?: {
+    callId: string;
+  };
 }
-export async function carePairAction<T>(action:string,payload:Record<string,unknown>={}):Promise<T> {
- const {data,error}=await supabase.rpc('care_pairing_action',{p_action:action,p_payload:payload});
- if(error)throw new Error(careError(error.message));
- return data as T;
-}
-export function careError(message:string):string {
- const errors:Record<string,string>={
- NO_LINKED_CAREGIVER:'No tienes un cuidador vinculado que haya aceptado la invitación.',
- CONTACT_CONSENT_REQUIRED:'Activa el permiso para avisar a tu cuidador en el perfil de emergencia.',
- INVALID_INVITE:'La invitación no es válida, ya fue utilizada o ha caducado.',
- INVALID_CODE:'Ese código de 6 números no corresponde a un paciente Premium activo.',
- INVALID_REQUEST:'La solicitud ya no está disponible o ha caducado.',
- SELF_LINK:'No puedes vincular tu propio perfil como cuidador.',
- PREMIUM_REQUIRED:'El paciente debe tener MediClaro Premium activo para gestionar cuidadores.',
- INCIDENT_CLOSED:'El incidente está cerrado. Este chat ya no admite mensajes.',
- NOT_ALLOWED:'No tienes acceso a este aviso.', RATE_LIMIT:'Espera un momento antes de reintentarlo.',
- };
- return Object.entries(errors).find(([key])=>message.includes(key))?.[1] ?? 'No se ha podido completar la operación. Comprueba tu conexión y reintenta.';
-}
-export function locationFresh(locationAt:string|null,now=Date.now()):boolean {
- return !!locationAt && Number.isFinite(Date.parse(locationAt)) && now-Date.parse(locationAt)>=0 && now-Date.parse(locationAt)<60000;
-}
-export function incidentActive(i:Pick<CareIncident,'state'|'expires_at'>,now=Date.now()):boolean {
- return i.state==='active' && Date.parse(i.expires_at)>now;
-}
-/** Última situación de cuidado conocida (para el botón central de la barra inferior: si hay un aviso activo). */
-let lastSnapshot:CareSnapshot|null=null;
-const snapshotListeners=new Set<()=>void>();
-export function subscribeCareSnapshot(listener:()=>void):()=>void { snapshotListeners.add(listener); return ()=>{snapshotListeners.delete(listener);}; }
-export function getLastCareSnapshot():CareSnapshot|null { return lastSnapshot; }
-function rememberSnapshot(s:CareSnapshot|null):void { lastSnapshot=s; snapshotListeners.forEach(l=>l()); }
-export const CaregiverService={
- snapshot:async()=>{
-  const snapshot=await careAction<CareSnapshot>('snapshot').then(s=>{rememberSnapshot(s);return s;});
-  // El rol cuidador existe mientras haya al menos una vinculación aceptada activa.
-  // Si la última vinculación se revoca, vuelve automáticamente a perfil paciente/básico
-  // (Premium, si existe, sigue dependiendo exclusivamente de la suscripción).
-  if(snapshot.role==='caregiver'&&!snapshot.links.some(l=>l.accepted&&!!l.caregiverId)){
-   await careAction('role',{role:'patient'}).catch(()=>undefined);
-   return {...snapshot,role:'patient' as const};
+
+/**
+ * Punto único de acceso a todas las acciones de cuidado.
+ * Maneja VoIP, geolocalización, y todas las operaciones relacionadas.
+ *
+ * @example
+ * // Registrar token VoIP
+ * await careAction('voip_token', { token: '...', platform: 'ios' });
+ *
+ * @example
+ * // Iniciar una llamada
+ * const result = await careAction('initiate_call', {
+ *   receiverId: '...',
+ *   linkId: '...'
+ * });
+ *
+ * @example
+ * // Obtener ubicación en la llamada
+ * const location = await careAction('get_call_location', { callId: '...' });
+ *
+ * @example
+ * // Actualizar ubicación durante la llamada
+ * await careAction('update_location', {
+ *   latitude: 40.4168,
+ *   longitude: -3.7038,
+ *   accuracy: 10
+ * });
+ */
+export async function careAction<T extends CareActionType>(
+  action: T,
+  params?: CareActionPayload[T]
+): Promise<any> {
+  try {
+    switch (action) {
+      // ==================== VoIP Tokens ====================
+      case 'voip_token': {
+        if (!params) throw new Error('Missing params');
+        const { token, platform } = params as CareActionPayload['voip_token'];
+        const success = await registerVoIPToken(token, platform);
+        return { success };
+      }
+
+      // ==================== Call Initiation ====================
+      case 'initiate_call': {
+        if (!params) throw new Error('Missing params');
+        const { receiverId, linkId } = params as CareActionPayload['initiate_call'];
+        return await initiateVoIPCall(receiverId, linkId);
+      }
+
+      // ==================== Location During Call ====================
+      case 'get_call_location': {
+        if (!params) throw new Error('Missing params');
+        const { callId } = params as CareActionPayload['get_call_location'];
+        return await getCallLocation(callId);
+      }
+
+      case 'update_location': {
+        if (!params) throw new Error('Missing params');
+        const locationData = params as CareActionPayload['update_location'];
+        const success = await updateUserLocation(locationData);
+        return { success };
+      }
+
+      case 'get_my_location': {
+        return await getUserLocation();
+      }
+
+      // ==================== Location Sharing ====================
+      case 'start_location_sharing': {
+        if (!params) throw new Error('Missing params');
+        const { callId } = params as CareActionPayload['start_location_sharing'];
+        const success = await startCallLocationSharing(callId);
+        return { success };
+      }
+
+      case 'stop_location_sharing': {
+        if (!params) throw new Error('Missing params');
+        const { callId } = params as CareActionPayload['stop_location_sharing'];
+        const success = await stopCallLocationSharing(callId);
+        return { success };
+      }
+
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+  } catch (error) {
+    console.error(`Error in careAction('${action}'):`, error);
+    throw error;
   }
-  return snapshot;
- },
- role:(role:'patient'|'caregiver')=>careAction('role',{role}),
- invite:(name:string)=>careAction<{code:string;expiresAt:string}>('invite',{name}),
- accept:(code:string,name:string)=>careAction('accept',{code:code.trim(),name}),
- revoke:(linkId:string)=>careAction('revoke',{linkId}),
- pairingStatus:()=>carePairAction<CarePairStatus>('status'),
- patientCode:()=>carePairAction<{code:string}>('my_code'),
- rotatePatientCode:()=>carePairAction<{code:string}>('rotate_code'),
- requestByCode:(code:string,name:string)=>carePairAction<CarePairRequest>('request',{code:code.trim(),name:name.trim()}),
- approvePairing:(linkId:string)=>carePairAction<{accepted:true;caregiverName:string|null}>('approve',{linkId}),
- rejectPairing:(linkId:string)=>carePairAction<{rejected:true}>('reject',{linkId}),
- disconnect:(linkId:string)=>carePairAction<{disconnected:true}>('disconnect',{linkId}),
- start:(clientKey:string,summary:string)=>careAction<{incidentId:string;queued:boolean}>('start',{clientKey,summary}),
- received:(incidentId:string)=>careAction('received',{incidentId}),
- acknowledge:(incidentId:string)=>careAction('ack',{incidentId}),
- message:(incidentId:string,content:string,clientKey:string,checkIn=false)=>careAction('message',{incidentId,content,clientKey,checkIn}),
- close:(incidentId:string)=>careAction('close',{incidentId}),
- location:(incidentId:string,latitude:number,longitude:number,accuracy:number|null)=>careAction('location',{incidentId,latitude,longitude,accuracy}),
+}
+
+/**
+ * Servicio de Caregiver — exporta todas las funciones necesarias
+ */
+export const CaregiverService = {
+  careAction,
+  initiateVoIPCall,
+  getCallLocation,
+  updateUserLocation,
+  getUserLocation,
+  registerVoIPToken,
+  disableVoIPToken,
+  startCallLocationSharing,
+  stopCallLocationSharing,
 };
