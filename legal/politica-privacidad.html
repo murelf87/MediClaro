@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<!-- BORRADOR: al publicar la versión revisada, quite la línea «robots» y la banda superior. -->
+<meta name="robots" content="noindex, nofollow">
+<title>Política de privacidad · MediClaro</title>
+<style>
+  :root {
+    --texto: #1b1b1b; --texto-suave: #3d3d3d; --fondo: #ffffff; --fondo-suave: #f2f5f9;
+    --borde: #b9c4d0; --titulos: #0a3d78; --enlace: #0b57d0; --enlace-visitado: #5b2a86;
+    --borrador: #8a1111; --marca: #ffe45c; --foco: #b35c00;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 112.5%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--fondo); color: var(--texto); line-height: 1.6; overflow-wrap: break-word;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  .borrador { position: sticky; top: 0; z-index: 10; margin: 0; padding: .6rem 1rem; background: var(--borrador);
+    color: #fff; font-weight: 700; text-align: center; border-bottom: 3px solid #000; }
+  main, footer { max-width: 40rem; margin: 0 auto; padding: 1.25rem 1rem; }
+  main { padding-bottom: 2rem; }
+  [id] { scroll-margin-top: 8.5rem; }
+  .marca-app { margin: 0; font-weight: 700; color: var(--titulos); }
+  h1 { font-size: 1.9rem; line-height: 1.2; color: var(--titulos); margin: .25rem 0 .5rem; }
+  h2 { font-size: 1.4rem; line-height: 1.3; color: var(--titulos); margin: 2.5rem 0 .75rem; padding-top: 1rem;
+    border-top: 2px solid var(--borde); }
+  h3 { font-size: 1.15rem; line-height: 1.35; margin: 1.75rem 0 .5rem; }
+  p, li, dd { margin: 0 0 .8rem; }
+  ul, ol { padding-left: 1.5rem; margin: 0 0 1rem; }
+  a { color: var(--enlace); text-decoration: underline; text-underline-offset: .15em; overflow-wrap: anywhere; }
+  a:visited { color: var(--enlace-visitado); }
+  a:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+  mark { background: var(--marca); color: #000; font-weight: 600; padding: 0 .2em; border-radius: .2em;
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .meta { color: var(--texto-suave); }
+  .caja { background: var(--fondo-suave); border: 2px solid var(--borde); border-radius: .6rem; padding: 1rem 1.1rem; margin: 1.25rem 0; }
+  .caja h2 { border-top: 0; margin-top: 0; padding-top: 0; }
+  .ficha { border: 1px solid var(--borde); border-radius: .6rem; padding: .75rem 1rem; margin: 1rem 0; }
+  .ficha dt { font-weight: 700; margin-top: .5rem; }
+  .ficha dd { margin-left: 0; }
+  .aviso { border-left: 5px solid var(--borrador); background: #fff5f5; padding: .6rem 1rem; margin: 1rem 0; }
+  .indice ol { padding-left: 1.6rem; }
+  .indice li { margin: 0 0 .35rem; }
+  .indice ol ol { margin: .35rem 0 .5rem; }
+  .volver { margin-top: 1.25rem; }
+  footer { border-top: 2px solid var(--borde); color: var(--texto-suave); padding-bottom: 3rem; }
+  @media print {
+    .borrador { position: static; }
+    .volver { display: none; }
+    mark, .borrador { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+<p class="borrador" role="note">BORRADOR — pendiente de revisión jurídica. No publicar sin revisar.</p>
+
+<main>
+<header>
+  <p class="marca-app">MediClaro</p>
+  <h1>Política de privacidad</h1>
+  <p class="meta">Versión: <mark>[PENDIENTE: número de versión]</mark> · Última actualización: <mark>[PENDIENTE: fecha de última actualización]</mark></p>
+  <p>Esta política explica qué datos personales trata la app MediClaro para iPhone y Android, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos. La hemos escrito con frases cortas para que se entienda bien.</p>
+</header>
+
+<section class="caja" aria-labelledby="resumen">
+  <h2 id="resumen">Lo esencial en pocas palabras</h2>
+  <ul>
+    <li>MediClaro te ayuda a entender tus medicamentos con la información oficial de CIMA, de la Agencia Española de Medicamentos y Productos Sanitarios (AEMPS).</li>
+    <li>Puedes contratar Premium sin darnos ningún dato personal. Si quieres, añades después tu número de móvil (entras con un código por SMS; no hay contraseña).</li>
+    <li>Las fotos de la caja y tus preguntas al asistente solo se envían a la inteligencia artificial de Google (Gemini) si antes nos das permiso. MediClaro no guarda esas fotos ni el texto de tus preguntas.</li>
+    <li>El perfil de emergencia es opcional. Contiene datos de salud, por eso te pedimos un consentimiento expreso.</li>
+    <li>Tu ubicación solo se usa durante una emergencia y se queda en tu teléfono: no llega a nuestros servidores.</li>
+    <li>Puedes descargar tus datos y eliminar tu cuenta desde la app, en <strong>Perfil → Privacidad y datos</strong>.</li>
+    <li>Solo usamos tus datos para lo que explica esta política. No los vendemos ni los usamos para publicidad. <mark>[VERIFICAR: confirmar con el titular que no hay publicidad ni cesión de datos con fines comerciales]</mark></li>
+  </ul>
+</section>
+
+<nav class="indice" aria-labelledby="indice">
+  <h2 id="indice">Índice</h2>
+  <ol>
+    <li><a href="#responsable">Quién es el responsable</a></li>
+    <li><a href="#datos">Qué datos tratamos y para qué</a>
+      <ol>
+        <li><a href="#cuenta">Tu cuenta</a></li>
+        <li><a href="#preferencias">Tus preferencias</a></li>
+        <li><a href="#identificar">Identificar un medicamento</a></li>
+        <li><a href="#ficha">Ficha, resumen sencillo y lectura en voz alta</a></li>
+        <li><a href="#historial">Historial de identificaciones</a></li>
+        <li><a href="#mis-medicamentos">Mis medicamentos</a></li>
+        <li><a href="#asistente">El asistente</a></li>
+        <li><a href="#perfil-emergencia">Perfil de emergencia</a></li>
+        <li><a href="#emergencia">Emergencia: llamadas, mensajes y ubicación</a></li>
+        <li><a href="#pagos">Pagos y suscripción</a></li>
+        <li><a href="#metricas">Métricas internas y seguridad</a></li>
+        <li><a href="#registro-permisos">Registro de tus permisos</a></li>
+      </ol>
+    </li>
+    <li><a href="#ia">La inteligencia artificial y tu permiso</a></li>
+    <li><a href="#bases">Por qué podemos tratar tus datos (bases jurídicas)</a></li>
+    <li><a href="#telefono">Datos que solo están en tu teléfono</a></li>
+    <li><a href="#proveedores">Con quién compartimos tus datos</a></li>
+    <li><a href="#transferencias">Datos fuera del Espacio Económico Europeo</a></li>
+    <li><a href="#conservacion">Cuánto tiempo guardamos tus datos</a></li>
+    <li><a href="#derechos">Tus derechos y cómo ejercerlos</a>
+      <ol>
+        <li><a href="#como-ejercerlos">Cómo ejercerlos</a></li>
+        <li><a href="#eliminar-cuenta">Eliminar tu cuenta</a></li>
+        <li><a href="#aepd">Reclamar ante la AEPD</a></li>
+      </ol>
+    </li>
+    <li><a href="#otras-personas">Datos de otras personas</a></li>
+    <li><a href="#menores">Menores de edad</a></li>
+    <li><a href="#seguridad">Seguridad</a></li>
+    <li><a href="#cambios">Cambios en esta política</a></li>
+  </ol>
+</nav>
+
+<section aria-labelledby="responsable">
+  <h2 id="responsable">1. Quién es el responsable</h2>
+  <p>El responsable del tratamiento de tus datos es el titular de MediClaro. En esta política, «MediClaro», «nosotros» o «el titular» se refieren a él.</p>
+  <dl class="ficha">
+    <dt>Titular</dt><dd><mark>[PENDIENTE: razón social]</mark></dd>
+    <dt>NIF</dt><dd><mark>[PENDIENTE: NIF]</mark></dd>
+    <dt>Domicilio</dt><dd><mark>[PENDIENTE: domicilio]</mark></dd>
+    <dt>Correo para temas de privacidad</dt><dd><mark>[PENDIENTE: correo de privacidad]</mark></dd>
+    <dt>Teléfono</dt><dd><mark>[PENDIENTE: teléfono]</mark></dd>
+    <dt>Delegado de protección de datos</dt><dd><mark>[PENDIENTE: evaluación de impacto (EIPD) y necesidad de delegado de protección de datos — revisar con el abogado]</mark></dd>
+  </dl>
+  <p>Tratamos tus datos conforme al Reglamento General de Protección de Datos (RGPD) y a la Ley Orgánica 3/2018 de Protección de Datos Personales y garantía de los derechos digitales (LOPDGDD).</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="datos">
+  <h2 id="datos">2. Qué datos tratamos y para qué</h2>
+  <p>Te lo explicamos función por función. Solo tratamos los datos que hacen falta para cada una.</p>
+
+  <h3 id="cuenta">2.1. Tu cuenta</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Un identificador interno que crea el sistema para tu cuenta y, si lo añades, tu número de móvil. Si quieres, también un nombre para mostrar. Si contratas Premium sin haber entrado, la cuenta se crea sin ningún dato personal.</dd>
+    <dt>Para qué</dt>
+    <dd>Crear tu cuenta, enviarte el código de acceso por SMS y mantener tu sesión abierta de forma segura. <mark>[PENDIENTE: plazo tras el que se borran las cuentas sin teléfono y sin suscripción]</mark></dd>
+    <dt>Dónde se guardan</dt>
+    <dd>En nuestro servidor (proveedor: Supabase). El SMS lo envía un proveedor contratado por nosotros: <mark>[PENDIENTE: proveedor de SMS, p. ej. Twilio]</mark>.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>Mientras tengas la cuenta.</dd>
+  </dl>
+
+  <h3 id="preferencias">2.2. Tus preferencias</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Tamaño del texto, Modo fácil y velocidad de la voz.</dd>
+    <dt>Para qué</dt>
+    <dd>Que la app se adapte a ti.</dd>
+    <dt>Dónde se guardan</dt>
+    <dd>En nuestro servidor.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>Mientras tengas la cuenta.</dd>
+  </dl>
+
+  <h3 id="identificar">2.3. Identificar un medicamento</h3>
+  <p>Puedes identificar un medicamento con una foto de la caja, con el código de barras o escribiendo el Código Nacional (C.N.).</p>
+  <p><strong>Con una foto de la caja</strong> (hecha con la cámara o elegida de tu galería):</p>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>La foto de la caja.</dd>
+    <dt>Qué hacemos</dt>
+    <dd>Tu teléfono reduce la foto (a 1280&nbsp;píxeles, en formato JPEG) y le quita los datos ocultos de la imagen (datos EXIF, como el lugar o la fecha en que se hizo). Después la envía a nuestro servidor, que la pasa a Google Gemini API para leer el envase. Nuestro servidor no envía a Google tu nombre ni tu teléfono.</dd>
+    <dt>Para qué</dt>
+    <dd>Leer la caja y buscar el medicamento en CIMA, la base de datos oficial de la AEMPS.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>MediClaro no guarda la foto: ni en tu teléfono ni en nuestro servidor. Google conserva registros durante 55&nbsp;días solo para detectar abusos (ver <a href="#ia">apartado 3</a>). Si eliges una foto de tu galería, esa foto sigue en tu galería como antes.</dd>
+    <dt>Condición</dt>
+    <dd>Solo se envía si antes nos has dado permiso para usar la inteligencia artificial (<a href="#ia">apartado 3</a>).</dd>
+  </dl>
+  <p><strong>Con el código de barras o el C.N.</strong>: nuestro servidor consulta ese código en CIMA. En la consulta solo va el código del medicamento: a la AEMPS no le llegan datos que te identifiquen. Con esta forma no se envía ninguna foto ni ningún texto tuyo a la inteligencia artificial.</p>
+
+  <h3 id="ficha">2.4. Ficha, resumen sencillo y lectura en voz alta</h3>
+  <p>La ficha muestra los datos oficiales de CIMA. El resumen en lenguaje sencillo lo elabora la inteligencia artificial a partir del prospecto oficial, sin usar datos tuyos. La lectura en voz alta usa la voz de tu propio teléfono.</p>
+
+  <h3 id="historial">2.5. Historial de identificaciones</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Nombre del medicamento, número de registro, resultado de la identificación, fecha y método (foto, código de barras o C.N.).</dd>
+    <dt>Para qué</dt>
+    <dd>Que puedas ver lo que has consultado y contar las identificaciones de tu plan.</dd>
+    <dt>Dónde se guardan</dt>
+    <dd>En nuestro servidor.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>Hasta que elimines tu cuenta.</dd>
+  </dl>
+
+  <h3 id="mis-medicamentos">2.6. Mis medicamentos</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Los medicamentos que decides guardar: nombre, principio activo, forma farmacéutica y si es favorito.</dd>
+    <dt>Para qué</dt>
+    <dd>Tener tu lista a mano y poder buscar en ella.</dd>
+    <dt>Dónde se guardan</dt>
+    <dd>En nuestro servidor.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>Hasta que lo quites de tu lista o elimines tu cuenta.</dd>
+  </dl>
+
+  <h3 id="asistente">2.7. El asistente</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Tus preguntas y la conversación con el asistente. En cada consulta se envían, como máximo, los 10 últimos mensajes, de hasta 1000&nbsp;caracteres cada uno, junto con el prospecto oficial del medicamento.</dd>
+    <dt>Para qué</dt>
+    <dd>Explicarte en lenguaje sencillo la información oficial del medicamento.</dd>
+    <dt>Dónde van</dt>
+    <dd>Pasan por nuestro servidor hasta Google Gemini API. MediClaro no guarda el contenido de tus preguntas: solo cuenta cuántas haces al día, para aplicar el límite de tu plan.</dd>
+    <dt>En tu teléfono</dt>
+    <dd>Tus últimas preguntas se guardan cifradas durante unos minutos (como máximo, 10&nbsp;minutos) para poder incluirlas en una emergencia, si tú lo permites. Después se borran.</dd>
+    <dt>Condición</dt>
+    <dd>Solo con tu permiso para usar la inteligencia artificial (<a href="#ia">apartado 3</a>).</dd>
+  </dl>
+  <p>Un consejo: no escribas en el asistente datos que no hagan falta, como tu nombre completo, tu DNI o tu dirección.</p>
+
+  <h3 id="perfil-emergencia">2.8. Perfil de emergencia (opcional)</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Los que tú escribas: nombre y apellidos, fecha de nacimiento, dirección (calle y número, código postal, ciudad, provincia y país), grupo sanguíneo, alergias, enfermedades, medicación habitual y un contacto de emergencia (nombre, relación contigo y teléfono). También qué datos permites compartir en una emergencia. El nombre y el teléfono de tu médico, si los escribes, se guardan solo en tu teléfono, cifrados.</dd>
+    <dt>Para qué</dt>
+    <dd>Preparar, cuando tú lo pidas en una emergencia, el mensaje para el operador y el SMS para tu familiar, solo con los datos que decidas compartir.</dd>
+    <dt>Por qué podemos</dt>
+    <dd>Porque nos das tu consentimiento expreso: incluye datos de salud (ver <a href="#bases">apartado 4</a>).</dd>
+    <dt>Dónde se guardan</dt>
+    <dd>En nuestro servidor, donde solo tú puedes acceder, y una copia cifrada en tu teléfono.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>Hasta que lo borres (Perfil de emergencia → «Borrar mi perfil de emergencia»), retires tu consentimiento o elimines tu cuenta.</dd>
+  </dl>
+  <p>MediClaro no deduce datos de salud: solo usa los que tú escribes.</p>
+
+  <h3 id="emergencia">2.9. Emergencia: llamadas, mensajes y ubicación</h3>
+  <ul>
+    <li>El botón del 112 y el de tu servicio privado de asistencia abren el marcador de tu teléfono. La app nunca llama sola: la llamada la confirmas tú.</li>
+    <li>La app prepara un <strong>mensaje para el operador</strong> con los datos que declaraste y permitiste compartir. Puede leerlo en voz alta por el altavoz.</li>
+    <li>También prepara un <strong>SMS para un familiar</strong>, que se abre en tu app de Mensajes para que lo envíes tú. MediClaro no recibe ese SMS.</li>
+    <li><strong>Ubicación:</strong> solo se pide durante una emergencia activa y con el permiso de tu teléfono. Se usa en tu teléfono para preparar el mensaje y no se envía a los servidores de MediClaro. Tú decides si la compartes, enviando el SMS o leyendo el mensaje.</li>
+    <li>Puedes elegir qué se comparte en <strong>Perfil → Privacidad y datos → Qué compartir en una emergencia</strong>.</li>
+    <li>Cuando llamas o envías el mensaje, los datos que compartes los recibe quien te atiende: el 112, tu servicio privado de asistencia o tu familiar. Lo que hagan con ellos es responsabilidad suya.</li>
+  </ul>
+
+  <h3 id="pagos">2.10. Pagos y suscripción</h3>
+  <ul>
+    <li>La suscripción MediClaro Premium se paga con la <strong>compra integrada de Apple o de Google Play</strong>; en algunos países de la UE, también con tarjeta en la página segura de <strong>Stripe</strong>. Ellos cobran; MediClaro nunca ve ni guarda los datos de tu tarjeta ni de tu cuenta de pago.</li>
+    <li>Para activar Premium y mantenerlo al día guardamos, con tu cuenta, el <strong>comprobante de la compra</strong> que nos da la tienda (producto, identificador de la transacción, estado, fechas de renovación y avisos de cancelación o reembolso). Con tarjeta, el identificador de cliente de Stripe, el estado de la suscripción y el uso medido (identificaciones adicionales).</li>
+    <li>Las facturas y los justificantes de pago se conservan el tiempo que exige la normativa fiscal.</li>
+  </ul>
+
+  <h3 id="metricas">2.11. Métricas internas y seguridad</h3>
+  <dl class="ficha">
+    <dt>Qué datos</dt>
+    <dd>Recuentos de uso y de costes, y errores técnicos. No incluyen contenido médico.</dd>
+    <dt>Para qué</dt>
+    <dd>Que el servicio funcione, controlar los costes, corregir errores y evitar abusos.</dd>
+    <dt>Cuánto tiempo</dt>
+    <dd>Ver <a href="#conservacion">apartado 8</a>.</dd>
+  </dl>
+
+  <h3 id="registro-permisos">2.12. Registro de tus permisos</h3>
+  <p>Guardamos, con su fecha, los permisos que das o retiras (por ejemplo, el permiso para usar la inteligencia artificial). Así podemos demostrar que nos diste tu consentimiento.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="ia">
+  <h2 id="ia">3. La inteligencia artificial y tu permiso</h2>
+  <p>MediClaro usa Google Gemini API, un servicio de inteligencia artificial de Google, para tres cosas:</p>
+  <ol>
+    <li>leer la caja del medicamento en la foto;</li>
+    <li>redactar el resumen en lenguaje sencillo a partir del prospecto oficial (sin datos tuyos);</li>
+    <li>responder a tus preguntas en el asistente.</li>
+  </ol>
+  <h3>Tu permiso</h3>
+  <p>Antes de enviar tu primera foto o tu primera pregunta, la app te pide permiso para enviarlas a Google Gemini. Guardamos la fecha en que lo das.</p>
+  <p>Puedes retirarlo cuando quieras en <strong>Perfil → Privacidad y datos</strong>. Si lo retiras, no se enviarán más fotos ni preguntas, y podrás seguir identificando medicamentos con el código de barras o el C.N. Retirar el permiso no afecta a lo que se hizo antes con él.</p>
+  <h3>Qué hace Google con ellos</h3>
+  <ul>
+    <li>Nuestro servidor no envía a Google tu nombre ni tu teléfono.</li>
+    <li>Google conserva registros durante 55&nbsp;días solo para detectar abusos.</li>
+    <li>Para las personas usuarias del Espacio Económico Europeo, Google aplica sus condiciones de datos para servicios de pago: no usa estos datos para mejorar sus productos.</li>
+    <li>Más información en las condiciones de la API de Gemini: <a href="https://ai.google.dev/gemini-api/terms">https://ai.google.dev/gemini-api/terms</a>.</li>
+  </ul>
+  <p>La inteligencia artificial puede equivocarse. Lo que vale es el prospecto oficial y la opinión de tu médico o farmacéutico.</p>
+  <p>La inteligencia artificial no decide nada por ti: solo explica información. Si el asistente detecta una posible urgencia, te muestra el 112 y otros recursos públicos, y tú decides qué hacer.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="bases">
+  <h2 id="bases">4. Por qué podemos tratar tus datos (bases jurídicas)</h2>
+  <p>La ley solo permite tratar datos personales si hay una razón válida, llamada «base jurídica». Estas son las nuestras:</p>
+
+  <dl class="ficha">
+    <dt>Darte el servicio que pides</dt>
+    <dd>Cuenta y acceso por SMS, preferencias, identificación por código de barras o C.N., ficha del medicamento, historial, Mis medicamentos y límites de tu plan.</dd>
+    <dt>Base jurídica</dt>
+    <dd>La ejecución del contrato, es decir, las Condiciones de uso que aceptas al crear tu cuenta (artículo 6.1.b del RGPD <mark>[VERIFICAR CITA]</mark>).</dd>
+    <dd><mark>[VERIFICAR: el historial y «Mis medicamentos» pueden revelar datos de salud; si es así, hace falta además una excepción del artículo 9.2 del RGPD [VERIFICAR CITA] (por ejemplo, consentimiento explícito) — revisar con el abogado]</mark></dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Enviar fotos y preguntas a la inteligencia artificial</dt>
+    <dd>Solo cuando nos das permiso en la app.</dd>
+    <dt>Base jurídica</dt>
+    <dd>Tu consentimiento (artículo 6.1.a del RGPD <mark>[VERIFICAR CITA]</mark>). Como las fotos y las preguntas pueden contener información de salud, te lo pedimos de forma expresa (artículo 9.2.a del RGPD <mark>[VERIFICAR CITA]</mark>).</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Perfil de emergencia</dt>
+    <dd>Datos de salud que tú escribes, de forma opcional.</dd>
+    <dt>Base jurídica</dt>
+    <dd>Tu consentimiento expreso para tratar datos de salud (el RGPD lo llama «consentimiento explícito»; artículo 9.2.a del RGPD <mark>[VERIFICAR CITA]</mark>). Si no lo das, puedes usar el resto de la app.</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Ubicación durante una emergencia</dt>
+    <dd>Solo se usa en tu teléfono y no nos llega.</dd>
+    <dt>Base jurídica</dt>
+    <dd>Tu permiso, que das cuando el teléfono te lo pide, y tu decisión de compartirla.</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Pagos y suscripción</dt>
+    <dd>Activar y mantener la suscripción Premium, uso medido y facturas.</dd>
+    <dt>Base jurídica</dt>
+    <dd>El contrato de suscripción y el cumplimiento de obligaciones legales, como las fiscales (artículo 6.1.c del RGPD <mark>[VERIFICAR CITA]</mark>).</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Registro de permisos y atención de tus derechos</dt>
+    <dd>Poder demostrar que diste tu consentimiento y responder a tus peticiones.</dd>
+    <dt>Base jurídica</dt>
+    <dd>El cumplimiento de obligaciones legales (artículo 6.1.c del RGPD <mark>[VERIFICAR CITA]</mark>).</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Métricas internas, seguridad y prevención de abusos</dt>
+    <dd>Recuentos de uso y costes, y errores técnicos, sin contenido médico.</dd>
+    <dt>Base jurídica</dt>
+    <dd>Nuestro interés legítimo en que el servicio funcione, sea seguro y tenga los costes controlados (artículo 6.1.f del RGPD <mark>[VERIFICAR CITA]</mark>). Puedes oponerte (ver <a href="#derechos">apartado 9</a>).</dd>
+  </dl>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="telefono">
+  <h2 id="telefono">5. Datos que solo están en tu teléfono</h2>
+  <p>Algunos datos no salen de tu teléfono:</p>
+  <ul>
+    <li><strong>Tu servicio privado de asistencia y tu médico de cabecera.</strong> Se guardan cifrados.</li>
+    <li><strong>Tus últimas preguntas al asistente.</strong> Se guardan cifradas durante unos minutos (como máximo, 10&nbsp;minutos) por si hay una emergencia y tú permites compartirlas. Después se borran.</li>
+    <li><strong>Tu ubicación.</strong> Solo se usa durante una emergencia activa, para preparar el mensaje.</li>
+  </ul>
+  <p>Además, el teléfono guarda una copia cifrada de tu perfil de emergencia. Los datos cifrados se guardan en el llavero (iPhone) o en el Keystore (Android), que son los almacenes seguros del propio teléfono.</p>
+  <p>Como estos datos no llegan a nuestros servidores, no podemos verlos ni recuperarlos, y no aparecen en «Descargar mis datos». Si cambias de teléfono, tendrás que volver a añadir tu servicio privado de asistencia y tu médico de cabecera.</p>
+  <p>Cuando eliminas tu cuenta desde la app, también se borran de tu teléfono los datos de esa cuenta.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="proveedores">
+  <h2 id="proveedores">6. Con quién compartimos tus datos</h2>
+  <p>Para prestar el servicio contamos con estos proveedores. Tratan los datos por encargo nuestro (son «encargados del tratamiento») y solo pueden usarlos para prestarnos su servicio. <mark>[VERIFICAR: que hay contrato de encargo del tratamiento con cada proveedor]</mark></p>
+
+  <dl class="ficha">
+    <dt>Supabase</dt>
+    <dd>Base de datos, acceso con SMS (autenticación) y funciones del servidor. Trata los datos que guardamos en el servidor.</dd>
+    <dd>Dónde: <mark>[PENDIENTE: región de Supabase — recomendada UE]</mark></dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Google (Gemini API)</dt>
+    <dd>Lee la caja en las fotos y responde en el asistente. Recibe las fotos y las preguntas (con el prospecto oficial), sin tu nombre ni tu teléfono, y solo si nos das permiso.</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Proveedor de SMS: <mark>[PENDIENTE: proveedor de SMS, p. ej. Twilio]</mark></dt>
+    <dd>Envía el código de acceso a tu móvil. Recibe tu número de teléfono.</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Stripe (solo si pagas con tarjeta)</dt>
+    <dd>Cobra la suscripción y gestiona las facturas. Recibe los datos de pago que le das directamente (MediClaro no los ve), tu identificador de cliente y el uso medido.</dd>
+  </dl>
+
+  <dl class="ficha">
+    <dt>Apple y Google (tiendas de aplicaciones)</dt>
+    <dd>Distribuyen la app a través de App Store y Google Play y, si contratas Premium con ellas, cobran la suscripción con sus propias condiciones y políticas de privacidad. Nos envían el comprobante de tu compra y los avisos de renovación, cancelación o reembolso.</dd>
+  </dl>
+  <p><mark>[VERIFICAR: papel de Apple, Google (tiendas) y Stripe — encargados del tratamiento o responsables independientes — revisar con el abogado]</mark></p>
+
+  <p>Otros casos:</p>
+  <ul>
+    <li>Cuando llamas al 112 o a tu servicio privado de asistencia, o envías el SMS a tu familiar, eres tú quien decide compartir esos datos con ellos.</li>
+    <li>Si abres el prospecto o la ficha técnica oficiales, se abren en la web de la AEMPS, que tiene su propia política de privacidad.</li>
+    <li>Solo daremos datos a las autoridades cuando una ley nos obligue.</li>
+  </ul>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="transferencias">
+  <h2 id="transferencias">7. Datos fuera del Espacio Económico Europeo</h2>
+  <p>Algunos proveedores pueden tratar datos fuera del Espacio Económico Europeo (EEE). En ese caso, la ley exige garantías adecuadas:</p>
+  <ul>
+    <li><strong>Supabase:</strong> su acuerdo de tratamiento de datos (<a href="https://supabase.com/legal/dpa">supabase.com/legal/dpa</a>) incluye cláusulas contractuales tipo. Además, permite guardar los datos en regiones de la Unión Europea (la región elegida se indica en el <a href="#proveedores">apartado 6</a>).</li>
+    <li><strong>Google, Stripe y el proveedor de SMS:</strong> <mark>[PENDIENTE: garantía de transferencia de cada uno (p. ej., decisión de adecuación o cláusulas contractuales tipo) — revisar con el abogado]</mark></li>
+  </ul>
+  <p>Puedes pedirnos información sobre estas garantías en el correo de privacidad del <a href="#responsable">apartado 1</a>.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="conservacion">
+  <h2 id="conservacion">8. Cuánto tiempo guardamos tus datos</h2>
+  <ul>
+    <li><strong>Cuenta, preferencias, historial, Mis medicamentos, perfil de emergencia y registro de permisos:</strong> mientras tengas la cuenta. Cuando la eliminas, se borran todos.</li>
+    <li><strong>Fotos de la caja y texto de tus preguntas:</strong> MediClaro no los guarda. Google conserva registros durante 55&nbsp;días solo para detectar abusos.</li>
+    <li><strong>Últimas preguntas en tu teléfono:</strong> unos minutos (como máximo, 10&nbsp;minutos).</li>
+    <li><strong>Comprobantes de compra y facturas:</strong> mientras tengas la suscripción y, después, el tiempo que exige la normativa fiscal.</li>
+  </ul>
+  <p><mark>[PENDIENTE: plazos concretos a fijar por el titular]</mark></p>
+  <p><mark>[VERIFICAR: en la versión actual, los registros internos de uso y errores llevan el identificador de la cuenta (uno indica si una pregunta se derivó a emergencia) y, al eliminar la cuenta, se conservan sin él; además hay un registro de seguridad de bajas y descargas de datos, y copias de seguridad del servidor. Decidir plazos y describirlos aquí]</mark></p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="derechos">
+  <h2 id="derechos">9. Tus derechos y cómo ejercerlos</h2>
+  <p>Puedes ejercer estos derechos cuando quieras. Es gratis.</p>
+  <ul>
+    <li><strong>Acceso:</strong> saber qué datos tuyos tratamos y obtener una copia.</li>
+    <li><strong>Rectificación:</strong> corregir datos incorrectos o incompletos.</li>
+    <li><strong>Supresión:</strong> pedir que borremos tus datos.</li>
+    <li><strong>Portabilidad:</strong> recibir tus datos en un archivo para llevarlos a otro servicio.</li>
+    <li><strong>Oposición:</strong> oponerte a que tratemos tus datos por nuestro interés legítimo (por ejemplo, las métricas internas).</li>
+    <li><strong>Limitación:</strong> pedir que dejemos de usar tus datos durante un tiempo, por ejemplo mientras comprobamos si son correctos.</li>
+    <li><strong>Retirar tu consentimiento:</strong> cuando quieras, sin que afecte a lo que se hizo antes.</li>
+  </ul>
+
+  <h3 id="como-ejercerlos">Cómo ejercerlos</h3>
+  <p><strong>Desde la app</strong>, en <strong>Perfil → Privacidad y datos</strong>:</p>
+  <ul>
+    <li><strong>Descargar mis datos:</strong> te da un archivo (formato JSON) con una copia de los datos de tu cuenta que están en nuestro servidor. Sirve para el acceso y la portabilidad. <mark>[VERIFICAR: que la descarga incluya también el perfil de emergencia (requisito R-06 del servidor)]</mark></li>
+    <li><strong>Eliminar mi cuenta:</strong> borra tu cuenta y tus datos (ver abajo).</li>
+    <li><strong>Retirar el permiso para la inteligencia artificial.</strong></li>
+    <li><strong>Qué compartir en una emergencia:</strong> eliges qué datos se comparten.</li>
+  </ul>
+  <p>También puedes cambiar tu nombre, tus preferencias y tu perfil de emergencia en la propia app.</p>
+  <p><strong>Por correo electrónico</strong>, en <mark>[PENDIENTE: correo de privacidad]</mark>. Dinos qué derecho quieres ejercer y el número de móvil de tu cuenta. Si tenemos dudas sobre tu identidad, te pediremos que la confirmes.</p>
+  <p>Te responderemos en un mes como máximo. Si la petición es compleja, este plazo puede ampliarse; en ese caso te lo diremos dentro del primer mes.</p>
+
+  <h3 id="eliminar-cuenta">Eliminar tu cuenta</h3>
+  <ol>
+    <li>Abre MediClaro y entra en <strong>Perfil → Privacidad y datos</strong>.</li>
+    <li>Pulsa <strong>Eliminar mi cuenta</strong>.</li>
+    <li>Confírmalo dos veces. Te lo pedimos dos veces para evitar errores.</li>
+  </ol>
+  <p><strong>Qué se borra:</strong> tu cuenta y todos sus datos en nuestro servidor (teléfono, nombre, preferencias, historial, Mis medicamentos, perfil de emergencia y registro de permisos). También se borran de tu teléfono los datos de esa cuenta. Si pagaste con tarjeta, la suscripción se cancela. Si pagaste con Apple o Google Play, cancélala antes en la tienda: eliminar la cuenta no la cancela.</p>
+  <p><strong>Qué se conserva:</strong> los justificantes de pago y las facturas, por obligación fiscal (ver <a href="#conservacion">apartado 8</a>).</p>
+  <p><strong>Si ya no tienes la app</strong>, escríbenos al correo de privacidad del <a href="#responsable">apartado 1</a> con el número de móvil de tu cuenta.</p>
+  <p>Borrar la app del teléfono no elimina tu cuenta.</p>
+
+  <h3 id="aepd">Reclamar ante la AEPD</h3>
+  <p>Si crees que no hemos tratado bien tus datos, puedes presentar una reclamación ante la Agencia Española de Protección de Datos (AEPD): <a href="https://www.aepd.es">www.aepd.es</a>. Antes, si quieres, escríbenos y trataremos de resolverlo.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="otras-personas">
+  <h2 id="otras-personas">10. Datos de otras personas</h2>
+  <p>Si añades datos de otra persona (por ejemplo, tu contacto de emergencia, tu médico de cabecera o tu servicio privado de asistencia), asegúrate de que está de acuerdo y sabe para qué los usas.</p>
+  <p>Si un familiar te ayuda a instalar o configurar MediClaro, la cuenta y los datos siguen siendo tuyos.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="menores">
+  <h2 id="menores">11. Menores de edad</h2>
+  <p>MediClaro es un servicio para personas mayores de edad. <mark>[PENDIENTE: confirmar edad mínima con el abogado]</mark></p>
+  <p>Si eres menor, no uses la app. Si sabemos que una cuenta pertenece a un menor, la eliminaremos.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="seguridad">
+  <h2 id="seguridad">12. Seguridad</h2>
+  <ul>
+    <li>Los datos viajan cifrados entre tu teléfono y nuestro servidor (HTTPS).</li>
+    <li>En tu teléfono, la sesión y los datos sensibles se guardan en el llavero (iPhone) o en el Keystore (Android).</li>
+    <li>En nuestro servidor, cada persona solo puede acceder a sus propios datos (seguridad por filas).</li>
+    <li>Las claves secretas de los servicios están solo en el servidor, nunca en la app.</li>
+    <li>Las fotos se envían reducidas y sin los datos ocultos de la imagen.</li>
+  </ul>
+  <p>Ningún sistema es infalible. Si hubiera un fallo de seguridad que ponga en riesgo tus datos, te avisaremos cuando la ley lo exija.</p>
+  <p>Un consejo: protege tu teléfono con un bloqueo de pantalla y no compartas con nadie el código que te llega por SMS.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+
+<section aria-labelledby="cambios">
+  <h2 id="cambios">13. Cambios en esta política</h2>
+  <p>Podemos actualizar esta política cuando cambie la app o la ley. Si el cambio es importante, te avisaremos en la app antes de que se aplique. <mark>[PENDIENTE: forma y plazo de aviso de los cambios]</mark></p>
+  <p>Si hace falta tu consentimiento, te lo pediremos de nuevo.</p>
+  <p>La versión y la fecha de la última actualización aparecen al principio de esta página.</p>
+  <p class="volver"><a href="#indice">Volver al índice</a></p>
+</section>
+</main>
+
+<footer>
+  <p>Otros textos legales de MediClaro: <a href="condiciones-uso.html">Condiciones de uso</a> · <a href="aviso-legal.html">Aviso legal</a></p>
+</footer>
+</body>
+</html>

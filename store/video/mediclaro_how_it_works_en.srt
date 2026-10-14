@@ -1,0 +1,183 @@
+1
+00:00:00,820 --> 00:00:08,910
+MediClaro is the app that explains your medicines clearly. Here's how it works, from start to finish.
+
+2
+00:00:09,180 --> 00:00:16,809
+No sign-up needed. When you open the app, tap “Discover MediClaro” to see everything it can do for you.
+
+3
+00:00:17,079 --> 00:00:22,865
+A four-step guided tour, with voice, shows you how to identify your medicines…
+
+4
+00:00:23,135 --> 00:00:25,505
+…how to ask the assistant…
+
+5
+00:00:25,775 --> 00:00:28,179
+…how to listen to the leaflet…
+
+6
+00:00:28,449 --> 00:00:34,642
+…and how it helps you in an emergency. If you already know the app, you can skip it.
+
+7
+00:00:34,912 --> 00:00:41,879
+Choose your plan: monthly, quarterly or yearly. No commitment: cancel whenever you like.
+
+8
+00:00:42,149 --> 00:00:47,518
+Pay with Apple or Google Play, using your phone's official payment sheet…
+
+9
+00:00:47,788 --> 00:00:54,665
+…or by card, on Stripe's secure page. MediClaro never sees or stores your card.
+
+10
+00:00:54,935 --> 00:00:59,929
+As soon as the payment is confirmed, Premium is active right away.
+
+11
+00:01:00,199 --> 00:01:05,817
+Then add your phone number, so you won't lose your subscription if you change phones.
+
+12
+00:01:06,087 --> 00:01:09,151
+You'll receive a code by text message.
+
+13
+00:01:09,421 --> 00:01:14,081
+Type it in with the large keypad, and that's it: you're in.
+
+14
+00:01:14,351 --> 00:01:22,923
+This is your home screen. Everything is one tap away: identify, your medicines, the assistant and emergency.
+
+15
+00:01:23,193 --> 00:01:27,989
+To find out what a medicine is, just take a photo of the box.
+
+16
+00:01:28,259 --> 00:01:30,910
+You can also scan the barcode…
+
+17
+00:01:31,180 --> 00:01:35,071
+…or type in the national code printed on the box.
+
+18
+00:01:35,341 --> 00:01:41,616
+MediClaro looks it up in the official database of the Spanish Agency of Medicines.
+
+19
+00:01:41,886 --> 00:01:45,781
+Within seconds, it tells you what the medicine is.
+
+20
+00:01:46,051 --> 00:01:50,593
+And it explains it in plain words: what it is, what it's for…
+
+21
+00:01:50,863 --> 00:01:54,852
+…how to take it, and what precautions to keep in mind.
+
+22
+00:01:55,122 --> 00:02:02,014
+If you want more detail, the full official leaflet is right there, with its source and date.
+
+23
+00:02:02,284 --> 00:02:09,975
+Is the print too small? Tap “Read aloud” and MediClaro reads it to you, at the speed you prefer.
+
+24
+00:02:10,245 --> 00:02:18,842
+Before using artificial intelligence, the app asks for your permission. You decide, and you can withdraw it at any time.
+
+25
+00:02:19,112 --> 00:02:26,664
+Ask whatever you need, in your own words. The assistant answers clearly, citing the official source…
+
+26
+00:02:26,934 --> 00:02:31,502
+…and always reminds you to check with your doctor or pharmacist.
+
+27
+00:02:31,772 --> 00:02:38,713
+If it detects an emergency, it shows you the 112 emergency number right away.
+
+28
+00:02:38,983 --> 00:02:43,137
+Save your medicines to your list and mark your favourites.
+
+29
+00:02:43,407 --> 00:02:49,318
+From each one you can open its details, listen to it, or ask the assistant.
+
+30
+00:02:49,588 --> 00:02:54,072
+Your history shows everything you've looked up, day by day.
+
+31
+00:02:54,342 --> 00:03:01,845
+In an emergency, 112 is always in view: with or without a subscription, and without signing up.
+
+32
+00:03:02,115 --> 00:03:06,491
+The emergency assistant asks whether you're able to speak…
+
+33
+00:03:06,761 --> 00:03:10,403
+…and helps you say what's wrong, with a single tap.
+
+34
+00:03:10,673 --> 00:03:17,560
+Then it prepares your information: where you are, your details, your medicines and your contact.
+
+35
+00:03:17,830 --> 00:03:25,985
+You can call your assistance service or 112. The app opens the phone dialer; it never calls on its own.
+
+36
+00:03:26,255 --> 00:03:32,702
+During the call, your information and a ready-made message for the operator are at hand.
+
+37
+00:03:32,972 --> 00:03:38,948
+And with one tap you can alert a family member, with a message that's already written.
+
+38
+00:03:39,218 --> 00:03:44,754
+All of this comes from your emergency profile, which you fill in just once…
+
+39
+00:03:45,024 --> 00:03:48,028
+…and where you decide what gets shared.
+
+40
+00:03:48,298 --> 00:03:52,026
+In your profile, you adjust the app to suit you.
+
+41
+00:03:52,296 --> 00:03:58,791
+Normal, large or extra-large text; high contrast; and the speed of the voice.
+
+42
+00:03:59,061 --> 00:04:03,589
+Easy Mode keeps only the essentials, with bigger buttons.
+
+43
+00:04:03,859 --> 00:04:11,453
+Your data is yours: download it whenever you want, withdraw the AI permission, or delete your account.
+
+44
+00:04:11,723 --> 00:04:17,573
+And your subscription is managed from the app store itself, with no hassle.
+
+45
+00:04:17,843 --> 00:04:23,063
+MediClaro. Your medicines, clearly explained.
+
+46
+00:04:23,333 --> 00:04:30,545
+MediClaro informs; it does not replace your doctor or pharmacist.

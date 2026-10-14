@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "../original/_shared/common.ts": "./fakes/common.ts",
+    "../original/_shared/stripe.ts": "./fakes/stripe.ts",
+    "../patched/_shared/common.ts": "./fakes/common.ts",
+    "../patched/_shared/stripe.ts": "./fakes/stripe.ts"
+  }
+}

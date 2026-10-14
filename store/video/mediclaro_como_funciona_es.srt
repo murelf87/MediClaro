@@ -1,0 +1,183 @@
+1
+00:00:00,820 --> 00:00:09,825
+MediClaro es la aplicación que te explica tus medicamentos con claridad. Así funciona, de principio a fin.
+
+2
+00:00:10,095 --> 00:00:18,468
+No hace falta registrarse. Al abrir la app, pulsa «Conocer MediClaro» para descubrir todo lo que puede hacer por ti.
+
+3
+00:00:18,738 --> 00:00:24,893
+Una explicación de cuatro pasos, con voz, te muestra cómo identificar tus medicamentos…
+
+4
+00:00:25,163 --> 00:00:27,780
+…cómo preguntar al asistente…
+
+5
+00:00:28,050 --> 00:00:30,632
+…cómo escuchar el prospecto…
+
+6
+00:00:30,902 --> 00:00:37,261
+…y cómo te ayuda en una emergencia. Si ya conoces la app, puedes saltarla.
+
+7
+00:00:37,531 --> 00:00:44,355
+Elige tu plan: mensual, trimestral o anual. Sin permanencia: cancelas cuando quieras.
+
+8
+00:00:44,625 --> 00:00:49,405
+Paga con Apple o con Google Play, en la hoja oficial de tu teléfono…
+
+9
+00:00:49,675 --> 00:00:56,565
+…o con tarjeta, en la página segura de Stripe. MediClaro nunca ve ni guarda tu tarjeta.
+
+10
+00:00:56,835 --> 00:01:01,306
+En cuanto el pago se confirma, Premium queda activo al momento.
+
+11
+00:01:01,576 --> 00:01:07,883
+Después, añade tu número de teléfono: así no perderás tu suscripción si cambias de móvil.
+
+12
+00:01:08,153 --> 00:01:11,479
+Recibirás un código por SMS.
+
+13
+00:01:11,749 --> 00:01:16,620
+Escríbelo con el teclado grande, y listo: ya estás dentro.
+
+14
+00:01:16,890 --> 00:01:25,282
+Esta es tu pantalla de inicio. Todo está a un toque: identificar, tus medicamentos, el asistente y la emergencia.
+
+15
+00:01:25,552 --> 00:01:29,733
+Para saber qué medicamento tienes, haz una foto a la caja.
+
+16
+00:01:30,003 --> 00:01:33,513
+También puedes escanear el código de barras…
+
+17
+00:01:33,783 --> 00:01:37,733
+…o escribir el código nacional que aparece en la caja.
+
+18
+00:01:38,003 --> 00:01:44,324
+MediClaro lo busca en la base de datos oficial de la Agencia Española de Medicamentos.
+
+19
+00:01:44,594 --> 00:01:48,172
+En unos segundos, te dice qué medicamento es.
+
+20
+00:01:48,442 --> 00:01:52,901
+Y te lo explica con palabras sencillas: qué es, para qué sirve…
+
+21
+00:01:53,171 --> 00:01:56,691
+…cómo se toma y qué precauciones debes tener.
+
+22
+00:01:56,961 --> 00:02:03,382
+Si quieres más detalle, tienes el prospecto oficial completo, con su fuente y su fecha.
+
+23
+00:02:03,652 --> 00:02:11,355
+¿La letra es pequeña? Pulsa «Leer en voz alta» y MediClaro te lo lee, a la velocidad que prefieras.
+
+24
+00:02:11,625 --> 00:02:19,827
+Antes de usar la inteligencia artificial, la app te pide permiso. Tú decides, y puedes retirarlo cuando quieras.
+
+25
+00:02:20,097 --> 00:02:27,619
+Pregunta lo que necesites, con tus palabras. El asistente responde de forma clara, con la fuente oficial…
+
+26
+00:02:27,889 --> 00:02:32,799
+…y siempre te recuerda que consultes a tu médico o farmacéutico.
+
+27
+00:02:33,069 --> 00:02:38,034
+Si detecta una urgencia, te muestra el uno uno dos al instante.
+
+28
+00:02:38,304 --> 00:02:42,999
+Guarda tus medicamentos en tu lista y marca tus favoritos.
+
+29
+00:02:43,269 --> 00:02:48,803
+Desde cada uno puedes ver la ficha, escucharla o preguntar al asistente.
+
+30
+00:02:49,073 --> 00:02:54,069
+En el historial encuentras todo lo que has consultado, día a día.
+
+31
+00:02:54,339 --> 00:03:00,948
+En una urgencia, el uno uno dos siempre está a la vista: con o sin suscripción, y sin registrarte.
+
+32
+00:03:01,218 --> 00:03:05,218
+El asistente de emergencia te pregunta si puedes hablar…
+
+33
+00:03:05,488 --> 00:03:09,428
+…y te ayuda a indicar qué te pasa, con un solo toque.
+
+34
+00:03:09,698 --> 00:03:16,158
+Después prepara tu información: dónde estás, tus datos, tus medicamentos y tu contacto.
+
+35
+00:03:16,428 --> 00:03:24,060
+Puedes llamar a tu servicio de asistencia o al uno uno dos. La app abre el teléfono; nunca llama sola.
+
+36
+00:03:24,330 --> 00:03:30,015
+Durante la llamada tienes a mano tu información y el mensaje para quien te atienda.
+
+37
+00:03:30,285 --> 00:03:35,098
+Y con un toque avisas a un familiar, con un mensaje ya preparado.
+
+38
+00:03:35,368 --> 00:03:39,980
+Todo sale de tu perfil de emergencia, que rellenas una sola vez…
+
+39
+00:03:40,250 --> 00:03:43,798
+…y donde tú decides qué se comparte.
+
+40
+00:03:44,068 --> 00:03:47,539
+En tu perfil ajustas la app a tu medida.
+
+41
+00:03:47,809 --> 00:03:53,238
+Letra normal, grande o muy grande; alto contraste; y la velocidad de la voz.
+
+42
+00:03:53,508 --> 00:03:58,124
+El Modo fácil deja solo lo esencial, con botones más grandes.
+
+43
+00:03:58,394 --> 00:04:05,087
+Tus datos son tuyos: descárgalos cuando quieras, retira el permiso de la IA o elimina tu cuenta.
+
+44
+00:04:05,357 --> 00:04:10,897
+Y tu suscripción se gestiona desde la propia tienda, sin complicaciones.
+
+45
+00:04:11,167 --> 00:04:16,172
+MediClaro. Tus medicamentos, con claridad.
+
+46
+00:04:16,442 --> 00:04:23,181
+MediClaro informa; no sustituye a tu médico ni a tu farmacéutico.
