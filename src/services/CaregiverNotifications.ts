@@ -3,6 +3,30 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { careAction } from './CaregiverService';
 import { CareChatService } from './CareChatService';
+import { localStore } from '../api/storage';
+
+const OFF_KEY='mediclaro_care_push_off_v1';
+/** Si la persona apagó los avisos a propósito, la app no los vuelve a activar sola. */
+export async function pushTurnedOffByUser():Promise<boolean>{return (await localStore.getJSON<boolean>(OFF_KEY,false))===true;}
+export type PushState='on'|'off'|'blocked'|'unsupported';
+/** Estado real: permiso del sistema + si la persona lo apagó. «blocked» = hay que permitirlo en Ajustes del móvil. */
+export async function caregiverPushState():Promise<PushState>{
+ if(Platform.OS==='web')return 'unsupported';
+ const p=await Notifications.getPermissionsAsync();
+ if(p.status!=='granted')return p.canAskAgain===false||p.status==='denied'?'blocked':'off';
+ return (await pushTurnedOffByUser())?'off':'on';
+}
+/** Interruptor ON: pide permiso si hace falta y registra este móvil. */
+export async function turnOnCaregiverPush():Promise<string>{
+ const message=await enableCaregiverNotifications(true);
+ await localStore.remove(OFF_KEY);
+ return message;
+}
+/** Interruptor OFF: este móvil deja de recibir avisos de familiares, chat y llamadas. */
+export async function turnOffCaregiverPush():Promise<void>{
+ await careAction('disable_devices');
+ await localStore.setJSON(OFF_KEY,true);
+}
 Notifications.setNotificationHandler({handleNotification:async(n)=>{
  // «Mis pastillas» con la app abierta: se abre la pantalla del aviso (PillReminderHost), que hace sonar la alarma y
  // después lo lee en voz alta; el teléfono no pone su sonido ni un banner encima (se oiría todo a la vez).

@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { useRealSession } from '../providers/SessionProvider';
 import { CaregiverService, incidentActive } from '../services/CaregiverService';
-import { enableCaregiverNotifications } from '../services/CaregiverNotifications';
+import { enableCaregiverNotifications, pushTurnedOffByUser } from '../services/CaregiverNotifications';
 import { CareChatService } from '../services/CareChatService';
 import { CareCallService } from '../services/CareCallService';
 import { BackgroundLocation } from '../services/BackgroundLocation';
@@ -40,7 +40,7 @@ export function CaregiverHost(){
   // Solo los avisos de familiares y del chat: los de «Mis pastillas» los abre PillReminderHost.
   void Notifications.getLastNotificationResponseAsync().then(r=>{const route=r?.notification.request.content.data?.route;if(!stopped&&r&&typeof route==='string'&&CARE_ROUTES.has(route)){navigate(r.notification);void Notifications.clearLastNotificationResponseAsync().catch(()=>undefined);}}).catch(()=>undefined);
   // Se pide el permiso al entrar (iOS/Android solo preguntan una vez) y se registra el móvil: sin esto no llega ningún aviso.
-  void enableCaregiverNotifications(true).catch(()=>undefined);
+  void pushTurnedOffByUser().then(off=>off?undefined:enableCaregiverNotifications(true)).catch(()=>undefined);
   const poll=async()=>{
    if(stopped||busy||AppState.currentState!=='active')return;busy=true;
    try {

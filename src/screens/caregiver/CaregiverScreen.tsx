@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Share, StyleSheet, TextInput, View, useWindowDimensions, type ScrollView } from 'react-native';
 import * as Crypto from 'expo-crypto';
-import { AppHeader, AppText, Avatar, Badge, Card, Icon, InfoBanner, PrimaryButton, SecondaryButton, Screen, TextButton } from '../../components';
+import { AppHeader, AppText, Avatar, Badge, Card, Icon, InfoBanner, PrimaryButton, SecondaryButton, SettingRow, Screen, TextButton } from '../../components';
 import { useSession, useAppTheme, useEntitlement, useOwnerPreview } from '../../hooks';
 import {useRouter,useLocalSearchParams} from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
@@ -10,7 +10,7 @@ import {CareInviteScanner} from '../../components/CareInviteScanner';
 import {parseCareInvite,parseCarePairCode,carePairQr} from '../../services/careInvite';
 import { CaregiverService, incidentActive, locationFresh, type CareSnapshot } from '../../services/CaregiverService';
 import { notificationDescription } from '../../services/CaregiverAlert';
-import { enableCaregiverNotifications, testCaregiverSound } from '../../services/CaregiverNotifications';
+import { caregiverPushState, testCaregiverSound, turnOffCaregiverPush, turnOnCaregiverPush, type PushState } from '../../services/CaregiverNotifications';
 import { callNumberOrExplain } from '../emergency/parts';
 import { CaregiverAudioCall } from '../../components/CaregiverAudioCall';
 import { confirmAsync, showAlert } from '../../utils/dialogs';
@@ -75,11 +75,24 @@ export default function CaregiverScreen(){
   if(busy)return;setBusy(true);setError('');
   try{await fn();await refresh();}catch(e){setError((e as Error).message);}finally{if(alive.current)setBusy(false);}
  };
- const activateNotifications=async()=>{
-  const message=await enableCaregiverNotifications(true);
-  setNotice(message);
-  await showAlert('Avisos activados', message);
+ const [pushState,setPushState]=useState<PushState>('off');
+ const [pushBusy,setPushBusy]=useState(false);
+ // Por defecto ON: el host pide el permiso y registra el móvil al entrar; aquí se vuelve a leer el estado real.
+ useEffect(()=>{const read=()=>void caregiverPushState().then(s=>{if(alive.current)setPushState(s);}).catch(()=>undefined);read();const t=setTimeout(read,3000);return()=>clearTimeout(t);},[]);
+ const togglePush=async(on:boolean)=>{
+  if(pushBusy)return;setPushBusy(true);
+  try{
+   if(on){
+    if(pushState==='blocked'){await showAlert('Avisos bloqueados','Permite las notificaciones de MediClaro en los Ajustes del teléfono y vuelve aquí.');void Linking.openSettings().catch(()=>undefined);return;}
+    await turnOnCaregiverPush();
+    setPushState('on');
+   } else {await turnOffCaregiverPush();setPushState('off');}
+  }catch(e){setError((e as Error).message);setPushState(await caregiverPushState().catch(()=>'off' as PushState));}
+  finally{if(alive.current)setPushBusy(false);}
  };
+ const pushRow=<SettingRow icon="notifications-outline" label="Avisos en este móvil"
+  description={pushState==='on'?'Activados: te avisamos de mensajes, llamadas, tomas y alertas.':pushState==='blocked'?'Bloqueados en el teléfono. Toca para abrir Ajustes.':'Apagados: no recibirás ningún aviso en este móvil.'}
+  toggle={{value:pushState==='on',onChange:v=>void togglePush(v),disabled:pushBusy}} testID="caregiver-push-toggle" />;
  const realActive=data?.incidents.filter(i=>incidentActive(i)).sort((a,b)=>b.created_at.localeCompare(a.created_at))??[];
  const drillIncident=drill&&drill.incident().state==='active'?drill.incident():null;
  const active=drillIncident?[drillIncident,...realActive]:realActive;
@@ -408,13 +421,13 @@ export default function CaregiverScreen(){
   <Card style={{gap:10}} testID="caregiver-device">
    <AppText variant="subheading" color="heading" accessibilityRole="header">En este móvil</AppText>
    {caregiverProfile?<>
-    <SecondaryButton label="Activar avisos en este móvil" icon="notifications-outline" onPress={()=>void run(activateNotifications)} disabled={busy} testID="caregiver-enable-notifications" />
+    {pushRow}
     <SecondaryButton label="Probar sonido del aviso" icon="volume-high-outline" onPress={()=>void run(testCaregiverSound)} disabled={busy} testID="caregiver-test-sound" />
     <AppText variant="caption" color="textSecondary">Sonido sujeto a los ajustes del teléfono. Alertas críticas pendientes de autorización Apple. Necesita conexión y notificaciones permitidas.</AppText>
     <SecondaryButton label={entitlement.isPremium?'Ver mi Premium':'Añadir Premium para mi propio uso'} icon="ribbon-outline" onPress={()=>router.push('/premium')} testID="caregiver-own-premium" />
     <AppText variant="caption" color="textSecondary">Ser cuidador/a es gratis. Premium es opcional y solo añade IA, identificación y funciones avanzadas para ti.</AppText>
    </>:canCreatePatientQr?<>
-    <SecondaryButton label="Activar avisos de vinculación" icon="notifications-outline" onPress={()=>void run(activateNotifications)} disabled={busy} testID="patient-enable-link-notifications" />
+    {pushRow}
    </>:<>
     <AppText variant="caption" color="textSecondary">También puedes ser Cuidador/a + Premium: seguirás siendo cuidador/a gratis y, si contratas Premium para ti, tendrás además IA, identificación y el resto de funciones Premium.</AppText>
    </>}
