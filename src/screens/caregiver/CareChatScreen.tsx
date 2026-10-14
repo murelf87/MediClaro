@@ -30,6 +30,7 @@ import { useAppTheme, useEntitlement } from '../../hooks';
 import { useCareChat, useChatReader, type ChatItem } from '../../hooks/useCareChat';
 import { CARE_CHAT_MAX_LENGTH, canWriteNow, chatOpen } from '../../services/CareChatService';
 import { useNow } from '../../hooks/usePillPlan';
+import { CareLiveLocation } from '../../components/CareLiveLocation';
 import { ChatWindowState } from '../../components/CareChatWindow';
 import { buildChatRows, chatTime, type ChatRow } from '../../utils/chatTimeline';
 import { useKeyboardVisible } from '../assistant/parts';
@@ -243,6 +244,7 @@ export default function CareChatScreen() {
     <Screen edges={['top']} scroll={false} padded={false} header={header} testID="care-chat-screen">
       <View ref={wrapRef} style={styles.flex} onLayout={measureWrap} collapsable={false}>
         <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
+          {!blocked && linkId ? <CareLiveLocation linkId={linkId} patientSide={patientSide} premium={premium} name={otherFirst} /> : null}
           {blocked ? (
             <View style={{ paddingHorizontal: theme.layout.screenPaddingH, paddingTop: theme.spacing.sm, gap: theme.spacing.sm }}>
               <InfoBanner tone="warning" title={chat.error?.message ?? 'Esta conversación no está disponible.'} />
