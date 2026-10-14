@@ -1,0 +1,2421 @@
+diff --git a/02_ESTADO_REAL_Y_PENDIENTES.md b/02_ESTADO_REAL_Y_PENDIENTES.md
+index b5b6a13..124d4f8 100644
+--- a/02_ESTADO_REAL_Y_PENDIENTES.md
++++ b/02_ESTADO_REAL_Y_PENDIENTES.md
+@@ -148,3 +148,13 @@ Trabajar sobre este código, conservar el diseño actual y corregir por capas:
+ 7. build de producción;
+ 8. inspección IPA;
+ 9. solo después, envío a Apple con autorización explícita.
++
++## Actualización 08/10/2026 — voces y Expo Go
++Ver `CAMBIOS_VOCES_Y_EXPO_GO_2026-10-08.md` y `100_CAMBIOS_VOCES_EXPO_GO_2026-10-08.patch`.
++- Corregido: el micrófono de Lucía no grababa en iPhone (faltaba activar la grabación en la sesión de audio).
++- Corregido: «Escuchar cómo funciona» del cuidador (texto no permitido en `tts-preview`).
++- Voz natural: texto preparado para la voz (unidades, 112, enlaces), español de España, sin palabras cortadas, sin solapes entre pantallas de la explicación inicial.
++- Vista previa en iPhone con Expo Go: `VER_EN_IPHONE_EXPO_GO.bat`. Compras y llamadas WebRTC solo en la build instalada.
++- Verificación: TypeScript 0 errores; Jest 30 suites / 356 pruebas OK; paquete iOS generado; foto protegida sin cambios.
++- Pendiente de desplegar: `npx supabase functions deploy tts tts-preview --project-ref ldonnvkysjalpmystoeq`.
++- Sin verificar: voces reales de Gemini y prueba física en iPhone.
+diff --git a/CAMBIOS_VOCES_Y_EXPO_GO_2026-10-08.md b/CAMBIOS_VOCES_Y_EXPO_GO_2026-10-08.md
+new file mode 100644
+index 0000000..f60f4f8
+--- /dev/null
++++ b/CAMBIOS_VOCES_Y_EXPO_GO_2026-10-08.md
+@@ -0,0 +1,56 @@
++# MediClaro — Voces y vista previa en Expo Go (08/10/2026)
++
++Trabajo hecho sobre el snapshot del 08/10/2026 (commit base `aa69d84` + cambios sin confirmar). No se ha reconstruido nada ni cambiado el diseño. La identificación por foto no se ha tocado (hash `3a50b595…49342`, igual que antes).
++
++Todos los cambios están también en `100_CAMBIOS_VOCES_EXPO_GO_2026-10-08.patch` (en tu repositorio: `git apply 100_CAMBIOS_VOCES_EXPO_GO_2026-10-08.patch`).
++
++## 1. Voces: qué fallaba y qué se ha corregido
++
++| Problema | Causa | Corrección |
++|---|---|---|
++| **«Hablar con Lucía» no grababa en iPhone** (aviso «Micrófono no disponible») | En el último cambio se quitó la activación de la grabación en la sesión de audio. En iPhone, expo-audio rechaza `record()` sin ella (`RecordingDisabledException`). | `configureAudioForRecording()` antes de grabar y vuelta al altavoz al terminar (`src/utils/audio.ts`, `AssistantScreen.tsx`). El mensaje se envía solo al minuto. Prueba de regresión incluida. |
++| **«Escuchar cómo funciona» del cuidador nunca sonaba** | El texto no estaba en la lista permitida de `tts-preview` (respondía 403). | Texto añadido al servidor y centralizado en `src/config/voicePreviews.ts`. Una prueba comprueba que todos los textos públicos coinciden con el servidor. |
++| **Acento**: la lectura y Lucía podían salir con acento no castellano (la explicación inicial sí es castellana) | La función `tts` no pedía español de España; `tts-preview` sí. | Las tres voces piden «Spanish from Spain (Castilian accent, es-ES)». |
++| **Unidades y siglas mal leídas** («500 mg c/8 h», «llama al 112», enlaces, emojis) | El texto se enviaba tal cual. | `src/utils/speechText.ts`: «500 miligramos cada 8 horas», «6 a 8 horas», «250 miligramos por cada 5 mililitros», «llama al uno, uno, dos» (una dosis «Eutirox 112 microgramos» NO se toca), sin enlaces ni emojis, pausa al final de cada línea. Solo cambia lo que se oye, no lo que se ve. |
++| **Palabras partidas** al final de respuestas largas de Lucía | Un texto de más de 3.200 caracteres se recortaba a mitad de palabra. | Nunca se recorta: si es largo se divide por frases y el servidor devuelve un único audio, con una pausa natural de 0,28 s entre trozos. |
++| **Restos de la voz anterior al cambiar de pantalla** en «Cómo funciona» | Un único reproductor reutilizado; iOS conservaba unas décimas en el búfer. | Un reproductor nuevo por pantalla; el anterior se silencia, se para y se libera antes de empezar. Pausar antes de que empiece ya no la deja sonar. |
++| **Voz «estirada» en la explicación inicial** | Se reproducía a 0,85× (velocidad pensada para la voz del sistema). | Misma escala que el resto de voces naturales: Normal = 1×. |
++| **Lectura de prospectos muy largos** (cuando no hay resumen sencillo) | El prospecto completo superaba los límites (28.000 caracteres o el tiempo máximo del servidor) y la lectura fallaba. | Se leen los primeros apartados (unos 5 min) y se avisa: «El texto completo está en la ficha». |
++| **Lectura «Preparando…» sin fin** si el audio no llegaba a sonar | Sin vigilancia de arranque. | Aviso a los 15 s y botón «Reintentar». |
++| Selector «Voz de lectura» engañoso | Decía «medicamentos y prospectos», pero la lectura de medicamentos usa siempre Sulafat. | Ahora: «Voz de la explicación de la app» (Sulafat/Achird, las grabadas) y «Voz de Lucía» (Sulafat/Achird/Aoede). |
++| Mensajes contradictorios | «Usaremos la voz del teléfono» y «No voy a sustituirla por la voz robótica…». | Mensajes claros y sin voz robótica: «No se ha podido preparar la voz. Comprueba tu conexión…». |
++| Modo demostración: la lectura y el micrófono fallaban con error técnico | Sin servidor no se genera audio nuevo. | Muestra breve de Sulafat con aviso; el micrófono explica que necesita la cuenta real. |
++
++Voces que se usan (sin cambios de criterio): **medicamentos = Sulafat siempre**; **Lucía = la elegida (Aoede por defecto)**; explicación inicial = Sulafat o Achird; emergencias críticas = canal propio con respaldo local (no depende de la red).
++
++## 2. Hay que desplegar en el servidor (lo hago yo NO: este entorno no llega a Supabase)
++
++```
++npx supabase functions deploy tts tts-preview --project-ref ldonnvkysjalpmystoeq
++```
++
++Sin este despliegue la app funciona igual, pero el acento castellano en lectura/Lucía, la pausa entre trozos y la voz de «Escuchar cómo funciona» del cuidador no se activan.
++
++## 3. Ver la app en tu iPhone con Expo Go
++
++1. En el iPhone: instala o actualiza **Expo Go** (App Store). Debe admitir el SDK 57 (la versión actual de la App Store lo admite).
++2. En el PC: descomprime el ZIP y haz doble clic en **`VER_EN_IPHONE_EXPO_GO.bat`**. La primera vez instala lo necesario (unos minutos).
++3. Aparece un **QR** en la ventana: apúntalo con la Cámara del iPhone → «Abrir en Expo Go».
++4. Deja la ventana abierta mientras lo usas. Usa túnel (funciona con datos móviles); si el túnel falla, prueba por la WiFi (iPhone y PC en la misma red).
++
++Para oír las voces naturales reales entra con tu número (Premium de propietario) o pon tu `EXPO_PUBLIC_QA_ACCESS_TOKEN` en un `.env` en esa carpeta y usa «Probar MediClaro por perfil → Paciente Premium». Sin cuenta real, el Modo demostración solo reproduce muestras.
++
++**En Expo Go NO funcionan** (sí en la build instalada de EAS): compras de Apple/Google (la pantalla de pago lo explica), llamadas de audio por internet con el cuidador (WebRTC: se avisa; chat y ubicación sí), y los permisos/plist propios de la app (Expo Go usa los suyos). Las notificaciones push en Expo Go son limitadas.
++
++## 4. Verificado aquí
++
++- TypeScript: 0 errores.
++- Jest: **30 suites / 356 pruebas OK** (antes 26/320). Nuevas: texto para voz, sincronía con `tts-preview`, sesión de audio para grabar, SpeechService, narración sin solapes.
++- Paquete iOS (Hermes) generado sin errores (1.927 módulos).
++- Pantallas cambiadas abiertas en la versión web de QA sin errores (lectura, accesibilidad, Lucía, pago, perfil, inicio).
++
++**No verificado aquí** (no se puede desde este entorno): voces reales de Gemini (el servidor no es accesible desde aquí) y prueba física en iPhone. Eso queda para tu prueba con Expo Go o con la próxima build interna.
++
++## 5. Pendientes reales (sin cambios)
++
++Apple IAP Sandbox (compra, restauración, caducidad; `storeVerification=false`), TURN para la llamada al cuidador, prueba física completa en iPhone y segundo móvil, inspección del Info.plist de la próxima IPA (micrófono y movimiento), 112 solo manual. La función `courtesy-access` (nueva, sin confirmar en git) no está conectada a ninguna pantalla ni desplegada por mí.
+diff --git a/VER_EN_IPHONE_EXPO_GO.bat b/VER_EN_IPHONE_EXPO_GO.bat
+new file mode 100644
+index 0000000..2683f8a
+--- /dev/null
++++ b/VER_EN_IPHONE_EXPO_GO.bat
+@@ -0,0 +1,57 @@
++@echo off
++setlocal
++title MediClaro - Vista previa en iPhone con Expo Go
++cd /d "%~dp0"
++
++echo.
++echo ==============================================================
++echo   MediClaro - vista previa en tu iPhone con Expo Go
++echo ==============================================================
++echo.
++echo   1. En el iPhone instala o actualiza "Expo Go" desde la App Store.
++echo   2. Espera a que aparezca un codigo QR en esta ventana.
++echo   3. Abre la Camara del iPhone, apunta al QR y toca "Abrir en Expo Go".
++echo.
++echo   Deja esta ventana abierta mientras usas la app en el iPhone.
++echo   Para cerrar: pulsa Ctrl+C en esta ventana.
++echo.
++
++where node >nul 2>nul
++if errorlevel 1 goto :nonode
++
++if exist "node_modules\expo\package.json" goto :run
++echo Instalando lo necesario. Solo la primera vez, tarda unos minutos...
++call npm ci --no-audit --no-fund
++if errorlevel 1 goto :installfail
++
++:run
++rem Valores PUBLICOS (los mismos de eas.json). Ningun secreto.
++set "EXPO_PUBLIC_SUPABASE_URL=https://ldonnvkysjalpmystoeq.supabase.co"
++set "EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf"
++rem Perfiles de revision internos visibles; compras solo por la tienda (en Expo Go no se cobra nada).
++set "EXPO_PUBLIC_DEMO_ACCESS=on"
++set "EXPO_PUBLIC_PAYMENTS_MODE=store"
++rem Si tienes tu archivo .env con EXPO_PUBLIC_QA_ACCESS_TOKEN, copialo en esta carpeta: Expo lo lee solo.
++
++echo Abriendo MediClaro con tunel: funciona aunque el iPhone use datos moviles...
++call npx expo start --go --tunnel --clear
++if not errorlevel 1 goto :end
++
++echo.
++echo El tunel no ha funcionado. Probando por la WiFi de casa.
++echo IMPORTANTE: el iPhone tiene que estar en la MISMA WiFi que este ordenador.
++call npx expo start --go --lan --clear
++goto :end
++
++:nonode
++echo Falta Node.js en este ordenador.
++echo Descargalo de https://nodejs.org (version LTS), instalalo y vuelve a abrir este archivo.
++goto :end
++
++:installfail
++echo No se ha podido instalar. Comprueba la conexion a internet y vuelve a abrir este archivo.
++
++:end
++echo.
++pause
++endlocal
+diff --git a/src/api/functions.ts b/src/api/functions.ts
+index bc6ff88..ba6efd6 100644
+--- a/src/api/functions.ts
++++ b/src/api/functions.ts
+@@ -16,7 +16,8 @@ const MESSAGE_BY_CODE: Record<string, string> = {
+   PREMIUM_REQUIRED: 'Esta función es de MediClaro Premium.',
+   PROVIDER_DOWN: 'Ahora mismo no podemos consultar la información oficial. Inténtalo de nuevo en unos minutos.',
+   AI_DOWN: 'El asistente no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.',
+-  TTS_DOWN: 'La voz natural no está disponible ahora mismo. Usaremos la voz del teléfono.',
++  TTS_DOWN: 'La voz natural no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.',
++  TTS_TOO_LONG: 'Este texto es demasiado largo para leerlo de una vez.',
+ };
+ 
+ const MESSAGE_BY_TEXT: Record<string, string> = {
+diff --git a/src/components/CaregiverAudioCall.tsx b/src/components/CaregiverAudioCall.tsx
+index 184cdb9..769d613 100644
+--- a/src/components/CaregiverAudioCall.tsx
++++ b/src/components/CaregiverAudioCall.tsx
+@@ -3,6 +3,7 @@ import { AppState, Platform, View } from 'react-native';
+ import * as Crypto from 'expo-crypto';
+ import { AppText, PrimaryButton, SecondaryButton } from './index';
+ import { supabase } from '../lib/supabase';
++import { IS_EXPO_GO } from '../utils/runtime';
+ 
+ interface Call {id:string;caller_id:string;recipient_id:string;state:'ringing'|'answered';offer:string;answer:string|null}
+ export function CaregiverAudioCall({incidentId,uid,recipients,autoStartRecipientId}:{incidentId:string;uid:string;recipients:Array<{id:string;name:string}>;autoStartRecipientId?:string|null}){
+@@ -46,6 +47,7 @@ export function CaregiverAudioCall({incidentId,uid,recipients,autoStartRecipient
+   if(pending.current)return;pending.current=true;setBusy(true);setStatus('');
+   try{
+    if(Platform.OS==='web')throw new Error('Las llamadas de audio necesitan la app instalada en el móvil.');
++   if(IS_EXPO_GO)throw new Error('Las llamadas de audio por internet funcionan en la app MediClaro instalada. En la vista previa de Expo Go no están disponibles; el chat y la ubicación sí.');
+    const {data:config,error:configError}=await supabase.functions.invoke('caregiver-rtc-config',{body:{incidentId}});
+    if(configError||!config?.iceServers?.length)throw new Error('No se puede iniciar el audio: la conexión para llamadas todavía no está disponible.');
+    const rtc=await import('react-native-webrtc');
+diff --git a/src/config/__tests__/voicePreviews.test.ts b/src/config/__tests__/voicePreviews.test.ts
+new file mode 100644
+index 0000000..e4ccc51
+--- /dev/null
++++ b/src/config/__tests__/voicePreviews.test.ts
+@@ -0,0 +1,27 @@
++/**
++ * Los textos que la app reproduce con la voz natural pública (`tts-preview`) deben estar en la lista permitida
++ * del servidor exactamente igual; si no, el servidor responde 403 y la persona oye «Voz natural no disponible».
++ */
++import * as fs from 'fs';
++import * as path from 'path';
++import { VOICE_PREVIEW_TEXTS } from '../voicePreviews';
++
++const root = path.resolve(__dirname, '../../..');
++const serverAllowList = fs.readFileSync(path.join(root, 'supabase/functions/tts-preview/index.ts'), 'utf8');
++
++describe('Textos de voz pública sincronizados con el servidor', () => {
++  test.each(Object.entries(VOICE_PREVIEW_TEXTS))('%s está permitido en tts-preview', (_key, text) => {
++    expect(serverAllowList.includes(text)).toBe(true);
++  });
++
++  test('la respuesta de ejemplo de Lucía en el Modo demostración usa la muestra permitida', () => {
++    const demoData = fs.readFileSync(path.join(root, 'src/mocks/demoData.ts'), 'utf8');
++    expect(demoData.includes(`reply: '${VOICE_PREVIEW_TEXTS.demoSample}'`)).toBe(true);
++  });
++
++  test('el servidor pide español de España en todas las voces', () => {
++    const tts = fs.readFileSync(path.join(root, 'supabase/functions/tts/index.ts'), 'utf8');
++    expect(tts).toMatch(/Spanish from Spain/);
++    expect(serverAllowList).toMatch(/Spanish from Spain/);
++  });
++});
+diff --git a/src/config/voicePreviews.ts b/src/config/voicePreviews.ts
+new file mode 100644
+index 0000000..5b94224
+--- /dev/null
++++ b/src/config/voicePreviews.ts
+@@ -0,0 +1,19 @@
++/**
++ * Textos FIJOS que suenan con la voz natural sin necesitar una cuenta Premium (función pública `tts-preview`):
++ * pruebas de voz en Accesibilidad, «Escuchar cómo funciona» del perfil cuidador (gratuito) y la muestra del
++ * Modo demostración.
++ *
++ * Deben coincidir letra por letra con la lista permitida del servidor (supabase/functions/tts-preview/index.ts).
++ * Una prueba automática lo comprueba: si cambias un texto aquí, cámbialo también allí y vuelve a desplegar
++ * `tts-preview`; si no, el botón respondería «Voz natural no disponible».
++ */
++export const VOICE_PREVIEW_TEXTS = {
++  readingTest: 'Hola. Soy la voz de MediClaro. Te acompañaré con una lectura clara, natural y tranquila.',
++  assistantTest:
++    'Hola. Soy el asistente de MediClaro. Estoy aquí para explicarte la información de tus medicamentos de forma sencilla y clara.',
++  caregiverIntro:
++    'El perfil de cuidador es gratuito. Para vincularte, un paciente con MediClaro Premium te comparte su código de seis números o su QR. Tú envías la solicitud y el paciente debe aceptarla. Solo después recibirás sus avisos y mensajes de emergencia. Puedes dejar de ser cuidador cuando quieras. Si además contratas Premium, conservarás tu perfil de cuidador y tendrás también las funciones Premium para tu propio uso.',
++  /** Muestra de Sulafat en el Modo demostración (y respuesta fija de ejemplo de Lucía en ese modo). */
++  demoSample:
++    'El paracetamol sirve para aliviar el dolor leve o moderado y para bajar la fiebre. En adultos se suele tomar 1 comprimido de 1 g cada 6 a 8 horas, sin pasar de 3 al día. Si tienes dudas, consulta a tu farmacéutico.',
++} as const;
+diff --git a/src/hooks/__tests__/tourNarration.test.ts b/src/hooks/__tests__/tourNarration.test.ts
+index 62116eb..07a6766 100644
+--- a/src/hooks/__tests__/tourNarration.test.ts
++++ b/src/hooks/__tests__/tourNarration.test.ts
+@@ -1,24 +1,74 @@
+ import React from 'react';
+ import {act,create} from 'react-test-renderer';
+ import {useTourNarration} from '../useTourNarration';
+-const mockPlayer={pause:jest.fn(),play:jest.fn(),replace:jest.fn(),seekTo:jest.fn().mockResolvedValue(undefined),setPlaybackRate:jest.fn(),shouldCorrectPitch:false,volume:1,addListener:jest.fn()};
+-jest.mock('expo-audio',()=>({useAudioPlayer:()=>mockPlayer,useAudioPlayerStatus:()=>({playing:false})}));
++type MockPlayer={source:string;pause:jest.Mock;play:jest.Mock;remove:jest.Mock;setPlaybackRate:jest.Mock;shouldCorrectPitch:boolean;volume:number;addListener:jest.Mock;listener?:(s:any)=>void};
++const mockPlayers:MockPlayer[]=[];
++const mockCreate=jest.fn((source:string)=>{
++ const p:MockPlayer={source,pause:jest.fn(),play:jest.fn(),remove:jest.fn(),setPlaybackRate:jest.fn(),shouldCorrectPitch:false,volume:1,addListener:jest.fn()};
++ p.addListener.mockImplementation((_e:string,fn:any)=>{p.listener=fn;return{remove:jest.fn()};});
++ mockPlayers.push(p);return p;
++});
++jest.mock('expo-audio',()=>({createAudioPlayer:(source:string)=>mockCreate(source)}));
+ jest.mock('../../utils/audio',()=>({configureAudioForSpeech:async()=>undefined}));
+ jest.mock('../../config/tourAudio',()=>({TOUR_AUDIO:{Sulafat:{identify:'google-sulafat',voice:'voice-sulafat'},Achird:{identify:'google-achird',voice:'voice-achird'}}}));
+-let output:any,tree:any,listener:any;
++let output:any,tree:any;
+ const done=jest.fn();
+ const step={id:'identify' as const,narration:'Presentation'};
++const last=()=>mockPlayers[mockPlayers.length-1];
+ function Probe(props:any){output=useTourNarration(props.step??step,props.enabled??true,0.85,props.voice??'Sulafat',done);return null;}
+ async function mount(props:any={}){
+  await act(async()=>{tree=create(React.createElement(Probe,props));});
+  await act(async()=>{jest.advanceTimersByTime(700);await Promise.resolve();});
+- await act(async()=>{jest.advanceTimersByTime(180);await Promise.resolve();});
++ await act(async()=>{await Promise.resolve();});
+ }
+-beforeEach(()=>{jest.useFakeTimers();(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;done.mockReset();Object.values(mockPlayer).forEach(v=>{if(typeof v==='function')(v as any).mockClear();});mockPlayer.addListener.mockImplementation((_event:string,fn:any)=>{listener=fn;return{remove:jest.fn()}});});
++beforeEach(()=>{jest.useFakeTimers();(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;done.mockReset();mockCreate.mockClear();mockPlayers.length=0;});
+ afterEach(async()=>{if(tree)await act(async()=>tree.unmount());tree=null;jest.useRealTimers();});
+-test('advances exactly once after actual audio completion and leaves a clean gap',async()=>{await mount();expect(done).not.toHaveBeenCalled();await act(async()=>{listener({didJustFinish:true});listener({didJustFinish:true});});expect(done).not.toHaveBeenCalled();expect(mockPlayer.pause).toHaveBeenCalled();expect(mockPlayer.seekTo).toHaveBeenCalledWith(0);await act(async()=>{jest.advanceTimersByTime(519);});expect(done).not.toHaveBeenCalled();await act(async()=>{jest.advanceTimersByTime(1);});expect(done).toHaveBeenCalledTimes(1);});
+-test('a stale audio completion cannot advance another step',async()=>{await mount();const previous=listener;await act(async()=>{tree.update(React.createElement(Probe,{step:{id:'voice',narration:'Voice'}}));jest.advanceTimersByTime(350);});await act(async()=>previous({didJustFinish:true}));expect(done).not.toHaveBeenCalled();});
+-test('pause prevents queued completion from advancing until resume',async()=>{await mount();await act(async()=>output.pause());await act(async()=>listener({didJustFinish:true}));expect(done).not.toHaveBeenCalled();await act(async()=>output.resume());expect(done).toHaveBeenCalledTimes(1);});
+-test('leaving presentation prevents late completion',async()=>{await mount();const previous=listener;await act(async()=>tree.update(React.createElement(Probe,{enabled:false})));await act(async()=>previous({didJustFinish:true}));expect(done).not.toHaveBeenCalled();});
+-test('Google Achird selection loads its own audio and preserves pitch',async()=>{await mount({voice:'Achird'});expect(mockPlayer.replace).toHaveBeenCalledWith('google-achird');expect(mockPlayer.shouldCorrectPitch).toBe(true);});
+-test('playback failure never silently advances',async()=>{await mount();await act(async()=>listener({error:'decode failed'}));expect(done).not.toHaveBeenCalled();expect(output.error).toBe(true);});
++test('advances exactly once after actual audio completion and leaves a clean gap',async()=>{
++ await mount();const p=last();expect(p.play).toHaveBeenCalled();expect(done).not.toHaveBeenCalled();
++ await act(async()=>{p.listener!({didJustFinish:true});p.listener!({didJustFinish:true});});
++ expect(done).not.toHaveBeenCalled();expect(p.pause).toHaveBeenCalled();expect(p.remove).toHaveBeenCalled();
++ await act(async()=>{jest.advanceTimersByTime(519);});expect(done).not.toHaveBeenCalled();
++ await act(async()=>{jest.advanceTimersByTime(1);});expect(done).toHaveBeenCalledTimes(1);
++});
++test('each step gets a fresh player and the previous one is silenced and released first',async()=>{
++ await mount();const first=last();
++ await act(async()=>{tree.update(React.createElement(Probe,{step:{id:'voice',narration:'Voice'}}));});
++ expect(first.volume).toBe(0);expect(first.pause).toHaveBeenCalled();expect(first.remove).toHaveBeenCalled();
++ await act(async()=>{jest.advanceTimersByTime(700);await Promise.resolve();});
++ await act(async()=>{await Promise.resolve();});
++ const second=last();expect(second).not.toBe(first);expect(second.source).toBe('voice-sulafat');expect(second.play).toHaveBeenCalled();
++});
++test('a stale audio completion cannot advance another step',async()=>{
++ await mount();const previous=last().listener!;
++ await act(async()=>{tree.update(React.createElement(Probe,{step:{id:'voice',narration:'Voice'}}));jest.advanceTimersByTime(350);});
++ await act(async()=>previous({didJustFinish:true}));await act(async()=>{jest.advanceTimersByTime(1000);});expect(done).not.toHaveBeenCalled();
++});
++test('pause prevents queued completion from advancing until resume',async()=>{
++ await mount();const p=last();await act(async()=>output.pause());await act(async()=>p.listener!({didJustFinish:true}));
++ await act(async()=>{jest.advanceTimersByTime(1000);});expect(done).not.toHaveBeenCalled();
++ await act(async()=>output.resume());expect(done).toHaveBeenCalledTimes(1);
++});
++test('pausing before the narration starts keeps it silent until resume',async()=>{
++ await act(async()=>{tree=create(React.createElement(Probe,{}));});
++ await act(async()=>output.pause());
++ await act(async()=>{jest.advanceTimersByTime(800);await Promise.resolve();});
++ expect(mockCreate).not.toHaveBeenCalled();
++ await act(async()=>output.resume());await act(async()=>{await Promise.resolve();});
++ expect(last().play).toHaveBeenCalled();
++});
++test('leaving presentation prevents late completion',async()=>{
++ await mount();const p=last();const previous=p.listener!;
++ await act(async()=>tree.update(React.createElement(Probe,{enabled:false})));expect(p.remove).toHaveBeenCalled();
++ await act(async()=>previous({didJustFinish:true}));await act(async()=>{jest.advanceTimersByTime(1000);});expect(done).not.toHaveBeenCalled();
++});
++test('Achird selection loads its own audio, preserves pitch and plays at natural speed',async()=>{
++ await mount({voice:'Achird'});const p=last();expect(p.source).toBe('google-achird');expect(p.shouldCorrectPitch).toBe(true);
++ expect(p.setPlaybackRate).toHaveBeenCalledWith(1);expect(p.volume).toBe(1);
++});
++test('Aoede uses the recorded Sulafat narration',async()=>{
++ await mount({voice:'Aoede'});expect(last().source).toBe('google-sulafat');
++});
++test('playback failure never silently advances',async()=>{
++ await mount();const p=last();await act(async()=>p.listener!({error:'decode failed'}));
++ await act(async()=>{jest.advanceTimersByTime(1000);});expect(done).not.toHaveBeenCalled();expect(output.error).toBe(true);expect(p.remove).toHaveBeenCalled();
++});
+diff --git a/src/hooks/useSpeech.ts b/src/hooks/useSpeech.ts
+index ce5abef..feef87f 100644
+--- a/src/hooks/useSpeech.ts
++++ b/src/hooks/useSpeech.ts
+@@ -148,10 +148,26 @@ export function useSimpleSpeech() {
+ // del dispositivo. Emergencias críticas conservan su canal de voz independiente.
+ 
+ import { createAudioPlayer, type AudioPlayer, type AudioSource, type AudioStatus } from 'expo-audio';
+-import { SpeechService, type GeminiVoice } from '../services';
++import { DemoMode, SpeechService, type GeminiVoice } from '../services';
+ import { configureAudioForSpeech } from '../utils/audio';
++import { naturalPlaybackRate } from '../utils/playbackRate';
+ import { showAlert } from '../utils/dialogs';
+ 
++/** Si el reproductor no arranca en este tiempo, se avisa (nunca se queda «Preparando…» para siempre). */
++const PLAYER_STARTUP_MS = 15_000;
++
++function inDemoMode(): boolean {
++  try {
++    return DemoMode?.isActive?.() === true;
++  } catch {
++    return false;
++  }
++}
++
++const NATURAL_VOICE_UNAVAILABLE = 'No se ha podido preparar la voz. Comprueba tu conexión a internet y vuelve a intentarlo.';
++const DEMO_VOICE_UNAVAILABLE =
++  'En el modo demostración solo suenan los ejemplos de voz. Entra con tu cuenta de MediClaro para escuchar todas las respuestas con voz natural.';
++
+ type GeminiPlayerRef = {
+   player: AudioPlayer;
+   subscription: { remove: () => void };
+@@ -159,12 +175,7 @@ type GeminiPlayerRef = {
+   startupTimer?: ReturnType<typeof setTimeout>;
+ };
+ 
+-function playbackRate(rate: number): number {
+-  // 0.85 era la velocidad "Normal" de MediClaro con la voz del sistema.
+-  if (rate <= 0.77) return 0.9;
+-  if (rate >= 0.93) return 1.12;
+-  return 1;
+-}
++const playbackRate = naturalPlaybackRate;
+ 
+ function releaseGeminiPlayer(ref: { current: GeminiPlayerRef | null }) {
+   const current = ref.current;
+@@ -197,12 +208,22 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice:
+     setStatus(next);
+   }, []);
+ 
++  const durationRef = useRef(0);
++
++  const fail = useCallback((my: number, message: string) => {
++    if (my !== token.current) return;
++    releaseGeminiPlayer(playerRef);
++    setSpeechStatus('error');
++    void showAlert(`${voiceRef.current} no está disponible`, message);
++  }, [setSpeechStatus]);
++
+   const prepareAndPlay = useCallback(async () => {
+     const cleanParts = partsRef.current.map((p) => p.trim()).filter(Boolean);
+     if (!cleanParts.length) return;
+     const my = ++token.current;
+     releaseGeminiPlayer(playerRef);
+     Speech.stop();
++    durationRef.current = 0;
+     setCurrentTime(0);
+     setDuration(0);
+     setSpeechStatus('loading');
+@@ -217,31 +238,39 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice:
+       const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
+         if (my !== token.current) return;
+         if (s.error) {
+-          releaseGeminiPlayer(playerRef);
+-          setSpeechStatus('error');
+-          void showAlert('Sulafat no está disponible', 'No se ha podido reproducir la explicación completa. Comprueba la conexión y vuelve a intentarlo.');
++          fail(my, 'No se ha podido reproducir la explicación completa. Comprueba la conexión y vuelve a intentarlo.');
+           return;
+         }
+         if (Number.isFinite(s.currentTime)) setCurrentTime(Math.max(0, s.currentTime));
+-        if (Number.isFinite(s.duration) && s.duration > 0) setDuration(s.duration);
+-        if (s.playing && statusRef.current !== 'paused') setSpeechStatus('speaking');
++        if (Number.isFinite(s.duration) && s.duration > 0) {
++          durationRef.current = s.duration;
++          setDuration(s.duration);
++        }
++        if (s.playing) {
++          const startup = playerRef.current?.startupTimer;
++          if (startup) {
++            clearTimeout(startup);
++            if (playerRef.current) playerRef.current.startupTimer = undefined;
++          }
++          if (statusRef.current !== 'paused') setSpeechStatus('speaking');
++        }
+         if (s.didJustFinish) {
+-          setCurrentTime(s.duration || duration);
++          setCurrentTime(s.duration || durationRef.current);
+           setSpeechStatus('finished');
+         }
+       });
+-      playerRef.current = { player, subscription, cleanupFile: audio.cleanup };
++      playerRef.current = {
++        player,
++        subscription,
++        cleanupFile: audio.cleanup,
++        // Si el audio no llega a sonar, se avisa en lugar de quedarse «Preparando…» para siempre.
++        startupTimer: setTimeout(() => fail(my, NATURAL_VOICE_UNAVAILABLE), PLAYER_STARTUP_MS),
++      };
+       player.play();
+     } catch {
+-      if (my !== token.current) return;
+-      releaseGeminiPlayer(playerRef);
+-      setSpeechStatus('error');
+-      void showAlert(
+-        'Sulafat no está disponible',
+-        'No voy a sustituirla por la voz robótica del teléfono. Comprueba la conexión y vuelve a intentarlo.',
+-      );
++      fail(my, NATURAL_VOICE_UNAVAILABLE);
+     }
+-  }, [setSpeechStatus]);
++  }, [fail, setSpeechStatus]);
+ 
+   const play = useCallback(() => {
+     const current = playerRef.current?.player;
+@@ -262,9 +291,13 @@ export function useGeminiContinuousSpeech(parts: string[], rate: number, voice:
+   }, [prepareAndPlay, setSpeechStatus]);
+ 
+   const pause = useCallback(() => {
+-    const current = playerRef.current?.player;
++    const current = playerRef.current;
+     if (!current) return;
+-    current.pause();
++    if (current.startupTimer) {
++      clearTimeout(current.startupTimer);
++      current.startupTimer = undefined;
++    }
++    current.player.pause();
+     setSpeechStatus('paused');
+   }, [setSpeechStatus]);
+ 
+@@ -365,7 +398,7 @@ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number,
+       setSpeechStatus('error');
+       void showAlert(
+         'Sulafat no está disponible',
+-        'No voy a sustituirla por la voz robótica del teléfono. Comprueba la conexión y pulsa reproducir para intentarlo de nuevo.',
++        'No se ha podido preparar la voz. Comprueba tu conexión a internet y pulsa reproducir para intentarlo de nuevo.',
+       );
+     };
+     if (deviceOnly) { fallback(); return; }
+@@ -479,7 +512,7 @@ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number,
+   return { status, index, play, pause, stop, goTo, restartWithNewRate };
+ }
+ 
+-/** Google voice first; the installed Spanish voice continues when synthesis or playback fails. */
++/** Voz natural (Sulafat · Achird · Aoede) para Lucía, pruebas de voz y explicaciones. Sin respaldo robótico: si falla, se avisa. */
+ export function useGeminiSimpleSpeech() {
+   const [speakingId, setSpeakingId] = useState<string | null>(null);
+   const [loadingId, setLoadingId] = useState<string | null>(null);
+@@ -529,12 +562,10 @@ export function useGeminiSimpleSpeech() {
+       pendingCleanup?.();
+       pendingCleanup = undefined;
+       finish();
+-      void showAlert(
+-        'Voz natural no disponible',
+-        'No voy a sustituirla por la voz robótica del teléfono. Comprueba la conexión y vuelve a intentarlo.',
+-      );
++      void showAlert('Voz natural no disponible', inDemoMode() ? DEMO_VOICE_UNAVAILABLE : NATURAL_VOICE_UNAVAILABLE);
+     };
+-    preparationRef.current = setTimeout(fallback, purpose === 'assistant' && text.length > 2800 ? 90_000 : 35_000);
++    // Las respuestas largas se generan por frases en el servidor (un único audio): necesitan más tiempo.
++    preparationRef.current = setTimeout(fallback, text.length > 2800 ? 120_000 : 35_000);
+     void (async () => {
+       try {
+         await configureAudioForSpeech();
+@@ -542,9 +573,7 @@ export function useGeminiSimpleSpeech() {
+         let source: AudioSource = localPreviewSource ?? null;
+         let cleanup = () => undefined as void;
+         if (!localPreviewSource) {
+-          const audio = purpose === 'assistant' && text.length > 2800
+-            ? await SpeechService.synthesizeContinuous([text], voice, 'assistant')
+-            : await SpeechService.synthesize(text, voice, purpose);
++          const audio = await SpeechService.synthesize(text, voice, purpose);
+           if (!current() || fallbackStarted) { audio.cleanup(); return; }
+           source = audio.uri;
+           cleanup = audio.cleanup;
+diff --git a/src/hooks/useTourNarration.ts b/src/hooks/useTourNarration.ts
+index 65d305a..6cbbc69 100644
+--- a/src/hooks/useTourNarration.ts
++++ b/src/hooks/useTourNarration.ts
+@@ -1,73 +1,138 @@
+ import { useCallback, useEffect, useRef, useState } from 'react';
+-import { useAudioPlayer, useAudioPlayerStatus, type AudioStatus } from 'expo-audio';
++import { createAudioPlayer, type AudioPlayer, type AudioStatus } from 'expo-audio';
+ import { TOUR_AUDIO, type TourStepId } from '../config/tourAudio';
+ import type { GeminiVoice } from '../services';
+ import { configureAudioForSpeech } from '../utils/audio';
+-/** Bundled Google Gemini audio. Advancement follows actual playback completion. */
++import { naturalPlaybackRate } from '../utils/playbackRate';
++
++/**
++ * Narración de «Cómo funciona» con las voces naturales grabadas (Sulafat o Achird; Aoede usa Sulafat porque
++ * la explicación inicial solo está grabada con esas dos).
++ *
++ * Sin mezclas entre pantallas: cada paso usa un reproductor NUEVO y el del paso anterior se silencia, se para y
++ * se LIBERA antes de empezar el siguiente. Con un único reproductor reutilizado, iOS podía conservar en su búfer
++ * unas décimas del audio anterior y colarlas al empezar la pantalla nueva («senci-»… «-llas»).
++ * El avance automático sigue al final REAL del audio.
++ */
+ export function useTourNarration(
+- step: {id:TourStepId;narration:string} | null,enabled:boolean,rate:number,
+- voice:GeminiVoice='Sulafat',onComplete?:()=>void,
++  step: { id: TourStepId; narration: string } | null,
++  enabled: boolean,
++  rate: number,
++  voice: GeminiVoice = 'Sulafat',
++  onComplete?: () => void,
+ ) {
+- const player=useAudioPlayer();
+- const status=useAudioPlayerStatus(player);
+- const token=useRef(0);
+- const pausedRef=useRef(false),pendingFinish=useRef(false);
+- const listener=useRef<{remove:()=>void}|null>(null);
+- const completeRef=useRef(onComplete);completeRef.current=onComplete;
+- const [paused,setPaused]=useState(false);
+- const [error,setError]=useState(false);
+- const stop=useCallback(()=>{
+-  token.current+=1;listener.current?.remove();listener.current=null;
+-  pendingFinish.current=false;pausedRef.current=false;
+-  // Silencia ANTES de pausar/rebobinar. En iOS el búfer de salida puede conservar
+-  // unas décimas de audio aunque pause() ya haya devuelto; bajar el volumen evita
+-  // que una palabra del paso anterior se cuele en la siguiente pantalla.
+-  try{player.volume=0;}catch{}
+-  try{player.pause();}catch{}
+-  try{void player.seekTo(0).catch(()=>undefined);}catch{}
+- },[player]);
+- const start=useCallback(()=>{
+-  if(!step)return;
+-  stop();setPaused(false);setError(false);const my=token.current;
+-  void(async()=>{
+-   try{
+-    await configureAudioForSpeech();if(my!==token.current)return;
+-    const tourVoice = voice === 'Achird' ? 'Achird' : 'Sulafat';
+-    player.replace(TOUR_AUDIO[tourVoice][step.id]);
+-    await player.seekTo(0);if(my!==token.current)return;
+-    // Da tiempo al motor de audio a descartar el búfer del paso anterior antes
+-    // de abrir el volumen del nuevo. Evita solapamientos entre diapositivas.
+-    await new Promise(resolve=>setTimeout(resolve,180));if(my!==token.current)return;
+-    try{player.volume=1;}catch{}
+-    player.setPlaybackRate(Math.min(1.25,Math.max(0.75,rate)));
+-    player.shouldCorrectPitch=true;
+-    let finished=false;
+-    listener.current=player.addListener('playbackStatusUpdate',(s:AudioStatus)=>{
+-     if(my!==token.current || finished)return;
+-     if(s.error){finished=true;setError(true);stop();return;}
+-     if(s.didJustFinish){finished=true;listener.current?.remove();listener.current=null;
+-      try{player.volume=0;}catch{}
+-      try{player.pause();}catch{}
+-      try{void player.seekTo(0).catch(()=>undefined);}catch{}
+-      if(pausedRef.current)pendingFinish.current=true;
+-      // Pequeña cola silenciosa para que iOS termine de vaciar el búfer antes
+-      // de cambiar visualmente al siguiente paso.
+-      else setTimeout(()=>{if(my===token.current)completeRef.current?.();},520);}
+-    });
+-    player.play();
+-   }catch{if(my===token.current){setError(true);stop();}}
+-  })();
+- },[player,rate,step,stop,voice]);
+- useEffect(()=>{
+-  if(!enabled || !step){stop();return;}
+-  // Dejamos una pequeña separación entre pantalla y pantalla para que la voz
+-  // anterior termine completamente antes de iniciar la siguiente narración.
+-  const timer=setTimeout(start,700);
+-  return()=>{clearTimeout(timer);stop();};
+- },[enabled,start,step,stop]);
+- const pause=useCallback(()=>{pausedRef.current=true;player.pause();setPaused(true);},[player]);
+- const resume=useCallback(()=>{pausedRef.current=false;setPaused(false);
+-  if(pendingFinish.current){pendingFinish.current=false;completeRef.current?.();}else player.play();
+- },[player]);
+- return {playing:status.playing,paused,error,replay:start,pause,resume,stop,prerecorded:true};
++  const playerRef = useRef<AudioPlayer | null>(null);
++  const listener = useRef<{ remove: () => void } | null>(null);
++  const token = useRef(0);
++  const pausedRef = useRef(false);
++  const pendingFinish = useRef(false);
++  const completeRef = useRef(onComplete);
++  completeRef.current = onComplete;
++  const [paused, setPaused] = useState(false);
++  const [error, setError] = useState(false);
++  const [playing, setPlaying] = useState(false);
++
++  /** Silencia, para y libera el reproductor actual (no queda audio pendiente en ningún búfer). */
++  const release = useCallback(() => {
++    try { listener.current?.remove(); } catch { /* noop */ }
++    listener.current = null;
++    const player = playerRef.current;
++    playerRef.current = null;
++    if (!player) return;
++    try { player.volume = 0; } catch { /* noop */ }
++    try { player.pause(); } catch { /* noop */ }
++    try { player.remove(); } catch { /* noop */ }
++  }, []);
++
++  const stop = useCallback(() => {
++    token.current += 1;
++    pendingFinish.current = false;
++    pausedRef.current = false;
++    release();
++    setPlaying(false);
++  }, [release]);
++
++  const start = useCallback(() => {
++    if (!step) return;
++    stop();
++    setPaused(false);
++    setError(false);
++    const my = token.current;
++    void (async () => {
++      try {
++        await configureAudioForSpeech();
++        if (my !== token.current) return;
++        const tourVoice = voice === 'Achird' ? 'Achird' : 'Sulafat';
++        const player = createAudioPlayer(TOUR_AUDIO[tourVoice][step.id], { updateInterval: 250 });
++        playerRef.current = player;
++        player.volume = 1;
++        player.setPlaybackRate(naturalPlaybackRate(rate));
++        player.shouldCorrectPitch = true;
++        let finished = false;
++        listener.current = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
++          if (my !== token.current || finished) return;
++          if (s.error) {
++            finished = true;
++            setError(true);
++            stop();
++            return;
++          }
++          if (s.didJustFinish) {
++            finished = true;
++            setPlaying(false);
++            release();
++            if (pausedRef.current) pendingFinish.current = true;
++            // Pequeña pausa antes de cambiar de pantalla, como haría una persona.
++            else setTimeout(() => { if (my === token.current) completeRef.current?.(); }, 520);
++            return;
++          }
++          if (typeof s.playing === 'boolean') setPlaying(s.playing);
++        });
++        player.play();
++      } catch {
++        if (my === token.current) {
++          setError(true);
++          stop();
++        }
++      }
++    })();
++  }, [rate, release, step, stop, voice]);
++
++  useEffect(() => {
++    if (!enabled || !step) {
++      stop();
++      return;
++    }
++    // Una pequeña separación entre pantalla y pantalla antes de empezar a hablar
++    // (si la persona ya ha pulsado «Pausa», se espera a que pulse «Continuar»).
++    const timer = setTimeout(() => {
++      if (!pausedRef.current) start();
++    }, 700);
++    return () => {
++      clearTimeout(timer);
++      stop();
++    };
++  }, [enabled, start, step, stop]);
++
++  const pause = useCallback(() => {
++    pausedRef.current = true;
++    try { playerRef.current?.pause(); } catch { /* noop */ }
++    setPaused(true);
++    setPlaying(false);
++  }, []);
++
++  const resume = useCallback(() => {
++    pausedRef.current = false;
++    setPaused(false);
++    if (pendingFinish.current) {
++      pendingFinish.current = false;
++      completeRef.current?.();
++      return;
++    }
++    const player = playerRef.current;
++    if (player) player.play();
++    else start();
++  }, [start]);
++
++  return { playing, paused, error, replay: start, pause, resume, stop, prerecorded: true };
+ }
+diff --git a/src/screens/assistant/AssistantScreen.tsx b/src/screens/assistant/AssistantScreen.tsx
+index 7176d53..1c33f7c 100644
+--- a/src/screens/assistant/AssistantScreen.tsx
++++ b/src/screens/assistant/AssistantScreen.tsx
+@@ -49,7 +49,7 @@ import {
+ } from '../../components';
+ import { useAppTheme, useAssistantConversation, useAsync, useEntitlement, usePreferences, useGeminiSimpleSpeech } from '../../hooks';
+ import { AiConsentService, AssistantMemoryService, PREMIUM_REQUIRED_CODE, VoiceConversationService } from '../../services';
+-import { configureAudioForSpeech } from '../../utils/audio';
++import { configureAudioForRecording, configureAudioForSpeech } from '../../utils/audio';
+ import { PUBLIC_HEALTH_RESOURCES } from '../../config/app';
+ import { MAX_FONT_SIZE_MULTIPLIER } from '../../theme';
+ import { callPhone, openExternalUrl } from '../../utils/device';
+@@ -68,6 +68,8 @@ import {
+ export type AssistantMode = 'tab' | 'stack';
+ 
+ const MAX_LENGTH = 1000;
++/** Un mensaje de voz se envía solo al cumplir un minuto (por si se queda el dedo apoyado). */
++const MAX_VOICE_MESSAGE_MS = 60_000;
+ const COUNTER_FROM = 800;
+ const WELCOME =
+   'Hola, soy Lucía, tu asistente de MediClaro. Puedo ayudarte con tus medicamentos y acompañarte en tus dudas del día a día. ¿Cómo estás hoy?';
+@@ -140,6 +142,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+   const [processingVoice, setProcessingVoice] = useState(false);
+   const micHeldRef = useRef(false);
+   const recordingRef = useRef(false);
++  const recordingLimitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
++  const finishVoiceRef = useRef<() => Promise<void>>(async () => undefined);
+   const autoSpeakAfterRef = useRef<number | null>(null);
+   const emergencyOpenedRef = useRef<string | null>(null);
+   const caregiverOpenedRef = useRef(new Set<string>());
+@@ -173,6 +177,10 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+   useFocusEffect(useCallback(() => () => {
+     stop();
+     micHeldRef.current = false;
++    if (recordingLimitRef.current) {
++      clearTimeout(recordingLimitRef.current);
++      recordingLimitRef.current = null;
++    }
+     if (recordingRef.current) {
+       recordingRef.current = false;
+       setRecordingVoice(false);
+@@ -272,11 +280,17 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+     }
+     if (!micHeldRef.current) return;
+     try {
++      // En iPhone la grabación necesita activar el micrófono en la sesión de audio; si no, expo-audio la rechaza.
++      await configureAudioForRecording();
++      if (!micHeldRef.current) { await configureAudioForSpeech(); return; }
+       await recorder.prepareToRecordAsync();
+-      if (!micHeldRef.current) return;
++      if (!micHeldRef.current) { await configureAudioForSpeech(); return; }
+       recorder.record();
+       recordingRef.current = true;
+       setRecordingVoice(true);
++      // Un mensaje de voz dura como mucho un minuto: después se envía solo.
++      if (recordingLimitRef.current) clearTimeout(recordingLimitRef.current);
++      recordingLimitRef.current = setTimeout(() => { void finishVoiceRef.current(); }, MAX_VOICE_MESSAGE_MS);
+     } catch {
+       recordingRef.current = false;
+       setRecordingVoice(false);
+@@ -288,6 +302,10 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+ 
+   const finishVoiceMessage = useCallback(async () => {
+     micHeldRef.current = false;
++    if (recordingLimitRef.current) {
++      clearTimeout(recordingLimitRef.current);
++      recordingLimitRef.current = null;
++    }
+     if (!recordingRef.current) return;
+     recordingRef.current = false;
+     setRecordingVoice(false);
+@@ -310,7 +328,8 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+     } finally {
+       setProcessingVoice(false);
+     }
+-  }, [recorder, messages, submit]);
++  }, [recorder, submit]);
++  finishVoiceRef.current = finishVoiceMessage;
+ 
+   const toggleSpeak = useCallback(
+     (message: AssistantMessage) => {
+diff --git a/src/screens/caregiver/CaregiverScreen.tsx b/src/screens/caregiver/CaregiverScreen.tsx
+index 966ee1a..b00563c 100644
+--- a/src/screens/caregiver/CaregiverScreen.tsx
++++ b/src/screens/caregiver/CaregiverScreen.tsx
+@@ -15,8 +15,9 @@ import { callNumberOrExplain } from '../emergency/parts';
+ import { CaregiverAudioCall } from '../../components/CaregiverAudioCall';
+ import { confirmAsync, showAlert } from '../../utils/dialogs';
+ import { GuideIllustration } from '../../components/Guide';
++import { VOICE_PREVIEW_TEXTS } from '../../config/voicePreviews';
+ 
+-const CAREGIVER_INTRO='El perfil de cuidador es gratuito. Para vincularte, un paciente con MediClaro Premium te comparte su código de seis números o su QR. Tú envías la solicitud y el paciente debe aceptarla. Solo después recibirás sus avisos y mensajes de emergencia. Puedes dejar de ser cuidador cuando quieras. Si además contratas Premium, conservarás tu perfil de cuidador y tendrás también las funciones Premium para tu propio uso.';
++const CAREGIVER_INTRO=VOICE_PREVIEW_TEXTS.caregiverIntro;
+ export default function CaregiverScreen(){
+  const {session}=useSession();const theme=useAppTheme();
+  const {width}=useWindowDimensions();
+diff --git a/src/screens/identify/VoiceScreen.tsx b/src/screens/identify/VoiceScreen.tsx
+index a78baee..c59922b 100644
+--- a/src/screens/identify/VoiceScreen.tsx
++++ b/src/screens/identify/VoiceScreen.tsx
+@@ -1,8 +1,10 @@
+ /**
+  * /voice?id=<id>&name=<nombre> — Lectura en voz alta (referencia 08_voice).
+  * Lee los MISMOS textos que la ficha: Qué es · Para qué se utiliza · Cómo tomarlo · Advertencias.
+- * Sin resumen sencillo, lee el prospecto oficial por apartados.
+- * La lectura se detiene al salir (lo hace useSectionSpeech).
++ * Sin resumen sencillo, lee el prospecto oficial por apartados (los primeros, hasta unos minutos de audio:
++ * el texto completo sigue en la ficha).
++ * Toda la explicación es UN único audio continuo con Sulafat (sin cortes entre apartados ni palabras partidas).
++ * La lectura se detiene al salir (lo hace useGeminiContinuousSpeech).
+  */
+ import { useCallback, useEffect, useMemo, useRef } from 'react';
+ import { Pressable, StyleSheet, View } from 'react-native';
+@@ -21,7 +23,8 @@ import {
+   type IconName,
+ } from '../../components';
+ import { useAppTheme, useAsync, usePreferences, useGeminiContinuousSpeech } from '../../hooks';
+-import { MedicationService } from '../../services';
++import { DemoMode, MedicationService } from '../../services';
++import { endWithPause, limitSpeechParts } from '../../utils/speechText';
+ import {
+   SPEED_RATES,
+   buildReadingSections,
+@@ -32,6 +35,9 @@ import {
+ import { FavoriteButton, ScreenError } from './parts';
+ import { useSavedMedication } from './useSavedMedication';
+ 
++/** Unos 5-6 minutos de audio: suficiente para la explicación sencilla y para los apartados principales del prospecto. */
++const MAX_READING_CHARS = 4500;
++
+ const SPEED_OPTIONS: { value: SpeedOption; label: string }[] = [
+   { value: 'slow', label: 'Más lento' },
+   { value: 'normal', label: 'Velocidad normal' },
+@@ -51,10 +57,15 @@ export default function VoiceScreen() {
+   const saved = useSavedMedication(d);
+ 
+   const sections = useMemo(() => (d ? buildReadingSections(d) : []), [d]);
+-  const audioParts = useMemo(
+-    () => sections.map((s) => `${s.title}. ${s.text}`.replace(/\s+/g, ' ').trim()).filter(Boolean),
++  const reading = useMemo(
++    () => limitSpeechParts(
++      sections.map((s) => `${endWithPause(s.title)} ${s.text}`.replace(/\s+/g, ' ').trim()).filter(Boolean),
++      MAX_READING_CHARS,
++    ),
+     [sections],
+   );
++  const audioParts = reading.parts;
++  const demo = DemoMode.isActive();
+   // Toda la explicación se prepara y reproduce como un único audio continuo con Sulafat.
+   const speech = useGeminiContinuousSpeech(audioParts, prefs.speechRate, 'Sulafat');
+ 
+@@ -107,9 +118,10 @@ export default function VoiceScreen() {
+         : 'Escuchar la lectura';
+   const playIcon: IconName = playing ? 'pause' : finished ? 'refresh' : 'play';
+ 
++  const errorText = 'No se ha podido preparar la voz Sulafat. Comprueba tu conexión a internet y pulsa reproducir para intentarlo de nuevo.';
+   const statusText = loading ? 'Preparando la explicación completa con Sulafat…' :
+     speech.status === 'error'
+-      ? 'No se ha podido reproducir Sulafat. Comprueba tu conexión y pulsa reproducir para reintentar.'
++      ? 'Voz no disponible'
+       : finished
+         ? 'Explicación terminada'
+         : speech.status === 'paused'
+@@ -202,7 +214,7 @@ export default function VoiceScreen() {
+                 onPress={() => (playing ? speech.pause() : speech.play())}
+                 disabled={loading}
+                 accessibilityRole="button"
+-                accessibilityLabel={playing ? 'Pausar explicación' : 'Continuar explicación'}
++                accessibilityLabel={playing ? 'Pausar explicación' : speech.status === 'error' ? 'Reintentar la lectura' : 'Continuar explicación'}
+                 style={({ pressed }) => [
+                   styles.sideControl,
+                   {
+@@ -212,8 +224,8 @@ export default function VoiceScreen() {
+                   },
+                 ]}
+               >
+-                <Icon name={playing ? 'pause-circle-outline' : 'play-circle-outline'} size={26} color={c.primary} />
+-                <AppText variant="small" color="primary">{playing ? 'Pausar' : 'Continuar'}</AppText>
++                <Icon name={playing ? 'pause-circle-outline' : speech.status === 'error' ? 'refresh-circle-outline' : 'play-circle-outline'} size={26} color={c.primary} />
++                <AppText variant="small" color="primary">{playing ? 'Pausar' : speech.status === 'error' ? 'Reintentar' : 'Continuar'}</AppText>
+               </Pressable>
+             </View>
+ 
+@@ -236,7 +248,20 @@ export default function VoiceScreen() {
+           </Card>
+ 
+           {speech.status === 'error' ? (
+-            <InfoBanner tone="warning" icon="volume-mute" message={statusText} style={{ marginTop: theme.spacing.sm }} />
++            <InfoBanner tone="warning" icon="volume-mute" message={errorText} style={{ marginTop: theme.spacing.sm }} />
++          ) : null}
++          {demo ? (
++            <InfoBanner
++              tone="info"
++              message="Modo demostración: escucharás una muestra breve de la voz Sulafat. Con tu cuenta de MediClaro se lee la explicación completa."
++              style={{ marginTop: theme.spacing.sm }}
++            />
++          ) : reading.truncated ? (
++            <InfoBanner
++              tone="info"
++              message="Se leen los primeros apartados del prospecto oficial. El texto completo está en la ficha del medicamento."
++              style={{ marginTop: theme.spacing.sm }}
++            />
+           ) : null}
+ 
+           <View style={{ marginTop: theme.spacing.lg }}>
+@@ -255,19 +280,27 @@ export default function VoiceScreen() {
+             <AppText variant="caption" color="textSecondary">
+               Se reproduce seguido, como un único audio, sin cortes entre apartados.
+             </AppText>
+-            {sections.map((s, i) => (
+-              <View key={s.id} style={styles.contentRow}>
+-                <View style={[styles.number, { backgroundColor: c.primary }]}>
+-                  <AppText variant="captionStrong" color="onPrimary" allowFontScaling={false}>
+-                    {String(i + 1)}
++            {sections.map((s, i) => {
++              const included = i < audioParts.length;
++              return (
++                <View key={s.id} style={styles.contentRow}>
++                  <View style={[styles.number, { backgroundColor: included ? c.primary : c.surfaceMuted }]}>
++                    <AppText variant="captionStrong" color={included ? 'onPrimary' : 'textSecondary'} allowFontScaling={false}>
++                      {String(i + 1)}
++                    </AppText>
++                  </View>
++                  <AppText variant="body" color={included ? 'text' : 'textSecondary'} style={styles.flex}>
++                    {s.title}
+                   </AppText>
++                  <Icon
++                    name={included ? 'checkmark-circle-outline' : 'document-text-outline'}
++                    size={22}
++                    color={included ? c.successStrong : c.textSecondary}
++                    accessibilityLabel={included ? 'Incluido en la lectura' : 'Solo en la ficha'}
++                  />
+                 </View>
+-                <AppText variant="body" color="text" style={styles.flex}>
+-                  {s.title}
+-                </AppText>
+-                <Icon name="checkmark-circle-outline" size={22} color={c.successStrong} />
+-              </View>
+-            ))}
++              );
++            })}
+           </Card>
+         </>
+       )}
+diff --git a/src/screens/premium/PaymentScreen.tsx b/src/screens/premium/PaymentScreen.tsx
+index 76d39ec..4c3d556 100644
+--- a/src/screens/premium/PaymentScreen.tsx
++++ b/src/screens/premium/PaymentScreen.tsx
+@@ -29,6 +29,7 @@ import {
+   StatusHero,
+ } from './parts';
+ import { usePurchase } from './usePurchase';
++import { IS_EXPO_GO } from '../../utils/runtime';
+ 
+ const STORE_METHOD: Record<StorePlatform, { title: string; subtitle: string; icon: 'logo-apple' | 'logo-google-playstore'; color: string; bg: string }> = {
+   apple: { title: 'Pagar con Apple', subtitle: 'Rápido y seguro. Con tu Apple ID.', icon: 'logo-apple', color: '#000000', bg: '#F1F5F9' },
+@@ -109,6 +110,14 @@ function PaymentMethodsScreen() {
+             action={purchase.notice.action}
+           />
+         ) : null}
++        {!storeMethod && !cardAvailable ? (
++          <InfoBanner
++            tone="info"
++            message={IS_EXPO_GO
++              ? 'En la vista previa de Expo Go no se puede pagar: la compra se hace con Apple o Google Play dentro de la app MediClaro instalada.'
++              : 'Ahora mismo no hay ninguna forma de pago disponible en este teléfono. Inténtalo de nuevo más tarde.'}
++          />
++        ) : null}
+         <View style={{ gap: theme.spacing.sm }} accessibilityRole="list">
+           {storeMethod ? (
+             <FadeIn delay={stagger(0, 90, 80)}>
+diff --git a/src/screens/profile/AccessibilityScreen.tsx b/src/screens/profile/AccessibilityScreen.tsx
+index a342a93..b1fe7d8 100644
+--- a/src/screens/profile/AccessibilityScreen.tsx
++++ b/src/screens/profile/AccessibilityScreen.tsx
+@@ -20,6 +20,8 @@ import { useAppTheme, usePreferences, useGeminiSimpleSpeech } from '../../hooks'
+ import { FONT_SIZE_LABELS, fontScale, typeScale } from '../../theme';
+ import type { FontSizePreference } from '../../types';
+ import type { GeminiVoice } from '../../services';
++import { tourVoiceOf, type TourVoice } from '../../services/PreferencesService';
++import { VOICE_PREVIEW_TEXTS } from '../../config/voicePreviews';
+ import { RadioMark } from '../premium/parts';
+ 
+ const SIZE_OPTIONS: FontSizePreference[] = ['normal', 'grande', 'muy_grande'];
+@@ -33,12 +35,17 @@ const RATE_OPTIONS: { value: RateValue; label: string }[] = [
+ 
+ const READING_TEST_ID = 'voice-test-reading';
+ const ASSISTANT_TEST_ID = 'voice-test-assistant';
+-const VOICE_TEST_TEXT = 'Hola. Soy la voz de MediClaro. Te acompañaré con una lectura clara, natural y tranquila.';
++const VOICE_TEST_TEXT = VOICE_PREVIEW_TEXTS.readingTest;
+ const VOICE_OPTIONS: { value: GeminiVoice; label: string }[] = [
+   { value: 'Sulafat', label: 'Sulafat · cálida' },
+   { value: 'Achird', label: 'Achird · amigable' },
+   { value: 'Aoede', label: 'Aoede · armoniosa' },
+ ];
++/** La explicación inicial está grabada con estas dos voces. */
++const TOUR_VOICE_OPTIONS: { value: TourVoice; label: string }[] = [
++  { value: 'Sulafat', label: 'Sulafat · cálida' },
++  { value: 'Achird', label: 'Achird · amigable' },
++];
+ 
+ /** La velocidad guardada puede venir del servidor con otro valor: se muestra la opción más cercana. */
+ function nearestRate(rate: number): RateValue {
+@@ -60,6 +67,7 @@ export default function AccessibilityScreen() {
+   const c = theme.colors;
+   const { prefs, setFontSize, setHighContrast, setSpeechRate, setReadingVoice, setAssistantVoice } = usePreferences();
+   const { speakingId, loadingId, speak, stop } = useGeminiSimpleSpeech();
++  const tourVoice = tourVoiceOf(prefs.readingVoice);
+   const readingTesting = (speakingId === READING_TEST_ID || loadingId === READING_TEST_ID);
+   const assistantTesting = (speakingId === ASSISTANT_TEST_ID || loadingId === ASSISTANT_TEST_ID);
+ 
+@@ -72,7 +80,7 @@ export default function AccessibilityScreen() {
+         READING_TEST_ID,
+         VOICE_TEST_TEXT,
+         rate,
+-        prefs.readingVoice,
++        tourVoice,
+         'preview'
+       );
+     }
+@@ -85,7 +93,7 @@ export default function AccessibilityScreen() {
+         READING_TEST_ID,
+         VOICE_TEST_TEXT,
+         prefs.speechRate,
+-        prefs.readingVoice,
++        tourVoice,
+         'preview'
+       );
+     }
+@@ -171,23 +179,26 @@ export default function AccessibilityScreen() {
+       </ListGroup>
+ 
+       <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+-        <SectionHeader title="Voz de lectura" />
++        <SectionHeader title="Voz de la explicación de la app" />
+         <SegmentedControl
+-          options={VOICE_OPTIONS}
+-          value={prefs.readingVoice}
++          options={TOUR_VOICE_OPTIONS}
++          value={tourVoice}
+           onChange={(voice) => {
+             stop();
+             void setReadingVoice(voice);
+           }}
+-          accessibilityLabel="Voz para leer medicamentos y prospectos"
++          accessibilityLabel="Voz de la explicación Cómo funciona"
+         />
+         <AppText variant="caption" color="textSecondary">
+-          Sulafat es cálida, Achird es conversacional y Aoede tiene un tono más suave y armonioso.
++          La lectura de medicamentos usa siempre Sulafat, la voz más clara para los prospectos.
+         </AppText>
+       </View>
+ 
+       <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+-        <SectionHeader title="Voz del Asistente IA" />
++        <SectionHeader title="Voz de Lucía, tu asistente" />
++        <AppText variant="caption" color="textSecondary">
++          Sulafat es cálida, Achird es conversacional y Aoede tiene un tono más suave y armonioso.
++        </AppText>
+         <SegmentedControl
+           options={VOICE_OPTIONS}
+           value={prefs.assistantVoice}
+@@ -195,7 +206,7 @@ export default function AccessibilityScreen() {
+             stop();
+             void setAssistantVoice(voice);
+           }}
+-          accessibilityLabel="Voz de las respuestas del Asistente IA"
++          accessibilityLabel="Voz de las respuestas de Lucía"
+         />
+         <SecondaryButton
+           label={assistantTesting ? 'Detener prueba' : `Probar ${prefs.assistantVoice}`}
+@@ -205,7 +216,7 @@ export default function AccessibilityScreen() {
+             else {
+               speak(
+                 ASSISTANT_TEST_ID,
+-                'Hola. Soy el asistente de MediClaro. Estoy aquí para explicarte la información de tus medicamentos de forma sencilla y clara.',
++                VOICE_PREVIEW_TEXTS.assistantTest,
+                 0.85,
+                 prefs.assistantVoice,
+                 'preview'
+@@ -225,7 +236,7 @@ export default function AccessibilityScreen() {
+           accessibilityLabel="Velocidad de lectura en voz alta"
+         />
+         <SecondaryButton
+-          label={readingTesting ? 'Detener prueba' : `Probar ${prefs.readingVoice}`}
++          label={readingTesting ? 'Detener prueba' : `Probar ${tourVoice}`}
+           icon={readingTesting ? 'stop-circle' : 'volume-high'}
+           onPress={testReadingVoice}
+           testID="accessibility-voice-test"
+diff --git a/src/screens/profile/ProfileScreen.tsx b/src/screens/profile/ProfileScreen.tsx
+index 769dc24..acef698 100644
+--- a/src/screens/profile/ProfileScreen.tsx
++++ b/src/screens/profile/ProfileScreen.tsx
+@@ -1,274 +1,274 @@
+-/**
+- * Pestaña "Perfil y ajustes" (referencia 13_profile).
+- * Tarjeta de la persona → /account · filas planas con separadores finos · emergencia ·
+- * información legal · cerrar sesión. Los ajustes de accesibilidad se aplican al instante.
+- */
+-import { RefreshControl, StyleSheet, View } from 'react-native';
+-import { useRouter } from 'expo-router';
+-import {
+-  AppText,
+-  Avatar,
+-  Card,
+-  Divider,
+-  Icon,
+-  InfoBanner,
+-  Screen,
+-  SectionHeader,
+-  SettingRow,
+-  Skeleton,
+-} from '../../components';
+-import { useAppTheme, useAsync, useEntitlement, usePreferences, useRefreshOnFocus, useSession } from '../../hooks';
+-import { ProfileService, TestAccess } from '../../services';
+-import { CaregiverService } from '../../services/CaregiverService';
+-import { OwnerService } from '../../services/OwnerService';
+-import { FONT_SIZE_LABELS } from '../../theme';
+-import { APP_VERSION } from '../../config/app';
+-import { formatPhoneForDisplay } from '../../utils/format';
+-import { rateMediClaro, shareMediClaro } from '../../utils/device';
+-import { showAlert } from '../../utils/dialogs';
+-import { CrownIcon } from '../premium/parts';
+-import { useAccountActions } from './accountActions';
+-import { AaGlyph, FlatRows, LeadingSlot } from './parts';
+-
+-export default function ProfileScreen() {
+-  const router = useRouter();
+-  const theme = useAppTheme();
+-  const c = theme.colors;
+-  const { prefs, setEasyMode, syncError } = usePreferences();
+-  const { session } = useSession();
+-  const { confirmSignOut } = useAccountActions();
+-
+-  const profile = useAsync(() => ProfileService.getProfile(), []);
+-  const careState = useAsync(() => CaregiverService.snapshot(), [session?.userId]);
+-  const entitlement = useEntitlement();
+-  const ownerAccess = useAsync(() => OwnerService.access(), [session?.userId]);
+-  useRefreshOnFocus(ownerAccess.refresh);
+-  useRefreshOnFocus(profile.refresh);
+-  useRefreshOnFocus(careState.refresh);
+-  useRefreshOnFocus(entitlement.refresh);
+-
+-  const mode = session?.mode ?? 'verified';
+-  const phone = profile.data?.phone ?? session?.phone ?? null;
+-  const caregiverProfile = careState.data?.role === 'caregiver';
+-  const isPremium = entitlement.isPremium;
+-  // El teléfono solo se solicita después de tener Premium. Un perfil Básico o
+-  // Cuidador/a gratuito no necesita teléfono ni verificación SMS.
+-  const needsPhone = mode === 'anonymous' && !TestAccess.isActive() && !phone && isPremium;
+-  const subtitle =
+-    mode === 'demo'
+-      ? 'Modo demostración'
+-      : needsPhone
+-        ? 'Premium · completa tu teléfono'
+-        : caregiverProfile
+-          ? isPremium ? 'Cuidador/a + Premium' : 'Perfil Cuidador/a'
+-          : isPremium
+-            ? phone ? formatPhoneForDisplay(phone) : 'Perfil Premium'
+-            : mode === 'anonymous'
+-              ? 'Perfil Básico'
+-              : phone
+-                ? formatPhoneForDisplay(phone)
+-                : 'Perfil Básico';
+-  const displayName = profile.data?.displayName ?? null;
+-  const profileIncomplete = profile.status === 'success' && !!profile.data && (!profile.data.displayName || !profile.data.sex || profile.data.age === null);
+-  const nameText = profile.status === 'loading' ? null : profile.status === 'error' ? 'Tu cuenta' : displayName ?? 'Completa tu perfil';
+-  // Sin forma de contratar Premium en la app, la fila muestra el plan, sin «Mejorar».
+-  const sell = entitlement.canSell;
+-  const premiumValue =
+-    entitlement.status === 'ready'
+-      ? sell
+-        ? isPremium
+-          ? 'Activo'
+-          : 'Mejorar'
+-        : isPremium
+-          ? 'Premium'
+-          : 'Gratuito'
+-      : undefined;
+-
+-  const refreshAll = () => {
+-    void profile.refresh();
+-    void careState.refresh();
+-    void entitlement.refresh();
+-  };
+-
+-  const shareApp = async () => {
+-    if (!(await shareMediClaro())) {
+-      await showAlert('Compartir MediClaro', 'No se ha podido abrir el menú para compartir. Inténtalo de nuevo desde tu teléfono.');
+-    }
+-  };
+-
+-  const rateApp = async () => {
+-    if (!(await rateMediClaro())) {
+-      await showAlert('Valorar MediClaro', 'La valoración se habilitará en esta tienda cuando la ficha pública de MediClaro esté disponible.');
+-    }
+-  };
+-
+-  return (
+-    <Screen
+-      edges={['top']}
+-      refreshControl={
+-        <RefreshControl
+-          refreshing={profile.refreshing}
+-          onRefresh={refreshAll}
+-          tintColor={c.primary}
+-          colors={[c.primary]}
+-        />
+-      }
+-    >
+-      <AppText variant="title" accessibilityRole="header" style={{ marginTop: theme.spacing.md, marginBottom: theme.spacing.md }}>
+-        Perfil y ajustes
+-      </AppText>
+-
+-      {syncError ? <InfoBanner tone="warning" message={syncError} style={{ marginBottom: theme.spacing.md }} /> : null}
+-
+-      {needsPhone ? (
+-        <InfoBanner
+-          tone="info"
+-          icon="shield-checkmark"
+-          title="Completa tu cuenta"
+-          message="Añade tu teléfono para no perder tu Premium si cambias de móvil."
+-          action={{ label: 'Añadir mi teléfono', onPress: () => router.push('/complete-account') }}
+-          style={{ marginBottom: theme.spacing.md }}
+-        />
+-      ) : null}
+-
+-      {profileIncomplete ? (
+-        <InfoBanner
+-          tone="info"
+-          icon="person-circle-outline"
+-          title="Completa tu perfil"
+-          message="Añade tu nombre, sexo, edad y, si quieres, teléfono y foto."
+-          action={{ label: 'Completar perfil', onPress: () => router.push({ pathname: '/profile-setup', params: { next: '/account' } }) }}
+-          style={{ marginBottom: theme.spacing.md }}
+-        />
+-      ) : null}
+-
+-      <Card
+-        onPress={() => profileIncomplete ? router.push({ pathname: '/profile-setup', params: { next: '/account' } }) : router.push('/account')}
+-        accessibilityLabel={`${nameText ?? 'Tu cuenta'}. ${subtitle}`}
+-        accessibilityHint="Abre tus datos de cuenta"
+-        testID="profile-account"
+-      >
+-        <View style={styles.userRow}>
+-          <Avatar name={displayName} uri={profile.data?.avatarUrl} size={64} />
+-          <View style={styles.userText}>
+-            {nameText ? (
+-              <AppText variant="heading" color={displayName || profile.status === 'error' ? 'heading' : 'primary'}>
+-                {nameText}
+-              </AppText>
+-            ) : (
+-              <Skeleton width="70%" height={22} />
+-            )}
+-            <AppText variant="caption" color="textSecondary">
+-              {subtitle}
+-            </AppText>
+-          </View>
+-          <Icon name="chevron-forward" size={24} color={c.textMuted} />
+-        </View>
+-      </Card>
+-
+-      <View style={{ marginTop: theme.spacing.sm }}>
+-        <FlatRows>
+-          <SettingRow
+-            leading={
+-              <LeadingSlot>
+-                <CrownIcon size={28} />
+-              </LeadingSlot>
+-            }
+-            label={sell ? 'MediClaro Premium' : 'Tu plan'}
+-            value={premiumValue}
+-            valueTone={isPremium ? 'success' : sell ? 'primary' : 'muted'}
+-            showChevron={!premiumValue}
+-            onPress={() => router.push('/premium')}
+-            testID="profile-premium"
+-          />
+-          <SettingRow
+-            leading={<AaGlyph />}
+-            label="Tamaño del texto"
+-            value={FONT_SIZE_LABELS[prefs.fontSize]}
+-            onPress={() => router.push('/accessibility')}
+-            testID="profile-text-size"
+-          />
+-          <SettingRow
+-            icon={isPremium ? "volume-high-outline" : "lock-closed-outline"}
+-            label="Voces de MediClaro"
+-            value={isPremium ? `${prefs.readingVoice} · ${prefs.assistantVoice}` : undefined}
+-            description={isPremium ? "Lectura y Asistente IA" : "Disponible con MediClaro Premium"}
+-            right={!isPremium ? <View style={{flexDirection:'row',alignItems:'center',gap:4,flexShrink:0}}><Icon name="lock-closed" size={14} color={c.premiumText}/><AppText variant="small" style={{color:c.premiumText}}>Premium</AppText></View> : undefined}
+-            onPress={() => router.push(isPremium ? '/accessibility' : '/premium')}
+-            testID="profile-voices"
+-          />
+-          <SettingRow
+-            icon="timer-outline"
+-            label="Modo fácil"
+-            description="Pantallas más simples y letra más grande"
+-            toggle={{ value: prefs.easyMode, onChange: (v) => void setEasyMode(v) }}
+-            testID="profile-easy-mode"
+-          />
+-          {ownerAccess.status === 'success' && !ownerAccess.error && ownerAccess.data ? <SettingRow icon="stats-chart-outline" label="Panel de propietario" description="Actividad, cuentas, suscripciones y avisos" onPress={() => router.push('/owner-dashboard')} testID="profile-owner-dashboard" /> : null}
+-          <SettingRow icon="globe-outline" label="Idioma" value="Español" onPress={() => router.push('/language')} />
+-          <SettingRow
+-            icon="people-outline"
+-            label={caregiverProfile ? 'Cuidador/a y vinculaciones' : isPremium ? 'Mi cuidador/a' : '¿Quieres ser cuidador/a?'}
+-            description={caregiverProfile ? 'Gestiona pacientes vinculados y avisos' : isPremium ? 'Código de 6 números o QR opcional' : 'Es gratis. Vincúlate con un paciente Premium'}
+-            value={caregiverProfile ? 'Cuidador/a' : undefined}
+-            valueTone={caregiverProfile ? 'success' : 'muted'}
+-            onPress={() => profileIncomplete ? router.push({ pathname: '/profile-setup', params: { next: '/caregiver', mode: 'caregiver' } }) : router.push('/caregiver')}
+-            testID="profile-caregiver"
+-          />
+-          <SettingRow icon="notifications-outline" label="Notificaciones" onPress={() => router.push('/notifications')} />
+-          <SettingRow icon="lock-closed-outline" label="Privacidad y datos" onPress={() => router.push('/privacy')} />
+-          <SettingRow icon="help-circle-outline" label="Ayuda" onPress={() => router.push('/help')} />
+-          <SettingRow
+-            icon="share-social-outline"
+-            label="Compartir MediClaro"
+-            description="Envía el enlace de descarga a familiares"
+-            onPress={() => void shareApp()}
+-            testID="profile-share-app"
+-          />
+-          <SettingRow
+-            icon="star-outline"
+-            label="Valorar MediClaro"
+-            description="Cuéntanos si la app te resulta útil"
+-            onPress={() => void rateApp()}
+-            testID="profile-rate-app"
+-          />
+-        </FlatRows>
+-      </View>
+-
+-      <View style={{ marginTop: theme.spacing.lg }}>
+-        <SectionHeader title="Emergencia" />
+-        <FlatRows>
+-          <SettingRow icon="medkit-outline" label="Mi perfil de emergencia" onPress={() => router.push('/emergency-profile')} />
+-          <SettingRow icon="headset-outline" label="Número privado de asistencia" onPress={() => router.push('/private-assistance')} />
+-          <SettingRow
+-            icon="shield-checkmark-outline"
+-            label="Qué compartir en una emergencia"
+-            onPress={() => router.push('/emergency-sharing')}
+-          />
+-        </FlatRows>
+-      </View>
+-
+-      <Divider style={{ marginTop: theme.spacing.md }} />
+-      <FlatRows>
+-        <SettingRow icon="document-text-outline" label="Información legal" onPress={() => router.push('/legal')} />
+-        <SettingRow
+-          icon="log-out-outline"
+-          label="Cerrar sesión"
+-          destructive
+-          showChevron={false}
+-          onPress={() => void confirmSignOut()}
+-          testID="profile-sign-out"
+-        />
+-      </FlatRows>
+-
+-      <AppText variant="caption" color="textMuted" align="center" style={{ marginTop: theme.spacing.lg }}>
+-        {`MediClaro ${APP_VERSION} · Información oficial AEMPS`}
+-      </AppText>
+-    </Screen>
+-  );
+-}
+-
+-const styles = StyleSheet.create({
+-  userRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+-  userText: { flex: 1, gap: 2 },
++/**
++ * Pestaña "Perfil y ajustes" (referencia 13_profile).
++ * Tarjeta de la persona → /account · filas planas con separadores finos · emergencia ·
++ * información legal · cerrar sesión. Los ajustes de accesibilidad se aplican al instante.
++ */
++import { RefreshControl, StyleSheet, View } from 'react-native';
++import { useRouter } from 'expo-router';
++import {
++  AppText,
++  Avatar,
++  Card,
++  Divider,
++  Icon,
++  InfoBanner,
++  Screen,
++  SectionHeader,
++  SettingRow,
++  Skeleton,
++} from '../../components';
++import { useAppTheme, useAsync, useEntitlement, usePreferences, useRefreshOnFocus, useSession } from '../../hooks';
++import { ProfileService, TestAccess } from '../../services';
++import { CaregiverService } from '../../services/CaregiverService';
++import { OwnerService } from '../../services/OwnerService';
++import { FONT_SIZE_LABELS } from '../../theme';
++import { APP_VERSION } from '../../config/app';
++import { formatPhoneForDisplay } from '../../utils/format';
++import { rateMediClaro, shareMediClaro } from '../../utils/device';
++import { showAlert } from '../../utils/dialogs';
++import { CrownIcon } from '../premium/parts';
++import { useAccountActions } from './accountActions';
++import { AaGlyph, FlatRows, LeadingSlot } from './parts';
++
++export default function ProfileScreen() {
++  const router = useRouter();
++  const theme = useAppTheme();
++  const c = theme.colors;
++  const { prefs, setEasyMode, syncError } = usePreferences();
++  const { session } = useSession();
++  const { confirmSignOut } = useAccountActions();
++
++  const profile = useAsync(() => ProfileService.getProfile(), []);
++  const careState = useAsync(() => CaregiverService.snapshot(), [session?.userId]);
++  const entitlement = useEntitlement();
++  const ownerAccess = useAsync(() => OwnerService.access(), [session?.userId]);
++  useRefreshOnFocus(ownerAccess.refresh);
++  useRefreshOnFocus(profile.refresh);
++  useRefreshOnFocus(careState.refresh);
++  useRefreshOnFocus(entitlement.refresh);
++
++  const mode = session?.mode ?? 'verified';
++  const phone = profile.data?.phone ?? session?.phone ?? null;
++  const caregiverProfile = careState.data?.role === 'caregiver';
++  const isPremium = entitlement.isPremium;
++  // El teléfono solo se solicita después de tener Premium. Un perfil Básico o
++  // Cuidador/a gratuito no necesita teléfono ni verificación SMS.
++  const needsPhone = mode === 'anonymous' && !TestAccess.isActive() && !phone && isPremium;
++  const subtitle =
++    mode === 'demo'
++      ? 'Modo demostración'
++      : needsPhone
++        ? 'Premium · completa tu teléfono'
++        : caregiverProfile
++          ? isPremium ? 'Cuidador/a + Premium' : 'Perfil Cuidador/a'
++          : isPremium
++            ? phone ? formatPhoneForDisplay(phone) : 'Perfil Premium'
++            : mode === 'anonymous'
++              ? 'Perfil Básico'
++              : phone
++                ? formatPhoneForDisplay(phone)
++                : 'Perfil Básico';
++  const displayName = profile.data?.displayName ?? null;
++  const profileIncomplete = profile.status === 'success' && !!profile.data && (!profile.data.displayName || !profile.data.sex || profile.data.age === null);
++  const nameText = profile.status === 'loading' ? null : profile.status === 'error' ? 'Tu cuenta' : displayName ?? 'Completa tu perfil';
++  // Sin forma de contratar Premium en la app, la fila muestra el plan, sin «Mejorar».
++  const sell = entitlement.canSell;
++  const premiumValue =
++    entitlement.status === 'ready'
++      ? sell
++        ? isPremium
++          ? 'Activo'
++          : 'Mejorar'
++        : isPremium
++          ? 'Premium'
++          : 'Gratuito'
++      : undefined;
++
++  const refreshAll = () => {
++    void profile.refresh();
++    void careState.refresh();
++    void entitlement.refresh();
++  };
++
++  const shareApp = async () => {
++    if (!(await shareMediClaro())) {
++      await showAlert('Compartir MediClaro', 'No se ha podido abrir el menú para compartir. Inténtalo de nuevo desde tu teléfono.');
++    }
++  };
++
++  const rateApp = async () => {
++    if (!(await rateMediClaro())) {
++      await showAlert('Valorar MediClaro', 'La valoración se habilitará en esta tienda cuando la ficha pública de MediClaro esté disponible.');
++    }
++  };
++
++  return (
++    <Screen
++      edges={['top']}
++      refreshControl={
++        <RefreshControl
++          refreshing={profile.refreshing}
++          onRefresh={refreshAll}
++          tintColor={c.primary}
++          colors={[c.primary]}
++        />
++      }
++    >
++      <AppText variant="title" accessibilityRole="header" style={{ marginTop: theme.spacing.md, marginBottom: theme.spacing.md }}>
++        Perfil y ajustes
++      </AppText>
++
++      {syncError ? <InfoBanner tone="warning" message={syncError} style={{ marginBottom: theme.spacing.md }} /> : null}
++
++      {needsPhone ? (
++        <InfoBanner
++          tone="info"
++          icon="shield-checkmark"
++          title="Completa tu cuenta"
++          message="Añade tu teléfono para no perder tu Premium si cambias de móvil."
++          action={{ label: 'Añadir mi teléfono', onPress: () => router.push('/complete-account') }}
++          style={{ marginBottom: theme.spacing.md }}
++        />
++      ) : null}
++
++      {profileIncomplete ? (
++        <InfoBanner
++          tone="info"
++          icon="person-circle-outline"
++          title="Completa tu perfil"
++          message="Añade tu nombre, sexo, edad y, si quieres, teléfono y foto."
++          action={{ label: 'Completar perfil', onPress: () => router.push({ pathname: '/profile-setup', params: { next: '/account' } }) }}
++          style={{ marginBottom: theme.spacing.md }}
++        />
++      ) : null}
++
++      <Card
++        onPress={() => profileIncomplete ? router.push({ pathname: '/profile-setup', params: { next: '/account' } }) : router.push('/account')}
++        accessibilityLabel={`${nameText ?? 'Tu cuenta'}. ${subtitle}`}
++        accessibilityHint="Abre tus datos de cuenta"
++        testID="profile-account"
++      >
++        <View style={styles.userRow}>
++          <Avatar name={displayName} uri={profile.data?.avatarUrl} size={64} />
++          <View style={styles.userText}>
++            {nameText ? (
++              <AppText variant="heading" color={displayName || profile.status === 'error' ? 'heading' : 'primary'}>
++                {nameText}
++              </AppText>
++            ) : (
++              <Skeleton width="70%" height={22} />
++            )}
++            <AppText variant="caption" color="textSecondary">
++              {subtitle}
++            </AppText>
++          </View>
++          <Icon name="chevron-forward" size={24} color={c.textMuted} />
++        </View>
++      </Card>
++
++      <View style={{ marginTop: theme.spacing.sm }}>
++        <FlatRows>
++          <SettingRow
++            leading={
++              <LeadingSlot>
++                <CrownIcon size={28} />
++              </LeadingSlot>
++            }
++            label={sell ? 'MediClaro Premium' : 'Tu plan'}
++            value={premiumValue}
++            valueTone={isPremium ? 'success' : sell ? 'primary' : 'muted'}
++            showChevron={!premiumValue}
++            onPress={() => router.push('/premium')}
++            testID="profile-premium"
++          />
++          <SettingRow
++            leading={<AaGlyph />}
++            label="Tamaño del texto"
++            value={FONT_SIZE_LABELS[prefs.fontSize]}
++            onPress={() => router.push('/accessibility')}
++            testID="profile-text-size"
++          />
++          <SettingRow
++            icon={isPremium ? "volume-high-outline" : "lock-closed-outline"}
++            label="Voces de MediClaro"
++            value={isPremium ? `Lucía: ${prefs.assistantVoice}` : undefined}
++            description={isPremium ? "Medicamentos con Sulafat · elige la voz de Lucía" : "Disponible con MediClaro Premium"}
++            right={!isPremium ? <View style={{flexDirection:'row',alignItems:'center',gap:4,flexShrink:0}}><Icon name="lock-closed" size={14} color={c.premiumText}/><AppText variant="small" style={{color:c.premiumText}}>Premium</AppText></View> : undefined}
++            onPress={() => router.push(isPremium ? '/accessibility' : '/premium')}
++            testID="profile-voices"
++          />
++          <SettingRow
++            icon="timer-outline"
++            label="Modo fácil"
++            description="Pantallas más simples y letra más grande"
++            toggle={{ value: prefs.easyMode, onChange: (v) => void setEasyMode(v) }}
++            testID="profile-easy-mode"
++          />
++          {ownerAccess.status === 'success' && !ownerAccess.error && ownerAccess.data ? <SettingRow icon="stats-chart-outline" label="Panel de propietario" description="Actividad, cuentas, suscripciones y avisos" onPress={() => router.push('/owner-dashboard')} testID="profile-owner-dashboard" /> : null}
++          <SettingRow icon="globe-outline" label="Idioma" value="Español" onPress={() => router.push('/language')} />
++          <SettingRow
++            icon="people-outline"
++            label={caregiverProfile ? 'Cuidador/a y vinculaciones' : isPremium ? 'Mi cuidador/a' : '¿Quieres ser cuidador/a?'}
++            description={caregiverProfile ? 'Gestiona pacientes vinculados y avisos' : isPremium ? 'Código de 6 números o QR opcional' : 'Es gratis. Vincúlate con un paciente Premium'}
++            value={caregiverProfile ? 'Cuidador/a' : undefined}
++            valueTone={caregiverProfile ? 'success' : 'muted'}
++            onPress={() => profileIncomplete ? router.push({ pathname: '/profile-setup', params: { next: '/caregiver', mode: 'caregiver' } }) : router.push('/caregiver')}
++            testID="profile-caregiver"
++          />
++          <SettingRow icon="notifications-outline" label="Notificaciones" onPress={() => router.push('/notifications')} />
++          <SettingRow icon="lock-closed-outline" label="Privacidad y datos" onPress={() => router.push('/privacy')} />
++          <SettingRow icon="help-circle-outline" label="Ayuda" onPress={() => router.push('/help')} />
++          <SettingRow
++            icon="share-social-outline"
++            label="Compartir MediClaro"
++            description="Envía el enlace de descarga a familiares"
++            onPress={() => void shareApp()}
++            testID="profile-share-app"
++          />
++          <SettingRow
++            icon="star-outline"
++            label="Valorar MediClaro"
++            description="Cuéntanos si la app te resulta útil"
++            onPress={() => void rateApp()}
++            testID="profile-rate-app"
++          />
++        </FlatRows>
++      </View>
++
++      <View style={{ marginTop: theme.spacing.lg }}>
++        <SectionHeader title="Emergencia" />
++        <FlatRows>
++          <SettingRow icon="medkit-outline" label="Mi perfil de emergencia" onPress={() => router.push('/emergency-profile')} />
++          <SettingRow icon="headset-outline" label="Número privado de asistencia" onPress={() => router.push('/private-assistance')} />
++          <SettingRow
++            icon="shield-checkmark-outline"
++            label="Qué compartir en una emergencia"
++            onPress={() => router.push('/emergency-sharing')}
++          />
++        </FlatRows>
++      </View>
++
++      <Divider style={{ marginTop: theme.spacing.md }} />
++      <FlatRows>
++        <SettingRow icon="document-text-outline" label="Información legal" onPress={() => router.push('/legal')} />
++        <SettingRow
++          icon="log-out-outline"
++          label="Cerrar sesión"
++          destructive
++          showChevron={false}
++          onPress={() => void confirmSignOut()}
++          testID="profile-sign-out"
++        />
++      </FlatRows>
++
++      <AppText variant="caption" color="textMuted" align="center" style={{ marginTop: theme.spacing.lg }}>
++        {`MediClaro ${APP_VERSION} · Información oficial AEMPS`}
++      </AppText>
++    </Screen>
++  );
++}
++
++const styles = StyleSheet.create({
++  userRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
++  userText: { flex: 1, gap: 2 },
+ });
+diff --git a/src/services/PreferencesService.ts b/src/services/PreferencesService.ts
+index 7079f3b..cf0f471 100644
+--- a/src/services/PreferencesService.ts
++++ b/src/services/PreferencesService.ts
+@@ -9,15 +9,20 @@ import { localStore } from '../api/storage';
+ import type { FontSizePreference } from '../types';
+ 
+ export type GeminiVoice = 'Sulafat' | 'Achird' | 'Aoede';
++/** Voces con las que está grabada la explicación inicial «Cómo funciona». */
++export type TourVoice = 'Sulafat' | 'Achird';
+ 
+ export interface LocalPreferences {
+   fontSize: FontSizePreference;
+   easyMode: boolean;
+   highContrast: boolean;
+   speechRate: number;
+-  /** Voz Gemini usada para leer prospectos y textos informativos. */
++  /**
++   * Voz de la explicación inicial «Cómo funciona» (grabada con Sulafat y Achird).
++   * La lectura de medicamentos usa SIEMPRE Sulafat.
++   */
+   readingVoice: GeminiVoice;
+-  /** Voz Gemini usada al escuchar respuestas del Asistente IA. */
++  /** Voz Gemini de Lucía (respuestas del Asistente IA): Sulafat, Achird o Aoede. */
+   assistantVoice: GeminiVoice;
+   onboardingSeen: boolean;
+ }
+@@ -37,7 +42,9 @@ export const DEFAULT_LOCAL_PREFERENCES: LocalPreferences = {
+ export const PreferencesService = {
+   async load(): Promise<LocalPreferences> {
+     const stored = await localStore.getJSON<Partial<LocalPreferences>>(KEY, {});
+-    return { ...DEFAULT_LOCAL_PREFERENCES, ...stored };
++    const merged = { ...DEFAULT_LOCAL_PREFERENCES, ...stored };
++    // La explicación inicial solo está grabada con Sulafat y Achird: nunca se muestra otra voz elegida que no suena.
++    return { ...merged, readingVoice: tourVoiceOf(merged.readingVoice) };
+   },
+ 
+   async save(patch: Partial<LocalPreferences>): Promise<LocalPreferences> {
+@@ -47,3 +54,8 @@ export const PreferencesService = {
+     return next;
+   },
+ };
++
++/** Voz real con la que suena la explicación inicial para una preferencia dada. */
++export function tourVoiceOf(voice: GeminiVoice | undefined): TourVoice {
++  return voice === 'Achird' ? 'Achird' : 'Sulafat';
++}
+diff --git a/src/services/SpeechService.ts b/src/services/SpeechService.ts
+index c8b5569..c0e2c6b 100644
+--- a/src/services/SpeechService.ts
++++ b/src/services/SpeechService.ts
+@@ -4,10 +4,17 @@
+  * La GEMINI_API_KEY vive exclusivamente en la Edge Function `tts`.
+  * El cliente solo envía texto, voz permitida y propósito. El backend devuelve
+  * un WAV efímero en base64, que se guarda en la caché local del dispositivo.
++ *
++ * Antes de enviarlo, el texto se prepara para la voz (unidades, «c/8 h», 112…): ver utils/speechText.
++ * Las previsualizaciones públicas (`tts-preview`) solo aceptan textos fijos y se envían tal cual.
++ * Nunca se corta un texto a mitad de palabra: si es largo, se divide por frases y el servidor devuelve
++ * un único audio continuo.
+  */
+ import { File, Paths } from 'expo-file-system';
+ import { invokeFunction } from '../api';
+ import { isBackendConfigured, isDemoClientActive, SUPABASE_ANON_KEY, SUPABASE_URL } from '../lib/supabase';
++import { endWithPause, prepareSpeechText } from '../utils/speechText';
++import { VOICE_PREVIEW_TEXTS } from '../config/voicePreviews';
+ import type { GeminiVoice } from './PreferencesService';
+ 
+ export type SpeechPurpose = 'reading' | 'assistant' | 'preview';
+@@ -21,6 +28,15 @@ interface TtsResponse {
+   continuous?: boolean;
+ }
+ 
++/** Máximo de caracteres por petición simple (el servidor admite 3200 por segmento). */
++const MAX_SINGLE_CHARS = 3000;
++
++/**
++ * Muestra fija de Sulafat para el Modo demostración (sin cuenta real no se genera audio nuevo).
++ * Debe coincidir EXACTAMENTE con un texto permitido en supabase/functions/tts-preview (hay una prueba que lo comprueba).
++ */
++export const DEMO_VOICE_SAMPLE: string = VOICE_PREVIEW_TEXTS.demoSample;
++
+ let counter = 0;
+ 
+ function safeVoice(voice: GeminiVoice): GeminiVoice {
+@@ -85,45 +101,57 @@ function splitForTts(text: string, max = 2800): string[] {
+   return out;
+ }
+ 
+-function packContinuousSegments(parts: string[]): string[] {
+-  const atomic = parts.flatMap((part) => splitForTts(part));
++/** Une los apartados en segmentos de hasta 3000 caracteres, siempre cortando entre frases. */
++export function packContinuousSegments(parts: string[]): string[] {
++  const atomic = parts
++    .map((part) => endWithPause(prepareSpeechText(part)))
++    .filter(Boolean)
++    .flatMap((part) => splitForTts(part));
+   const packed: string[] = [];
+   let current = '';
+   for (const part of atomic) {
+     if (!current) { current = part; continue; }
+     const candidate = `${current} ${part}`;
+-    if (candidate.length <= 3000) current = candidate;
++    if (candidate.length <= MAX_SINGLE_CHARS) current = candidate;
+     else { packed.push(current); current = part; }
+   }
+   if (current) packed.push(current);
+   return packed;
+ }
+ 
++async function publicPreview(text: string, voice: GeminiVoice): Promise<TtsResponse> {
++  if (!isBackendConfigured) {
++    return invokeFunction<TtsResponse>('tts-preview', { text, voice: safeVoice(voice), purpose: 'preview' }, { timeoutMs: 60_000 });
++  }
++  // La previsualización y la respuesta fija de QA usan textos permitidos: no deben
++  // depender de una sesión real, de que haya caducado ni de una suscripción.
++  const r = await fetch(`${SUPABASE_URL}/functions/v1/tts-preview`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
++    body: JSON.stringify({ text, voice: safeVoice(voice), purpose: 'preview' }),
++  });
++  const data = (await r.json().catch(() => ({}))) as TtsResponse & { error?: string };
++  if (!r.ok) throw new Error(data.error || 'La voz natural no está disponible.');
++  return data;
++}
++
+ export const SpeechService = {
+   async synthesize(text: string, voice: GeminiVoice, purpose: SpeechPurpose): Promise<{ uri: string; cleanup: () => void }> {
+-    const clean = text.replace(/\s+/g, ' ').trim().slice(0, 3200);
++    // Textos fijos (previsualización, o la respuesta de ejemplo del Modo demostración): se envían tal cual.
++    if (purpose === 'preview' || (purpose === 'assistant' && isDemoClientActive())) {
++      const exact = text.replace(/\s+/g, ' ').trim();
++      if (!exact) throw new Error('Texto vacío');
++      const response = await publicPreview(exact, voice);
++      if (!response?.audioBase64) throw new Error('Audio vacío');
++      return saveAudio(response.audioBase64);
++    }
++
++    const clean = prepareSpeechText(text);
+     if (!clean) throw new Error('Texto vacío');
++    // Un texto largo nunca se recorta (cortaría una palabra): se lee entero como audio continuo.
++    if (clean.length > MAX_SINGLE_CHARS) return SpeechService.synthesizeContinuous([clean], voice, purpose);
+ 
+-    let response: TtsResponse;
+-    const publicPreview = purpose === 'preview' || (purpose === 'assistant' && isDemoClientActive());
+-    if (publicPreview && isBackendConfigured) {
+-      // La previsualización y la respuesta fija de QA usan textos permitidos: no deben
+-      // depender de una sesión real, de que haya caducado ni de una suscripción.
+-      const r = await fetch(`${SUPABASE_URL}/functions/v1/tts-preview`, {
+-        method: 'POST',
+-        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+-        body: JSON.stringify({ text: clean, voice: safeVoice(voice), purpose: 'preview' }),
+-      });
+-      const data = (await r.json().catch(() => ({}))) as TtsResponse & { error?: string };
+-      if (!r.ok) throw new Error(data.error || 'La voz natural no está disponible.');
+-      response = data;
+-    } else {
+-      response = await invokeFunction<TtsResponse>(
+-        purpose === 'preview' ? 'tts-preview' : 'tts',
+-        { text: clean, voice: safeVoice(voice), purpose },
+-        { timeoutMs: 60_000 },
+-      );
+-    }
++    const response = await invokeFunction<TtsResponse>('tts', { text: clean, voice: safeVoice(voice), purpose }, { timeoutMs: 60_000 });
+     if (!response?.audioBase64) throw new Error('Audio vacío');
+     return saveAudio(response.audioBase64);
+   },
+@@ -133,6 +161,13 @@ export const SpeechService = {
+     voice: GeminiVoice = 'Sulafat',
+     purpose: Exclude<SpeechPurpose, 'preview'> = 'reading',
+   ): Promise<{ uri: string; cleanup: () => void }> {
++    // Modo demostración: no hay cuenta real que pueda generar audio nuevo; se reproduce una muestra fija de la voz.
++    if (isDemoClientActive() && purpose === 'reading') {
++      const response = await publicPreview(DEMO_VOICE_SAMPLE, voice);
++      if (!response?.audioBase64) throw new Error('Audio vacío');
++      return saveAudio(response.audioBase64);
++    }
++
+     const segments = packContinuousSegments(parts);
+     if (!segments.length) throw new Error('Texto vacío');
+     const total = segments.reduce((n, s) => n + s.length, 0);
+diff --git a/src/services/VoiceConversationService.ts b/src/services/VoiceConversationService.ts
+index 2f5a86b..9025f65 100644
+--- a/src/services/VoiceConversationService.ts
++++ b/src/services/VoiceConversationService.ts
+@@ -1,5 +1,6 @@
+ import { File } from 'expo-file-system';
+ import { invokeFunction } from '../api';
++import { DemoMode } from './DemoMode';
+ 
+ interface TranscriptionResponse { text:string; model?:string }
+ 
+@@ -15,6 +16,8 @@ function mimeFromUri(uri:string):string {
+ 
+ export const VoiceConversationService={
+   async transcribe(uri:string):Promise<string>{
++    // El Modo demostración no tiene servidor: se dice claramente en lugar de un error técnico.
++    if(DemoMode.isActive())throw new Error('En el modo demostración no se puede transcribir la voz. Escribe tu pregunta o entra con tu cuenta de MediClaro para hablar con Lucía.');
+     const file=new File(uri);
+     if(!file.exists)throw new Error('No se ha encontrado la grabación.');
+     if(file.size>4_500_000)throw new Error('El mensaje de voz es demasiado largo.');
+@@ -27,4 +30,4 @@ export const VoiceConversationService={
+     if(!text)throw new Error('No he podido entender el audio.');
+     return text.slice(0,1000);
+   },
+-};
+\ No newline at end of file
++};
+diff --git a/src/services/__tests__/SpeechService.test.ts b/src/services/__tests__/SpeechService.test.ts
+new file mode 100644
+index 0000000..5894eb0
+--- /dev/null
++++ b/src/services/__tests__/SpeechService.test.ts
+@@ -0,0 +1,88 @@
++/**
++ * Voz natural: lo que se envía al servidor.
++ *  - Lectura y Lucía: texto preparado para la voz (unidades, 112…), nunca recortado a mitad de palabra.
++ *  - Previsualizaciones públicas: texto EXACTO (debe coincidir con la lista permitida del servidor).
++ *  - Modo demostración: muestra fija de Sulafat (sin cuenta real no se genera audio nuevo).
++ */
++const mockInvoke = jest.fn();
++let mockDemo = false;
++jest.mock('../../api', () => ({ invokeFunction: (...a: unknown[]) => mockInvoke(...a) }));
++jest.mock('../../lib/supabase', () => ({
++  isBackendConfigured: true,
++  isDemoClientActive: () => mockDemo,
++  SUPABASE_URL: 'https://example.supabase.co',
++  SUPABASE_ANON_KEY: 'public-anon-key-for-tests',
++}));
++jest.mock('expo-file-system', () => ({
++  Paths: { cache: 'cache' },
++  File: class {
++    uri: string;
++    exists = true;
++    constructor(_dir: string, name: string) { this.uri = `file:///cache/${name}`; }
++    write() { /* noop */ }
++    delete() { /* noop */ }
++  },
++}), { virtual: true });
++
++import { DEMO_VOICE_SAMPLE, SpeechService, packContinuousSegments } from '../SpeechService';
++
++const fetchMock = jest.fn();
++
++beforeEach(() => {
++  mockDemo = false;
++  mockInvoke.mockReset().mockResolvedValue({ audioBase64: 'UklGRg==' });
++  fetchMock.mockReset().mockResolvedValue({ ok: true, json: async () => ({ audioBase64: 'UklGRg==' }) });
++  (globalThis as { fetch?: unknown }).fetch = fetchMock;
++});
++
++test('la lectura envía el texto preparado para la voz', async () => {
++  await SpeechService.synthesize('Paracetamol 500 mg c/8 h. Si empeoras, llama al 112.', 'Sulafat', 'reading');
++  expect(mockInvoke).toHaveBeenCalledWith(
++    'tts',
++    { text: 'Paracetamol 500 miligramos cada 8 horas. Si empeoras, llama al uno, uno, dos.', voice: 'Sulafat', purpose: 'reading' },
++    expect.anything(),
++  );
++});
++
++test('una respuesta larga de Lucía nunca se recorta: va entera, por frases, como un único audio', async () => {
++  const sentence = 'Esta es una frase sencilla para explicar el medicamento con calma. ';
++  const long = sentence.repeat(80); // ~5.300 caracteres
++  await SpeechService.synthesize(long, 'Aoede', 'assistant');
++  const [name, body] = mockInvoke.mock.calls[0];
++  expect(name).toBe('tts');
++  expect(body.voice).toBe('Aoede');
++  expect(body.purpose).toBe('assistant');
++  expect(Array.isArray(body.segments)).toBe(true);
++  expect(body.segments.length).toBeGreaterThan(1);
++  for (const segment of body.segments) {
++    expect(segment.length).toBeLessThanOrEqual(3000);
++    expect(segment).toMatch(/\.$/); // cada segmento termina en un final de frase
++  }
++  expect(body.segments.join(' ')).toBe(long.trim());
++});
++
++test('las previsualizaciones públicas se envían exactamente igual (sin preparar el texto)', async () => {
++  await SpeechService.synthesize(DEMO_VOICE_SAMPLE, 'Achird', 'preview');
++  expect(mockInvoke).not.toHaveBeenCalled();
++  const [url, init] = fetchMock.mock.calls[0];
++  expect(url).toBe('https://example.supabase.co/functions/v1/tts-preview');
++  expect(JSON.parse(init.body)).toEqual({ text: DEMO_VOICE_SAMPLE, voice: 'Achird', purpose: 'preview' });
++});
++
++test('en el Modo demostración la lectura usa la muestra fija de Sulafat', async () => {
++  mockDemo = true;
++  await SpeechService.synthesizeContinuous(['Qué es. Un medicamento de ejemplo.'], 'Sulafat', 'reading');
++  expect(mockInvoke).not.toHaveBeenCalled();
++  expect(JSON.parse(fetchMock.mock.calls[0][1].body).text).toBe(DEMO_VOICE_SAMPLE);
++});
++
++test('los apartados se unen con pausa y sin cortar palabras', () => {
++  expect(packContinuousSegments(['Qué es', 'Para qué sirve. Alivia el dolor de 1 g'])).toEqual([
++    'Qué es. Para qué sirve. Alivia el dolor de 1 gramo.',
++  ]);
++});
++
++test('una voz desconocida se sustituye por Sulafat en la petición', async () => {
++  await SpeechService.synthesize('Hola.', 'Desconocida' as never, 'reading');
++  expect(mockInvoke.mock.calls[0][1].voice).toBe('Sulafat');
++});
+diff --git a/src/utils/__tests__/audioSession.test.ts b/src/utils/__tests__/audioSession.test.ts
+new file mode 100644
+index 0000000..15ab2a1
+--- /dev/null
++++ b/src/utils/__tests__/audioSession.test.ts
+@@ -0,0 +1,46 @@
++/**
++ * «Hablar con Lucía» en iPhone: expo-audio rechaza la grabación si antes no se activa en la sesión de audio.
++ * Después de grabar, la voz debe volver a sonar por el ALTAVOZ (no por el auricular) y con el modo silencio activado.
++ */
++const mockSetAudioMode = jest.fn(async (_mode: Record<string, unknown>) => undefined);
++jest.mock('expo-audio', () => ({ setAudioModeAsync: (mode: Record<string, unknown>) => mockSetAudioMode(mode) }), { virtual: true });
++import { configureAudioForRecording, configureAudioForSpeech } from '../audio';
++
++beforeEach(() => mockSetAudioMode.mockClear());
++
++test('antes de grabar se permite la grabación (si no, iOS lanza RecordingDisabledException)', async () => {
++  await configureAudioForRecording();
++  expect(mockSetAudioMode).toHaveBeenCalledWith(expect.objectContaining({
++    allowsRecording: true,
++    playsInSilentMode: true,
++    shouldRouteThroughEarpiece: false,
++  }));
++});
++
++test('la lectura en voz alta suena con el interruptor de silencio y por el altavoz', async () => {
++  await configureAudioForSpeech();
++  expect(mockSetAudioMode).toHaveBeenCalledWith(expect.objectContaining({
++    allowsRecording: false,
++    playsInSilentMode: true,
++    shouldRouteThroughEarpiece: false,
++  }));
++});
++
++test('si el sistema no deja grabar, se informa (no se ignora en silencio)', async () => {
++  mockSetAudioMode.mockRejectedValueOnce(new Error('denied'));
++  await expect(configureAudioForRecording()).rejects.toThrow('denied');
++});
++
++test('la pantalla de Lucía activa la grabación ANTES de preparar el micrófono (regresión)', () => {
++  // eslint-disable-next-line @typescript-eslint/no-require-imports
++  const fs = require('fs') as typeof import('fs');
++  // eslint-disable-next-line @typescript-eslint/no-require-imports
++  const path = require('path') as typeof import('path');
++  const source = fs.readFileSync(path.resolve(__dirname, '../../screens/assistant/AssistantScreen.tsx'), 'utf8');
++  const begin = source.indexOf('const beginVoiceMessage');
++  const end = source.indexOf('const finishVoiceMessage');
++  const body = source.slice(begin, end);
++  expect(begin).toBeGreaterThan(0);
++  expect(body.indexOf('configureAudioForRecording()')).toBeGreaterThan(0);
++  expect(body.indexOf('configureAudioForRecording()')).toBeLessThan(body.indexOf('prepareToRecordAsync()'));
++});
+diff --git a/src/utils/__tests__/speechText.test.ts b/src/utils/__tests__/speechText.test.ts
+new file mode 100644
+index 0000000..5834c30
+--- /dev/null
++++ b/src/utils/__tests__/speechText.test.ts
+@@ -0,0 +1,66 @@
++import { endWithPause, limitSpeechParts, prepareSpeechText } from '../speechText';
++
++describe('Texto para la voz natural', () => {
++  test.each([
++    ['Tome 1 comprimido de 1 g cada 6-8 horas, sin pasar de 3 g/día.', 'Tome 1 comprimido de 1 gramo cada 6 a 8 horas, sin pasar de 3 gramos por día.'],
++    ['Paracetamol 500mg c/8h.', 'Paracetamol 500 miligramos cada 8 horas.'],
++    ['Jarabe 250 mg/5 ml.', 'Jarabe 250 miligramos por cada 5 mililitros.'],
++    ['Solución 100 mg/ml.', 'Solución 100 miligramos por mililitro.'],
++    ['0,5 mg; 1 mg; 1,5 g; 1000 UI; 30 min; 5 %; 1000 mcg', '0,5 miligramos; 1 miligramo; 1,5 gramos; 1000 unidades internacionales; 30 minutos; 5 por ciento; 1000 microgramos'],
++    ['Si te encuentras mal, llama al 112 o acude a urgencias.', 'Si te encuentras mal, llama al uno, uno, dos o acude a urgencias.'],
++    ['El teléfono 024 atiende 24 h.', 'El teléfono cero, dos, cuatro atiende 24 horas.'],
++    ['Toma aprox. 2 comprimidos, p. ej. con el desayuno, etc. Después descansa.', 'Toma aproximadamente 2 comprimidos, por ejemplo con el desayuno, etcétera. Después descansa.'],
++  ])('%s', (input, expected) => {
++    expect(prepareSpeechText(input)).toBe(expected);
++  });
++
++  test('una dosis de 112 microgramos NO se lee como el teléfono de emergencias', () => {
++    expect(prepareSpeechText('Eutirox 112 mcg comprimidos')).toBe('Eutirox 112 microgramos comprimidos');
++    expect(prepareSpeechText('Toma el 112 mcg por la mañana')).toBe('Toma el 112 microgramos por la mañana');
++  });
++
++  test('no toca fechas, teléfonos, direcciones ni vitaminas', () => {
++    const text = 'Llamada del 08-10-2026 al teléfono 91-562-04-20. Vivo en c/ Mayor 5. Vitamina B12.';
++    expect(prepareSpeechText(text)).toBe(text);
++  });
++
++  test('quita el formato y deja una pausa al final de cada línea de una lista', () => {
++    expect(prepareSpeechText('**Importante**: no lo tomes con alcohol.\n- Bebe agua\n• Consulta a tu médico'))
++      .toBe('Importante: no lo tomes con alcohol. Bebe agua. Consulta a tu médico');
++  });
++
++  test('no lee enlaces ni emojis en voz alta', () => {
++    expect(prepareSpeechText('Puedes consultarlo en https://cima.aemps.es/cima/dochtml/p/65402/P_65402.html. ¡Ánimo! 😊👍'))
++      .toBe('Puedes consultarlo en el enlace. ¡Ánimo!');
++    expect(prepareSpeechText('Fuente oficial (www.aemps.gob.es) ✅ revisada.')).toBe('Fuente oficial revisada.');
++  });
++
++  test('es idempotente (se puede aplicar dos veces)', () => {
++    const once = prepareSpeechText('Paracetamol 1 g c/8 h, máx. 3 g/día. Llama al 112. Jarabe 250 mg/5 ml, 5 %.');
++    expect(prepareSpeechText(once)).toBe(once);
++  });
++
++  test('endWithPause añade el punto solo si falta', () => {
++    expect(endWithPause('Qué es')).toBe('Qué es.');
++    expect(endWithPause('¿Para qué sirve?')).toBe('¿Para qué sirve?');
++  });
++});
++
++describe('Lectura continua limitada', () => {
++  test('incluye apartados completos en orden y avisa si deja alguno fuera', () => {
++    expect(limitSpeechParts(['Uno. Dos.', 'Tres cuatro.', 'Cinco.'], 22)).toEqual({ parts: ['Uno. Dos.', 'Tres cuatro.'], truncated: true });
++    expect(limitSpeechParts(['Uno.', 'Dos.'], 100)).toEqual({ parts: ['Uno.', 'Dos.'], truncated: false });
++  });
++
++  test('si el primer apartado ya es largo, corta al final de una frase (nunca a mitad de palabra)', () => {
++    const { parts, truncated } = limitSpeechParts(['Frase uno larga. Frase dos larga. Frase tres larga.'], 36);
++    expect(truncated).toBe(true);
++    expect(parts).toEqual(['Frase uno larga. Frase dos larga.']);
++  });
++
++  test('sin final de frase, corta en un espacio y termina con pausa', () => {
++    const { parts } = limitSpeechParts(['palabras sencillas sin puntos que siguen y siguen'], 20);
++    expect(parts[0]).toBe('palabras sencillas.');
++    expect(parts[0]).not.toMatch(/senci$/);
++  });
++});
+diff --git a/src/utils/audio.ts b/src/utils/audio.ts
+index 3c47134..798809c 100644
+--- a/src/utils/audio.ts
++++ b/src/utils/audio.ts
+@@ -1,7 +1,11 @@
+ /**
+- * Audio de la lectura en voz alta.
+- * En iPhone, sin esto la voz NO suena si el interruptor de silencio está activado:
+- * para personas mayores la lectura en voz alta es una función de accesibilidad.
++ * Sesión de audio del teléfono.
++ *
++ * - Lectura en voz alta (voz natural, Lucía, explicación inicial): en iPhone, sin esto la voz NO suena si el
++ *   interruptor de silencio está activado; para personas mayores la lectura en voz alta es una función de
++ *   accesibilidad. Además devuelve el sonido al ALTAVOZ después de usar el micrófono.
++ * - Grabación («Hablar con Lucía»): en iPhone, expo-audio rechaza `record()` (RecordingDisabledException) si
++ *   antes no se ha activado la grabación en la sesión de audio. Al terminar hay que volver a la lectura.
+  */
+ import { Platform } from 'react-native';
+ import { setAudioModeAsync } from 'expo-audio';
+@@ -13,9 +17,26 @@ export async function configureAudioForSpeech(): Promise<void> {
+       allowsRecording: false,
+       playsInSilentMode: true,
+       shouldPlayInBackground: false,
++      shouldRouteThroughEarpiece: false,
+       interruptionMode: 'duckOthers',
+     });
+   } catch {
+     // Si el sistema no lo permite, la voz sigue funcionando con el modo por defecto.
+   }
+ }
++
++/**
++ * Prepara el teléfono para grabar un mensaje de voz. Lanza un error si el sistema no lo permite (la pantalla
++ * lo muestra con un aviso claro; nunca cierra la app). El sonido sigue saliendo por el altavoz, no por el
++ * auricular.
++ */
++export async function configureAudioForRecording(): Promise<void> {
++  if (Platform.OS === 'web') return;
++  await setAudioModeAsync({
++    allowsRecording: true,
++    playsInSilentMode: true,
++    shouldPlayInBackground: false,
++    shouldRouteThroughEarpiece: false,
++    interruptionMode: 'doNotMix',
++  });
++}
+diff --git a/src/utils/playbackRate.ts b/src/utils/playbackRate.ts
+new file mode 100644
+index 0000000..e8575e4
+--- /dev/null
++++ b/src/utils/playbackRate.ts
+@@ -0,0 +1,10 @@
++/**
++ * Velocidad de reproducción de una voz natural ya grabada a partir de la preferencia de lectura.
++ * 0,85 era la velocidad «Normal» de la voz del sistema: con voz natural, «Normal» es su velocidad real (1×).
++ * Se evita estirar mucho el audio (sonaría metálico): solo 0,9× (más lento) o 1,12× (más rápido).
++ */
++export function naturalPlaybackRate(rate: number): number {
++  if (rate <= 0.77) return 0.9;
++  if (rate >= 0.93) return 1.12;
++  return 1;
++}
+diff --git a/src/utils/runtime.ts b/src/utils/runtime.ts
+new file mode 100644
+index 0000000..d505d49
+--- /dev/null
++++ b/src/utils/runtime.ts
+@@ -0,0 +1,12 @@
++/**
++ * ¿Dónde se está ejecutando MediClaro?
++ * En Expo Go (la app de pruebas de Expo) no existen los módulos nativos propios de MediClaro: compras de la
++ * App Store / Google Play y llamadas de audio por internet (WebRTC). Esas funciones muestran un aviso claro
++ * en lugar de un error técnico; en la app instalada (build de EAS) funcionan con normalidad.
++ */
++import Constants from 'expo-constants';
++
++export const IS_EXPO_GO: boolean = String(Constants.executionEnvironment ?? '') === 'storeClient';
++
++export const EXPO_GO_NATIVE_ONLY_MESSAGE =
++  'Esta función necesita la app MediClaro instalada. En la vista previa de Expo Go no está disponible.';
+diff --git a/src/utils/speechText.ts b/src/utils/speechText.ts
+new file mode 100644
+index 0000000..a112b72
+--- /dev/null
++++ b/src/utils/speechText.ts
+@@ -0,0 +1,178 @@
++/**
++ * Texto preparado para la VOZ NATURAL (Sulafat · Achird · Aoede).
++ *
++ * El texto que se ve en pantalla no cambia: solo se ajusta lo que se envía a la voz, para que una persona
++ * mayor oiga «quinientos miligramos cada ocho horas» y no «quinientos eme ge ce barra ocho hache».
++ *  - Unidades junto a una cifra: mg, g, mcg/µg, ml, UI, h, min, %, mmol, mEq y combinadas (mg/ml, mg/5 ml).
++ *  - «c/8 h» → «cada 8 horas»; rangos «6-8 horas» → «6 a 8 horas».
++ *  - El 112 se dice como en España («uno, uno, dos») SOLO cuando se habla del teléfono de emergencias
++ *    («llama al 112»); una dosis como «Eutirox 112 microgramos» no se toca.
++ *  - Restos de formato (asteriscos, almohadillas, viñetas) fuera.
++ * Es idempotente: aplicarla dos veces da el mismo resultado.
++ * Sin lookbehind ni \p{…}: funciona igual en Hermes (iPhone/Android) que en las pruebas.
++ */
++
++const LETTERS = 'A-Za-zÁÉÍÓÚÜÑáéíóúüñ';
++/** Lo que puede ir justo antes de una cifra para que sea una cantidad (no parte de «B12» o de «x2»). */
++const LEFT = `(^|[^${LETTERS}\\d.,])`;
++const NUMBER = String.raw`(\d+(?:[.,]\d+)?)`;
++/** Después de la unidad no puede seguir una letra ni una cifra («5 mgx» no es una unidad; «8 horas» ya está). */
++const UNIT_END = `(?![${LETTERS}\\d])`;
++
++/** Unidad → [singular, plural]. Claves en minúsculas. */
++const UNIT_WORDS: Record<string, [string, string]> = {
++  mg: ['miligramo', 'miligramos'],
++  g: ['gramo', 'gramos'],
++  gr: ['gramo', 'gramos'],
++  mcg: ['microgramo', 'microgramos'],
++  'µg': ['microgramo', 'microgramos'],
++  'μg': ['microgramo', 'microgramos'],
++  ug: ['microgramo', 'microgramos'],
++  kg: ['kilo', 'kilos'],
++  ml: ['mililitro', 'mililitros'],
++  l: ['litro', 'litros'],
++  ui: ['unidad internacional', 'unidades internacionales'],
++  mmol: ['milimol', 'milimoles'],
++  meq: ['miliequivalente', 'miliequivalentes'],
++  h: ['hora', 'horas'],
++  min: ['minuto', 'minutos'],
++};
++
++const UNIT_ALT = Object.keys(UNIT_WORDS)
++  .sort((a, b) => b.length - a.length)
++  .join('|');
++
++const DOSE_WORDS = 'miligramo|microgramo|gramo|mililitro|unidad|comprimido|cápsula|capsula|sobre|gota|dosis';
++
++function unitWord(unit: string, num: string): string {
++  const words = UNIT_WORDS[unit.toLowerCase()];
++  if (!words) return unit;
++  return num === '1' ? words[0] : words[1];
++}
++
++/** «100 mg/ml» → «100 miligramos por mililitro»; «250 mg/5 ml» → «250 miligramos por cada 5 mililitros». */
++function expandCompositeUnits(text: string): string {
++  const re = new RegExp(`${LEFT}${NUMBER}\\s?(${UNIT_ALT})\\s?\\/\\s?(?:(\\d+(?:[.,]\\d+)?)\\s?)?(${UNIT_ALT})${UNIT_END}`, 'gi');
++  return text.replace(re, (_m, left: string, num: string, unit: string, perNum: string | undefined, perUnit: string) => {
++    const first = `${num} ${unitWord(unit, num)}`;
++    if (perNum) return `${left}${first} por cada ${perNum} ${unitWord(perUnit, perNum)}`;
++    return `${left}${first} por ${unitWord(perUnit, '1')}`;
++  });
++}
++
++function expandSimpleUnits(text: string): string {
++  const re = new RegExp(`${LEFT}${NUMBER}(\\s?)(${UNIT_ALT})${UNIT_END}`, 'gi');
++  return text.replace(re, (match, left: string, num: string, space: string, unit: string) => {
++    // «2 l» sí; «2l» suele ser una errata o parte de un código: no se toca.
++    if (unit.toLowerCase() === 'l' && !space) return match;
++    return `${left}${num} ${unitWord(unit, num)}`;
++  });
++}
++
++const EMERGENCY_CONTEXT = 'al|el|del|número|numero|teléfono|telefono|marca|marcar|marque|llama|llamar|llame|llamad|emergencias';
++
++function sayEmergencyNumbers(text: string): string {
++  const notDose = `(?!\\s?(?:${UNIT_ALT}|${DOSE_WORDS}))`;
++  return text
++    .replace(
++      new RegExp(`(^|[^${LETTERS}\\d])(${EMERGENCY_CONTEXT})(\\s+)112(?!\\d|[.,]\\d)${notDose}`, 'gi'),
++      '$1$2$3uno, uno, dos',
++    )
++    .replace(/\(112\)/g, '(uno, uno, dos)')
++    .replace(new RegExp(`(^|[^${LETTERS}\\d])(${EMERGENCY_CONTEXT})(\\s+)024(?!\\d|[.,]\\d)`, 'gi'), '$1$2$3cero, dos, cuatro');
++}
++
++/**
++ * Restos de Markdown o de listas que la voz leería en voz alta. Cada línea de una lista termina con una pausa,
++ * para que «Bebe agua» y «Consulta a tu médico» no se lean pegados.
++ */
++function stripFormatting(text: string): string {
++  const lines = text
++    .replace(/\*\*|__|`+/g, '')
++    .split('\n')
++    .map((line) =>
++      line
++        .replace(/^[ \t]{0,3}#{1,6}[ \t]+/, '')
++        .replace(/^[ \t]*[•·▪●◦*-][ \t]+/, '')
++        .replace(/\s+·\s+/g, ', ')
++        .replace(/[•▪●◦]/g, ',')
++        .trim(),
++    )
++    .filter(Boolean);
++  if (lines.length <= 1) return lines.join('');
++  return lines.map((line, i) => (i < lines.length - 1 ? endWithPause(line) : line)).join(' ');
++}
++
++/**
++ * Prepara un texto para la voz natural. No cambia el sentido: solo cómo se pronuncia.
++ */
++export function prepareSpeechText(input: string): string {
++  if (!input) return '';
++  let text = stripFormatting(input.replace(/\r\n?/g, '\n'));
++  // Enlaces y emojis no se leen en voz alta («hache te te pe ese…», «cara sonriente»).
++  text = text
++    .replace(/\s*\((?:https?:\/\/|www\.)[^\s)]*\)/gi, '')
++    .replace(/\b(?:https?:\/\/|www\.)[^\s]*[^\s.,;:!?)]/gi, 'el enlace')
++    .replace(/(?:\uD83C[\uDDE6-\uDDFF\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F\uDE80-\uDEFF]|\uD83E[\uDD00-\uDEFF])|[\u2600-\u27BF]|\uFE0F|\u200D/g, '')
++    .replace(/\s+([,.;:!?])/g, '$1');
++  text = text.replace(/[\s\u00A0\u202F]+/g, ' ').trim();
++  if (!text) return '';
++
++  // «c/8 h», «c/ 12h» → «cada 8 h» (una dirección «c/ Mayor» no lleva cifra detrás y no se toca)
++  text = text.replace(/(^|[^A-Za-z])c\s?\/\s?(?=\d)/gi, '$1cada ');
++  // Rangos de cifras pequeñas (no fechas ni códigos): «6-8 horas» → «6 a 8 horas»
++  text = text.replace(/(^|[^\d\-–/.,])(\d{1,3})\s?[-–]\s?(\d{1,3})(?!\d|[-–/]\d)/g, '$1$2 a $3');
++  text = expandCompositeUnits(text);
++  text = expandSimpleUnits(text);
++  // «1 gramo/día», «20 miligramos/dosis» → «por día», «por dosis»
++  text = text.replace(/\s?\/\s?(día|dia|dosis|semana|mes|toma)(?![A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/gi, ' por $1');
++  // Porcentajes: «5 %» → «5 por ciento»
++  text = text.replace(/(\d)\s?%/g, '$1 por ciento');
++  // Abreviaturas habituales en explicaciones
++  // (si la abreviatura cerraba la frase, se conserva el punto: «…, etc. El número…» → «…, etcétera. El número…»)
++  text = text
++    .replace(/(^|\s)aprox\.(?=\s|$)/gi, '$1aproximadamente')
++    .replace(/(^|\s)p\.\s?ej\.(?=\s|$)/gi, '$1por ejemplo')
++    .replace(/(^|\s)etc\.(?=\s+[A-ZÁÉÍÓÚÑ¿¡]|\s*$)/g, '$1etcétera.')
++    .replace(/(^|\s)etc\.(?=\s|$)/gi, '$1etcétera');
++  text = sayEmergencyNumbers(text);
++  return text.replace(/\s+/g, ' ').trim();
++}
++
++/** Añade un punto final si el apartado no termina en signo de puntuación (la voz hace la pausa correcta). */
++export function endWithPause(text: string): string {
++  const t = text.trim();
++  if (!t) return t;
++  return /[.!?…:;]$/.test(t) ? t : `${t}.`;
++}
++
++/**
++ * Limita una lectura continua a `maxChars` sin partir palabras ni frases:
++ * apartados completos en orden y, si el primero ya es demasiado largo, hasta el último final de frase.
++ */
++export function limitSpeechParts(parts: string[], maxChars: number): { parts: string[]; truncated: boolean } {
++  const out: string[] = [];
++  let used = 0;
++  for (const raw of parts) {
++    const part = raw.trim();
++    if (!part) continue;
++    const extra = out.length ? 1 : 0;
++    if (used + extra + part.length <= maxChars) {
++      out.push(part);
++      used += extra + part.length;
++      continue;
++    }
++    if (!out.length) out.push(cutAtSentence(part, maxChars));
++    return { parts: out, truncated: true };
++  }
++  return { parts: out, truncated: false };
++}
++
++function cutAtSentence(text: string, maxChars: number): string {
++  if (text.length <= maxChars) return text;
++  const slice = text.slice(0, maxChars);
++  const sentenceEnd = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('? '), slice.lastIndexOf('! '), slice.lastIndexOf('; '));
++  if (sentenceEnd > maxChars * 0.4) return slice.slice(0, sentenceEnd + 1).trim();
++  const space = slice.lastIndexOf(' ');
++  return endWithPause(space > 0 ? slice.slice(0, space) : slice);
++}
+diff --git a/supabase/functions/tts-preview/index.ts b/supabase/functions/tts-preview/index.ts
+index 06be845..7055270 100644
+--- a/supabase/functions/tts-preview/index.ts
++++ b/supabase/functions/tts-preview/index.ts
+@@ -12,6 +12,8 @@ const ALLOWED = new Set([
+   'Hola. Soy la voz de MediClaro. Te acompañaré con una lectura clara, natural y tranquila.',
+   'Hola. Soy el asistente de MediClaro. Estoy aquí para explicarte la información de tus medicamentos de forma sencilla y clara.',
+   'El paracetamol sirve para aliviar el dolor leve o moderado y para bajar la fiebre. En adultos se suele tomar 1 comprimido de 1 g cada 6 a 8 horas, sin pasar de 3 al día. Si tienes dudas, consulta a tu farmacéutico.',
++  // «¿Quieres ser cuidador/a?» → «Escuchar cómo funciona» (perfil cuidador gratuito: no puede usar la voz Premium).
++  'El perfil de cuidador es gratuito. Para vincularte, un paciente con MediClaro Premium te comparte su código de seis números o su QR. Tú envías la solicitud y el paciente debe aceptarla. Solo después recibirás sus avisos y mensajes de emergencia. Puedes dejar de ser cuidador cuando quieras. Si además contratas Premium, conservarás tu perfil de cuidador y tendrás también las funciones Premium para tu propio uso.',
+ ]);
+ const cors = {
+   'Access-Control-Allow-Origin': '*',
+diff --git a/supabase/functions/tts/index.ts b/supabase/functions/tts/index.ts
+index 3ef2685..e3e55da 100644
+--- a/supabase/functions/tts/index.ts
++++ b/supabase/functions/tts/index.ts
+@@ -2,6 +2,8 @@
+  * Gemini TTS — voz natural de MediClaro.
+  * La lectura de medicamentos admite varios segmentos pero devuelve UN solo WAV,
+  * para que no haya cortes ni palabras partidas al cambiar de tarjeta.
++ * Los segmentos llegan cortados entre frases; al unirlos se deja una pausa breve y natural.
++ * Todas las voces hablan en español de España (acento castellano), como la explicación inicial.
+  */
+ import { fail, handler, json } from '../_shared/common.ts';
+ import { requirePremium } from '../_shared/entitlements.ts';
+@@ -13,16 +15,21 @@ const MAX_SEGMENT = 3200;
+ const MAX_SEGMENTS = 16;
+ const MAX_TOTAL = 28_000;
+ 
++const SPAIN_SPANISH = 'Speak in Spanish from Spain (Castilian accent, es-ES). ';
++
+ function styleFor(purpose: string): string {
+   if (purpose === 'assistant') {
+-    return 'Natural, warm and reassuring. Speak clearly to an older adult, with human conversational cadence, gentle pauses and no theatrical exaggeration.';
++    return SPAIN_SPANISH + 'Natural, warm and reassuring. Speak clearly to an older adult, with human conversational cadence, gentle pauses and no theatrical exaggeration.';
+   }
+   if (purpose === 'preview') {
+-    return 'Warm, natural and friendly. Clear diction, relaxed pace, human cadence.';
++    return SPAIN_SPANISH + 'Warm, natural and friendly. Clear diction, relaxed pace, human cadence.';
+   }
+-  return 'Warm, calm and exceptionally clear. Accessible reading for an older adult, unhurried cadence, natural pauses and precise pronunciation of medication names. Continue naturally between sections without clipping the last or first word.';
++  return SPAIN_SPANISH + 'Warm, calm and exceptionally clear. Accessible reading for an older adult, unhurried cadence, natural pauses and precise pronunciation of medication names. Always finish the last word completely.';
+ }
+ 
++/** Pausa entre segmentos al unirlos (24 kHz · 16 bits · mono): 0,28 s de silencio. */
++const SEGMENT_PAUSE_BYTES = Math.round(24000 * 0.28) * 2;
++
+ function extractAudio(payload: any): { data: string; mime: string } | null {
+   if (typeof payload?.output_audio?.data === 'string' && payload.output_audio.data) {
+     return { data: payload.output_audio.data, mime: payload.output_audio.mime_type ?? 'audio/wav' };
+@@ -88,10 +95,15 @@ function mergeWavBase64(parts: string[]): string | null {
+   const pcmParts = parts.map(wavToPcm);
+   if (pcmParts.some((p) => !p)) return null;
+   const valid = pcmParts as Uint8Array[];
+-  const total = valid.reduce((n, p) => n + p.length, 0);
+-  const merged = new Uint8Array(total);
++  const pauses = Math.max(0, valid.length - 1) * SEGMENT_PAUSE_BYTES;
++  const total = valid.reduce((n, p) => n + p.length, 0) + pauses;
++  const merged = new Uint8Array(total); // los huecos quedan a cero = silencio
+   let offset = 0;
+-  for (const p of valid) { merged.set(p, offset); offset += p.length; }
++  valid.forEach((p, i) => {
++    merged.set(p, offset);
++    offset += p.length;
++    if (i < valid.length - 1) offset += SEGMENT_PAUSE_BYTES;
++  });
+   return pcm24kToWavBase64(bytesToBase64(merged));
+ }
+ 

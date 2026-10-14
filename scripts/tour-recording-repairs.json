@@ -1,0 +1,49 @@
+{
+  "about": "Reparaciones de las grabaciones ACTUALES de la explicación (Google Gemini TTS). Comprobadas con reconocimiento de voz y con la continuidad de la onda: algunas grabaciones empiezan con el final de la anterior («-macéutico», «-llas») y por eso a otras les falta la última palabra. Solo se aplican si el archivo coincide exactamente (sha256); al regenerar las voces dejan de aplicarse solas.",
+  "repairs": [
+    {
+      "file": "tour-overview-sulafat.wav",
+      "sha256": "bdb4154ddefe3e9cf25707aa1da6bbdfd6e6b29f8c11a89f2c369c4e304d5339",
+      "cutAt": 78.3,
+      "spokenUntil": "con tu número de teléfono.",
+      "why": "Se corta justo al empezar la última palabra («…puede hacer por t-»). Termina en «…con tu número de teléfono.» hasta regenerarla."
+    },
+    {
+      "file": "tour-assistant-sulafat.wav",
+      "sha256": "3ef80f4669601ebb4a61ce1c407dc1f185953e04829a2c93f07ca8e04a98348d",
+      "dropHead": 0.3,
+      "appendFrom": {
+        "file": "tour-voice-sulafat.wav",
+        "sha256": "556d8ae1b405b49c710847dfeff0785a8e149ed2d6ccca54a2fc6c1b1c48ad7f",
+        "from": 0,
+        "to": 0.6
+      },
+      "why": "Empezaba con un resto de otra grabación y terminaba en «farma-»: el final («-macéutico») estaba al principio de la grabación siguiente. Unidas, la frase queda completa."
+    },
+    {
+      "file": "tour-voice-sulafat.wav",
+      "sha256": "556d8ae1b405b49c710847dfeff0785a8e149ed2d6ccca54a2fc6c1b1c48ad7f",
+      "cutAt": 6.08,
+      "dropHead": 0.62,
+      "spokenUntil": "en voz alta",
+      "why": "Empezaba con «-macéutico» (de la grabación anterior) y se cortaba en «despacio y a tu r-». Se termina en «en voz alta» hasta regenerarla."
+    },
+    {
+      "file": "tour-identify-achird.wav",
+      "sha256": "c71699df7c0bb24ce694917b70a6a979d0c3b47e57dd610ed4c6d4645f28d646",
+      "appendFrom": {
+        "file": "tour-assistant-achird.wav",
+        "sha256": "a4e3295f0abbe33c83f43c5b553aa51719705acd77fd0ac82be9cf8a4f36b75a",
+        "from": 0,
+        "to": 0.3
+      },
+      "why": "Se cortaba en «palabras sen-»: el final de «sencillas» estaba al principio de la grabación siguiente."
+    },
+    {
+      "file": "tour-assistant-achird.wav",
+      "sha256": "a4e3295f0abbe33c83f43c5b553aa51719705acd77fd0ac82be9cf8a4f36b75a",
+      "dropHead": 0.3,
+      "why": "Empezaba con el final de «sencillas» (de la grabación anterior)."
+    }
+  ]
+}

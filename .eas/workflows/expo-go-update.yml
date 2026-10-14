@@ -1,0 +1,40 @@
+name: Expo Go - vista previa
+
+# Publica la ultima version del codigo para abrirla en Expo Go (iPhone/Android).
+# Se lanza a mano. No toca las builds de App Store / Google Play:
+# la configuracion de actualizaciones solo se aplica dentro de esta ejecucion.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  expo_go:
+    name: Publicar para Expo Go
+    environment: preview
+    env:
+      # Valores PUBLICOS (los mismos de eas.json). Ningun secreto.
+      EXPO_PUBLIC_SUPABASE_URL: https://ldonnvkysjalpmystoeq.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf
+      EXPO_PUBLIC_DEMO_ACCESS: 'on'
+      # Como el perfil «preview»: en Expo Go no hay compras de Apple, así que se muestran los planes con pago por tarjeta (Stripe).
+      EXPO_PUBLIC_PAYMENTS_MODE: store,stripe
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Preparar runtime de Expo Go (solo en esta ejecucion)
+        run: |
+          node -e "
+            const fs=require('fs');
+            const j=JSON.parse(fs.readFileSync('app.json','utf8'));
+            const sdk=require('expo/package.json').version.split('.')[0];
+            j.expo.runtimeVersion='exposdk:'+sdk+'.0.0';
+            j.expo.updates={url:'https://u.expo.dev/'+j.expo.extra.eas.projectId};
+            fs.writeFileSync('app.json',JSON.stringify(j,null,2));
+            console.log('runtimeVersion',j.expo.runtimeVersion);
+          "
+      - name: Canal fijo expo-go (el mismo QR abre siempre la ultima version)
+        run: npx eas-cli@latest channel:create expo-go --non-interactive || echo "El canal expo-go ya existe"
+      - name: Publicar actualizacion
+        run: |
+          npx eas-cli@latest update --branch expo-go --platform all --non-interactive \
+            --message "Expo Go $(git rev-parse --short HEAD)"

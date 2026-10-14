@@ -1,0 +1,211 @@
+PROMPT MAESTRO — CONTINUAR MEDICLARO SIN RECONSTRUIR DESDE CERO
+
+Actúa como responsable técnico senior de MediClaro. Debes continuar exactamente sobre el código de este paquete y llevarlo a una Release Candidate real para iOS/Android.
+
+REGLAS OBLIGATORIAS
+
+1. NO reconstruyas el proyecto desde cero.
+2. NO sustituyas el diseño actual por otro diseño.
+3. Conserva la identidad visual y mejora solo distribución, responsive, accesibilidad y claridad.
+4. NO cambies la lógica de identificación por fotografía de medicamentos salvo que una prueba demuestre un fallo concreto.
+5. NO vuelvas a introducir lectura de código de barras como requisito.
+6. NO inventes endpoints, servicios, builds, credenciales ni resultados de pruebas.
+7. NO declares una función "lista" sin probarla.
+8. NO envíes automáticamente una build a Apple. Solo crear build interna/QA hasta autorización explícita.
+9. NO incluyas secretos en Git, ZIP ni logs.
+10. Mantén botón Atrás/Volver en todos los flujos donde el usuario pueda quedar encerrado.
+
+MODELO DE PERFILES
+
+Perfil Básico:
+- gratis por defecto;
+- no mostrar "Soy usuario";
+- nombre obligatorio;
+- sexo obligatorio;
+- edad obligatoria;
+- teléfono opcional;
+- foto de perfil disponible;
+- funciones Premium con candado claro.
+
+Perfil Cuidador/a:
+- gratuito;
+- NO pedir teléfono;
+- NO SMS;
+- NO verificación telefónica;
+- nombre, sexo, edad y foto;
+- puede recibir avisos/chat/llamadas de pacientes Premium vinculados;
+- no obtiene Premium para sí mismo;
+- puede ser Cuidador/a + Premium.
+
+Perfil Premium:
+- desbloquea IA real, identificación/explicación completa de medicamentos, voz natural y funciones Premium;
+- puede vincular cuidadores;
+- IAP debe verificarse en servidor.
+
+VINCULACIÓN CUIDADOR
+
+Cada paciente Premium tiene código fijo de 6 cifras.
+El cuidador puede:
+A) escribir el código;
+B) escanear QR.
+QR opcional.
+Ambas rutas crean solicitud pendiente.
+El paciente debe Aceptar o Rechazar.
+Hasta aceptar no se comparten datos.
+Después:
+"Cuidador/a de [Nombre paciente]".
+El paciente puede desvincular con doble confirmación.
+El cuidador puede abandonar vínculo con confirmación.
+Si pierde el último vínculo y no paga Premium -> Básico.
+Si tiene Premium -> sigue Premium.
+
+IA LUCÍA
+
+Debe:
+- mantener conversación continua;
+- no volver a saludar cada turno;
+- preguntar cómo está hoy cuando encaje;
+- acompañar con tono amable;
+- persistir historial;
+- mantener contexto longitudinal;
+- mostrar "Pensando..." animado;
+- escribir progresivamente la respuesta;
+- NO reanimar el historial antiguo;
+- responder automáticamente por voz natural a cada nueva respuesta;
+- permitir hablar manteniendo pulsado el micrófono y soltar para enviar;
+- transcribir y enviar;
+- no usar fallback robótico silencioso.
+
+Voces:
+- Sulafat;
+- Achird;
+- Aoede.
+Aoede puede usarse como voz más suave/armoniosa para Lucía.
+La lectura de medicamentos debe usar Sulafat.
+
+LECTURA DE MEDICAMENTOS
+
+Debe prepararse como reproducción continua.
+No cortar palabras entre tarjetas/apartados.
+Nunca reproducir "senci-" y luego "llas" en el siguiente bloque.
+Controles:
+- reproducir;
+- pausar;
+- continuar;
+- repetir desde principio;
+- progreso;
+- tiempo actual;
+- duración;
+- iconos claros;
+- diseño responsive.
+Si Sulafat falla, mostrar error y reintentar; no cambiar a voz robótica.
+
+EMERGENCIA
+
+Dentro del chat de Lucía, cuando detecte posible emergencia, mostrar:
+- "Avisar y llamar a mi cuidador/a";
+- "Abrir emergencia".
+
+Al pulsar avisar/llamar:
+1. crear incidente;
+2. notificar cuidador aceptado;
+3. abrir chat de emergencia;
+4. compartir motivo;
+5. compartir ubicación autorizada;
+6. iniciar automáticamente llamada VoIP al cuidador;
+7. cuidador acepta llamada;
+8. mantener chat/ubicación durante incidente.
+
+Solo cuidadores aceptados pueden recibir emergencia.
+
+La llamada debe ser WebRTC/VoIP, no llamada telefónica de pago.
+Configurar TURN para producción.
+No declarar llamada autónoma real al 112 mientras no esté validada legal/técnicamente.
+El 112 permanece manual hasta esa validación.
+
+NOTIFICACIONES
+
+"Activar avisos en este móvil" debe pedir permiso real, registrar dispositivo y mostrar estado.
+Si permiso denegado, ofrecer acceso a Ajustes.
+Probar:
+- solicitud cuidador;
+- incidente;
+- mensaje;
+- llamada;
+- pantalla bloqueada.
+
+MICRÓFONO
+
+La siguiente build debe incluir NSMicrophoneUsageDescription REAL dentro del Info.plist final.
+No basta con app.json.
+Descargar IPA y comprobar el plist embebido.
+Pulsar micrófono jamás puede cerrar la app.
+
+PAGOS
+
+No activar producción hasta Apple Sandbox:
+- compra;
+- restore;
+- cancelación;
+- expiración;
+- webhook/notificación servidor.
+storeVerification debe permanecer bloqueando cobro real hasta completar pruebas.
+
+QA OBLIGATORIA
+
+Antes de una RC:
+- npm ci;
+- npx expo install --check;
+- npm run typecheck;
+- npm test -- --runInBand;
+- auditoría de foto de medicamento;
+- auditoría cuidador;
+- auditoría emergencia;
+- auditoría TTS;
+- release-check;
+- expo-doctor;
+- build interna;
+- descargar IPA;
+- inspeccionar Info.plist;
+- prueba física iPhone.
+
+NO declarar producción si:
+- falta TURN;
+- no se ha probado IAP Sandbox;
+- no se ha verificado micrófono en dispositivo;
+- no se ha probado flujo cuidador en dos móviles;
+- no se ha verificado voz natural real.
+
+DOCUMENTACIÓN DE REFERENCIA
+
+Leer primero:
+- 00_LEEME_PRIMERO_MEDICLARO.md
+- 01_ESPECIFICACION_FUNCIONAL_EXACTA.md
+- 02_ESTADO_REAL_Y_PENDIENTES.md
+- README.md
+- BACKEND_REQUIREMENTS.md
+- FRONTEND_AUDIT.md
+- SCREEN_MAP.md
+- PRODUCTION_SETUP.md
+- MEDICLARO_RC_IPHONE_ACCEPTANCE.md
+
+OBJETIVO FINAL
+
+Entregar una RC claramente versionada, responsive y funcional, con:
+- perfiles correctos;
+- cuidador gratuito;
+- Premium validado;
+- medicamento + Sulafat continua;
+- Lucía conversacional con voz natural;
+- micrófono estable;
+- historial persistente;
+- emergencia integrada;
+- chat cuidador;
+- llamada VoIP;
+- ubicación;
+- notificaciones;
+- privacidad y permisos correctos;
+- pruebas completas;
+- IPA inspeccionada.
+
+Nunca ocultes un bloqueo. Si algo depende de Apple, TURN, permisos o una prueba física, indícalo exactamente.

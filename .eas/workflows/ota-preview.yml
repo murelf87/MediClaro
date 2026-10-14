@@ -1,0 +1,29 @@
+name: Actualizar la app instalada (preview)
+
+# Publica el JavaScript nuevo para las apps instaladas desde una build «preview» que ya incluya expo-updates
+# (la siguiente build en adelante) y tengan la MISMA version de la app (runtime = version, p. ej. 1.0.1).
+# No gasta builds. Si cambia codigo nativo (modulos nuevos, permisos, ajustes de plataforma en app.json)
+# hace falta una build nueva y, normalmente, subir la version.
+# Se lanza a mano. Solo valores PUBLICOS (los mismos del perfil preview de eas.json). Ningun secreto.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  ota_preview:
+    name: Publicar actualizacion (preview)
+    environment: preview
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: https://ldonnvkysjalpmystoeq.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf
+      EXPO_PUBLIC_DEMO_ACCESS: 'on'
+      EXPO_PUBLIC_PAYMENTS_MODE: store,stripe
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Canal preview (lo crea la build; por si acaso)
+        run: npx eas-cli@latest channel:create preview --non-interactive || echo "El canal preview ya existe"
+      - name: Publicar actualizacion
+        run: |
+          npx eas-cli@latest update --channel preview --platform all --non-interactive \
+            --message "Preview $(git rev-parse --short HEAD)"

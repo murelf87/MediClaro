@@ -1,0 +1,73 @@
+{
+  "generatedBy": "scripts/build-tour-track.mjs",
+  "voices": {
+    "Sulafat": {
+      "file": "tour-full-sulafat.wav",
+      "sha256": "577d6aa9e0345ba4e9795e114e0d0c78da02463facd49445a54cd33ad5a6446a",
+      "duration": 79.04,
+      "parts": [
+        {
+          "file": "tour-overview-sulafat.wav",
+          "sha256": "bdb4154ddefe3e9cf25707aa1da6bbdfd6e6b29f8c11a89f2c369c4e304d5339",
+          "repaired": true,
+          "complete": true
+        }
+      ],
+      "chapters": [
+        {
+          "id": "overview",
+          "start": 0,
+          "speechStart": 0.36,
+          "speechEnd": 78.22,
+          "end": 79.04
+        }
+      ],
+      "scenes": [
+        {
+          "id": "welcome",
+          "at": 0
+        },
+        {
+          "id": "problem",
+          "at": 8.4
+        },
+        {
+          "id": "together",
+          "at": 17.5
+        },
+        {
+          "id": "featurePhoto",
+          "at": 22.97
+        },
+        {
+          "id": "featureAsk",
+          "at": 31.33
+        },
+        {
+          "id": "featureListen",
+          "at": 34.55
+        },
+        {
+          "id": "featureSave",
+          "at": 38.44
+        },
+        {
+          "id": "featureReady",
+          "at": 41.19
+        },
+        {
+          "id": "people",
+          "at": 46.65
+        },
+        {
+          "id": "trust",
+          "at": 55.18
+        },
+        {
+          "id": "premium",
+          "at": 66.47
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1375 @@
+﻿diff --git a/app.json b/app.json
+index c327c42..1ab723a 100644
+--- a/app.json
++++ b/app.json
+@@ -88,8 +88,8 @@
+         "expo-camera",
+         {
+           "cameraPermission": "MediClaro usa la c├ímara para fotografiar la caja de tu medicamento e identificarlo.",
+-          "microphonePermission": false,
+-          "recordAudioAndroid": false
++          "microphonePermission": "MediClaro usa el micr├│fono cuando mantienes pulsado para hablar con la asistente o cuando aceptas una llamada de audio con tu cuidador.",
++          "recordAudioAndroid": true
+         }
+       ],
+       [
+@@ -109,7 +109,7 @@
+         {
+           "photosPermission": "MediClaro usa tus fotos solo si eliges una imagen de la caja de tu medicamento para identificarla.",
+           "cameraPermission": "MediClaro usa la c├ímara para fotografiar la caja de tu medicamento e identificarlo.",
+-          "microphonePermission": false
++          "microphonePermission": "MediClaro usa el micr├│fono cuando mantienes pulsado para hablar con la asistente o cuando aceptas una llamada de audio con tu cuidador."
+         }
+       ],
+       "expo-font",
+@@ -140,7 +140,8 @@
+         }
+       ],
+       "@config-plugins/react-native-webrtc",
+-      "expo-asset"
++      "expo-asset",
++      "./plugins/withRequiredIosPrivacy"
+     ],
+     "extra": {
+       "supabaseUrl": "https://TU-PROYECTO.supabase.co",
+@@ -149,7 +150,7 @@
+       "eas": {
+         "projectId": "fefacac9-9dc6-42fe-972e-15b3b62f4286"
+       },
+-      "buildLabel": "1.0.1-production-29-20261007",
++      "buildLabel": "1.0.1-qa-32-20261008",
+       "appReviewReady": false
+     },
+     "icon": "./assets/icon.png",
+diff --git a/src/hooks/__tests__/naturalSpeech.test.ts b/src/hooks/__tests__/naturalSpeech.test.ts
+index cdece41..45cd0c9 100644
+--- a/src/hooks/__tests__/naturalSpeech.test.ts
++++ b/src/hooks/__tests__/naturalSpeech.test.ts
+@@ -49,32 +49,34 @@ describe('Natural speech lifecycle',()=>{
+  test('simple voice preparation does not claim playback',async()=>{
+   mockSynthesize.mockResolvedValue({uri:'a.wav',cleanup:jest.fn()});await mount({simple:true});await act(async()=>output.speak('x','hello',0.85,'Achird'));expect(output.loadingId).toBe('x');expect(output.speakingId).toBeNull();await act(async()=>mockListener({playing:true}));expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
+  });
+- test('simple synthesis failure falls back and resets on device completion',async()=>{
++ test('simple synthesis failure never falls back to the robotic device voice',async()=>{
+   mockSynthesize.mockRejectedValue(new Error('offline'));await mount({simple:true});await act(async()=>output.speak('x','hola'));
+-  expect(Speech.speak).toHaveBeenCalledWith('hola',expect.objectContaining({voice:'es-premium'}));
+-  const options=(Speech.speak as jest.Mock).mock.calls[0][1];
+-  await act(async()=>options.onStart());expect(output.speakingId).toBe('x');expect(output.loadingId).toBeNull();
+-  await act(async()=>options.onDone());expect(output.speakingId).toBeNull();
++  expect(Speech.speak).not.toHaveBeenCalled();
++  expect(output.speakingId).toBeNull();expect(output.loadingId).toBeNull();
+  });
+- test('native playback error releases Google audio before fallback',async()=>{
++ test('native playback error releases natural audio without robotic fallback',async()=>{
+   const cleanup=jest.fn();mockSynthesize.mockResolvedValue({uri:'bad.wav',cleanup});await mount({simple:true});
+   await act(async()=>output.speak('x','hola'));await act(async()=>mockListener({error:'decode failed'}));
+-  expect(mockPlayer.remove).toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);expect(Speech.speak).toHaveBeenCalledTimes(1);
++  expect(mockPlayer.remove).toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);expect(Speech.speak).not.toHaveBeenCalled();
++  expect(output.speakingId).toBeNull();expect(output.loadingId).toBeNull();
+  });
+- test('stopping while device voices load prevents late fallback playback',async()=>{
+-  let resolve:any;(Speech.getAvailableVoicesAsync as jest.Mock).mockReturnValue(new Promise(r=>resolve=r));
+-  mockSynthesize.mockRejectedValue(new Error('offline'));await mount({simple:true});await act(async()=>output.speak('x','hola'));
+-  await act(async()=>output.stop());await act(async()=>resolve([]));expect(Speech.speak).not.toHaveBeenCalled();
++ test('stop during natural synthesis prevents late playback',async()=>{
++  let resolve:any;const cleanup=jest.fn();mockSynthesize.mockReturnValue(new Promise(r=>resolve=r));
++  await mount({simple:true});await act(async()=>output.speak('x','hola'));await act(async()=>output.stop());
++  await act(async()=>resolve({uri:'late.wav',cleanup}));
++  expect(Speech.speak).not.toHaveBeenCalled();expect(mockPlayer.play).not.toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+- test('slow synthesis falls back once and discards late cloud audio',async()=>{
++ test('slow synthesis times out without switching to the device voice',async()=>{
+   jest.useFakeTimers();let resolve:any;const cleanup=jest.fn();mockSynthesize.mockReturnValue(new Promise(r=>resolve=r));
+-  await mount({simple:true});await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(20000));
+-  expect(Speech.speak).toHaveBeenCalledTimes(1);await act(async()=>resolve({uri:'late.wav',cleanup}));
++  await mount({simple:true});await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(35000));
++  expect(Speech.speak).not.toHaveBeenCalled();expect(output.loadingId).toBeNull();
++  await act(async()=>resolve({uri:'late.wav',cleanup}));
+   expect(cleanup).toHaveBeenCalledTimes(1);expect(mockPlayer.play).not.toHaveBeenCalled();
+  });
+- test('silent player startup falls back instead of waiting forever',async()=>{
+-  jest.useFakeTimers();mockSynthesize.mockResolvedValue({uri:'silent.wav',cleanup:jest.fn()});await mount({simple:true});
+-  await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(10000));expect(Speech.speak).toHaveBeenCalledTimes(1);
++ test('silent natural player startup stops instead of falling back to a robotic voice',async()=>{
++  jest.useFakeTimers();const cleanup=jest.fn();mockSynthesize.mockResolvedValue({uri:'silent.wav',cleanup});await mount({simple:true});
++  await act(async()=>output.speak('x','hola'));await act(async()=>jest.advanceTimersByTime(10000));
++  expect(Speech.speak).not.toHaveBeenCalled();expect(cleanup).toHaveBeenCalledTimes(1);expect(output.speakingId).toBeNull();
+  });
+  test('medication reading retries natural TTS after an error',async()=>{
+   mockSynthesize.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({uri:'retry.wav',cleanup:jest.fn()});
+diff --git a/src/hooks/index.ts b/src/hooks/index.ts
+index ed422a2..b61bce8 100644
+--- a/src/hooks/index.ts
++++ b/src/hooks/index.ts
+@@ -3,7 +3,7 @@ export { useRefreshOnFocus } from './useRefreshOnFocus';
+ export { useCountdown, useElapsedSeconds } from './useCountdown';
+ export { useEmergencySession } from './useEmergencySession';
+ export { useAssistantConversation } from './useAssistantConversation';
+-export { useSectionSpeech, useSimpleSpeech, useGeminiSectionSpeech, useGeminiSimpleSpeech, type SpeechSection, type SpeechStatus } from './useSpeech';
++export { useSectionSpeech, useSimpleSpeech, useGeminiSectionSpeech, useGeminiContinuousSpeech, useGeminiSimpleSpeech, type SpeechSection, type SpeechStatus } from './useSpeech';
+ export { useSession } from '../providers/SessionProvider';
+ export { usePreferences, useAppTheme } from '../providers/PreferencesProvider';
+ export { useEntitlement, type EntitlementStatus } from '../providers/EntitlementProvider';
+diff --git a/src/hooks/useSpeech.ts b/src/hooks/useSpeech.ts
+index a982f69..ce5abef 100644
+--- a/src/hooks/useSpeech.ts
++++ b/src/hooks/useSpeech.ts
+@@ -144,14 +144,13 @@ export function useSimpleSpeech() {
+ }
+ 
+ // ÔöÇÔöÇÔöÇ Gemini TTS: voces naturales seleccionables ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+-// Se mantiene expo-speech arriba como respaldo local si el servicio de voz
+-// natural no est├í disponible. Emergencias siguen usando useSimpleSpeech().
++// La lectura Premium y Luc├¡a no sustituyen la voz natural por la voz rob├│tica
++// del dispositivo. Emergencias cr├¡ticas conservan su canal de voz independiente.
+ 
+ import { createAudioPlayer, type AudioPlayer, type AudioSource, type AudioStatus } from 'expo-audio';
+ import { SpeechService, type GeminiVoice } from '../services';
+ import { configureAudioForSpeech } from '../utils/audio';
+ import { showAlert } from '../utils/dialogs';
+-import { speakOnDevice } from '../utils/deviceSpeech';
+ 
+ type GeminiPlayerRef = {
+   player: AudioPlayer;
+@@ -177,7 +176,140 @@ function releaseGeminiPlayer(ref: { current: GeminiPlayerRef | null }) {
+   try { current.cleanupFile(); } catch { /* noop */ }
+ }
+ 
+-/** Lectura por secciones con Gemini TTS. La pantalla de medicamentos fija Sulafat y nunca cae a una voz rob├│tica del dispositivo. */
++/** Reproducci├│n continua: genera toda la explicaci├│n y la reproduce como un ├║nico audio. */
++export function useGeminiContinuousSpeech(parts: string[], rate: number, voice: GeminiVoice = 'Sulafat') {
++  const [status, setStatus] = useState<SpeechStatus>('idle');
++  const [currentTime, setCurrentTime] = useState(0);
++  const [duration, setDuration] = useState(0);
++  const playerRef = useRef<GeminiPlayerRef | null>(null);
++  const token = useRef(0);
++  const partsRef = useRef(parts);
++  const rateRef = useRef(rate);
++  const voiceRef = useRef(voice);
++  const statusRef = useRef<SpeechStatus>('idle');
++  partsRef.current = parts;
++  rateRef.current = rate;
++  voiceRef.current = voice;
++  statusRef.current = status;
++
++  const setSpeechStatus = useCallback((next: SpeechStatus) => {
++    statusRef.current = next;
++    setStatus(next);
++  }, []);
++
++  const prepareAndPlay = useCallback(async () => {
++    const cleanParts = partsRef.current.map((p) => p.trim()).filter(Boolean);
++    if (!cleanParts.length) return;
++    const my = ++token.current;
++    releaseGeminiPlayer(playerRef);
++    Speech.stop();
++    setCurrentTime(0);
++    setDuration(0);
++    setSpeechStatus('loading');
++    try {
++      await configureAudioForSpeech();
++      const audio = await SpeechService.synthesizeContinuous(cleanParts, voiceRef.current);
++      if (my !== token.current) { audio.cleanup(); return; }
++
++      const player = createAudioPlayer(audio.uri, { downloadFirst: true, updateInterval: 200 });
++      player.playbackRate = playbackRate(rateRef.current);
++      player.shouldCorrectPitch = true;
++      const subscription = player.addListener('playbackStatusUpdate', (s: AudioStatus) => {
++        if (my !== token.current) return;
++        if (s.error) {
++          releaseGeminiPlayer(playerRef);
++          setSpeechStatus('error');
++          void showAlert('Sulafat no est├í disponible', 'No se ha podido reproducir la explicaci├│n completa. Comprueba la conexi├│n y vuelve a intentarlo.');
++          return;
++        }
++        if (Number.isFinite(s.currentTime)) setCurrentTime(Math.max(0, s.currentTime));
++        if (Number.isFinite(s.duration) && s.duration > 0) setDuration(s.duration);
++        if (s.playing && statusRef.current !== 'paused') setSpeechStatus('speaking');
++        if (s.didJustFinish) {
++          setCurrentTime(s.duration || duration);
++          setSpeechStatus('finished');
++        }
++      });
++      playerRef.current = { player, subscription, cleanupFile: audio.cleanup };
++      player.play();
++    } catch {
++      if (my !== token.current) return;
++      releaseGeminiPlayer(playerRef);
++      setSpeechStatus('error');
++      void showAlert(
++        'Sulafat no est├í disponible',
++        'No voy a sustituirla por la voz rob├│tica del tel├®fono. Comprueba la conexi├│n y vuelve a intentarlo.',
++      );
++    }
++  }, [setSpeechStatus]);
++
++  const play = useCallback(() => {
++    const current = playerRef.current?.player;
++    if (statusRef.current === 'paused' && current) {
++      current.play();
++      setSpeechStatus('speaking');
++      return;
++    }
++    if (statusRef.current === 'finished' && current) {
++      void current.seekTo(0).then(() => {
++        setCurrentTime(0);
++        current.play();
++        setSpeechStatus('speaking');
++      }).catch(() => void prepareAndPlay());
++      return;
++    }
++    void prepareAndPlay();
++  }, [prepareAndPlay, setSpeechStatus]);
++
++  const pause = useCallback(() => {
++    const current = playerRef.current?.player;
++    if (!current) return;
++    current.pause();
++    setSpeechStatus('paused');
++  }, [setSpeechStatus]);
++
++  const replay = useCallback(() => {
++    const current = playerRef.current?.player;
++    if (!current) { void prepareAndPlay(); return; }
++    void current.seekTo(0).then(() => {
++      setCurrentTime(0);
++      current.play();
++      setSpeechStatus('speaking');
++    }).catch(() => void prepareAndPlay());
++  }, [prepareAndPlay, setSpeechStatus]);
++
++  useEffect(() => {
++    if (!playerRef.current) return;
++    playerRef.current.player.playbackRate = playbackRate(rate);
++    playerRef.current.player.shouldCorrectPitch = true;
++  }, [rate]);
++
++  useEffect(() => {
++    token.current += 1;
++    releaseGeminiPlayer(playerRef);
++    setCurrentTime(0);
++    setDuration(0);
++    setSpeechStatus('idle');
++  }, [parts]);
++
++  useEffect(() => () => {
++    token.current += 1;
++    releaseGeminiPlayer(playerRef);
++    Speech.stop();
++  }, []);
++
++  return {
++    status,
++    currentTime,
++    duration,
++    progress: duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0,
++    play,
++    pause,
++    replay,
++  };
++}
++
++/** Lectura por secciones con Gemini TTS. Conservada para otros usos internos. */
+ export function useGeminiSectionSpeech(sections: SpeechSection[], rate: number, voice: GeminiVoice) {
+   const [status, setStatus] = useState<SpeechStatus>('idle');
+   const [index, setIndex] = useState(0);
+@@ -389,11 +521,6 @@ export function useGeminiSimpleSpeech() {
+       setSpeakingId(null);
+       setLoadingId(null);
+     };
+-    const failDevice = () => {
+-      if (!current()) return;
+-      finish();
+-      void showAlert('No se puede reproducir la voz', 'La voz del tel├®fono tampoco est├í disponible. Puedes seguir leyendo el texto.');
+-    };
+     const fallback = () => {
+       if (!current() || fallbackStarted) return;
+       fallbackStarted = true;
+@@ -401,16 +528,13 @@ export function useGeminiSimpleSpeech() {
+       releaseGeminiPlayer(playerRef);
+       pendingCleanup?.();
+       pendingCleanup = undefined;
+-      setSpeakingId(null);
+-      setLoadingId(id);
+-      void speakOnDevice(text, rate, current, {
+-        onStart: () => { if (current()) { setLoadingId(null); setSpeakingId(id); } },
+-        onDone: finish,
+-        onStopped: finish,
+-        onError: failDevice,
+-      }).catch(failDevice);
++      finish();
++      void showAlert(
++        'Voz natural no disponible',
++        'No voy a sustituirla por la voz rob├│tica del tel├®fono. Comprueba la conexi├│n y vuelve a intentarlo.',
++      );
+     };
+-    preparationRef.current = setTimeout(fallback, 20_000);
++    preparationRef.current = setTimeout(fallback, purpose === 'assistant' && text.length > 2800 ? 90_000 : 35_000);
+     void (async () => {
+       try {
+         await configureAudioForSpeech();
+@@ -418,7 +542,9 @@ export function useGeminiSimpleSpeech() {
+         let source: AudioSource = localPreviewSource ?? null;
+         let cleanup = () => undefined as void;
+         if (!localPreviewSource) {
+-          const audio = await SpeechService.synthesize(text, voice, purpose);
++          const audio = purpose === 'assistant' && text.length > 2800
++            ? await SpeechService.synthesizeContinuous([text], voice, 'assistant')
++            : await SpeechService.synthesize(text, voice, purpose);
+           if (!current() || fallbackStarted) { audio.cleanup(); return; }
+           source = audio.uri;
+           cleanup = audio.cleanup;
+diff --git a/src/screens/assistant/AssistantScreen.tsx b/src/screens/assistant/AssistantScreen.tsx
+index e791c5e..7176d53 100644
+--- a/src/screens/assistant/AssistantScreen.tsx
++++ b/src/screens/assistant/AssistantScreen.tsx
+@@ -6,8 +6,8 @@
+  *  - /chat?medicationId=ÔÇª&medicationName=ÔÇª (mode 'stack'): con "Volver" y contexto
+  *    del medicamento (el backend recibe medicineId y usa su prospecto oficial).
+  *
+- * La conversaci├│n vive en AssistantService (memoria): se conserva al cambiar de
+- * pesta├▒a o de pantalla y se borra con "Nueva conversaci├│n" o al cerrar sesi├│n.
++ * La conversaci├│n se conserva en el historial privado del usuario y se recupera
++ * al volver a abrir MediClaro. No se borra al cambiar de pantalla ni al cerrar sesi├│n.
+  *
+  * Teclado: KeyboardAvoidingView con behavior 'padding' en iOS y Android (con
+  * edge-to-edge, obligatorio en Android 15+, la ventana ya no se redimensiona).
+@@ -33,7 +33,7 @@ import {
+ } from 'react-native';
+ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+ import { useSafeAreaInsets } from 'react-native-safe-area-context';
+-import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
++import { RecordingPresets, requestRecordingPermissionsAsync, useAudioRecorder } from 'expo-audio';
+ import {
+   AppText,
+   Badge,
+@@ -53,7 +53,7 @@ import { configureAudioForSpeech } from '../../utils/audio';
+ import { PUBLIC_HEALTH_RESOURCES } from '../../config/app';
+ import { MAX_FONT_SIZE_MULTIPLIER } from '../../theme';
+ import { callPhone, openExternalUrl } from '../../utils/device';
+-import { confirmAsync, showAlert } from '../../utils/dialogs';
++import { showAlert } from '../../utils/dialogs';
+ import { formatPhoneForDisplay, onlyDigits } from '../../utils/format';
+ import type { AssistantContext, AssistantMessage, EmergencyResource } from '../../types';
+ import {
+@@ -133,14 +133,14 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+   );
+   const shortName = medicationName ? shortMedicationName(medicationName) : null;
+ 
+-  const { messages, sending, send, retry, clear } = useAssistantConversation(ctx);
++  const { messages, sending, send, retry } = useAssistantConversation(ctx);
+   const { speakingId, loadingId, speak, stop } = useGeminiSimpleSpeech();
+-  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
++  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+   const [recordingVoice, setRecordingVoice] = useState(false);
+   const [processingVoice, setProcessingVoice] = useState(false);
+   const micHeldRef = useRef(false);
+   const recordingRef = useRef(false);
+-  const autoSpeakBaseRef = useRef<number | null>(null);
++  const autoSpeakAfterRef = useRef<number | null>(null);
+   const emergencyOpenedRef = useRef<string | null>(null);
+   const caregiverOpenedRef = useRef(new Set<string>());
+   useEffect(() => {
+@@ -159,13 +159,14 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+   // Si la pregunta se hizo manteniendo pulsado el micr├│fono, la primera respuesta
+   // nueva se reproduce autom├íticamente con la voz natural elegida.
+   useEffect(() => {
+-    const base = autoSpeakBaseRef.current;
+-    if (base === null) return;
+-    const replies = messages.filter((m) => m.role === 'assistant' && !m.emergency);
+-    if (replies.length <= base) return;
+-    const latest = replies[replies.length - 1];
+-    autoSpeakBaseRef.current = null;
+-    if (latest?.text) speak(latest.id, latest.text, prefs.speechRate, prefs.assistantVoice, 'assistant');
++    const after = autoSpeakAfterRef.current;
++    if (after === null) return;
++    const latest = [...messages]
++      .reverse()
++      .find((m) => m.role === 'assistant' && !m.emergency && Date.parse(m.createdAt) >= after - 1000);
++    if (!latest) return;
++    autoSpeakAfterRef.current = null;
++    if (latest.text) speak(latest.id, latest.text, prefs.speechRate, prefs.assistantVoice, 'assistant');
+   }, [messages, speak, prefs.speechRate, prefs.assistantVoice]);
+ 
+   // La voz y cualquier grabaci├│n se detienen al salir de la pantalla.
+@@ -250,11 +251,12 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+       // Permiso expl├¡cito antes de enviar la pregunta a la IA (el borrador se conserva si no lo da).
+       if (!(await AiConsentService.ensure())) return;
+       if (text === undefined) setDraft('');
++      autoSpeakAfterRef.current = Date.now();
+       stickToBottom.current = true;
+       void send(question);
+       scrollToEnd();
+     },
+-    [draft, sending, send, scrollToEnd],
++    [draft, sending, send, scrollToEnd, messages],
+   );
+ 
+   const beginVoiceMessage = useCallback(async () => {
+@@ -270,10 +272,9 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+     }
+     if (!micHeldRef.current) return;
+     try {
+-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+       await recorder.prepareToRecordAsync();
+-      if (!micHeldRef.current) { await configureAudioForSpeech(); return; }
+-      recorder.record({ forDuration: 60 });
++      if (!micHeldRef.current) return;
++      recorder.record();
+       recordingRef.current = true;
+       setRecordingVoice(true);
+     } catch {
+@@ -301,10 +302,9 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+       }
+       setProcessingVoice(true);
+       const transcript = await VoiceConversationService.transcribe(uri);
+-      autoSpeakBaseRef.current = messages.filter((m) => m.role === 'assistant' && !m.emergency).length;
+       await submit(transcript);
+     } catch (e) {
+-      autoSpeakBaseRef.current = null;
++      autoSpeakAfterRef.current = null;
+       await configureAudioForSpeech();
+       await showAlert('No he podido entenderte', (e as Error).message || 'Vuelve a intentarlo hablando un poco m├ís cerca del tel├®fono.');
+     } finally {
+@@ -312,24 +312,6 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+     }
+   }, [recorder, messages, submit]);
+ 
+-  const onNewConversation = useCallback(async () => {
+-    if (sending) {
+-      await showAlert('Un momento', 'Espera a que llegue la respuesta para empezar una conversaci├│n nueva.');
+-      return;
+-    }
+-    const ok = await confirmAsync({
+-      title: '┬┐Empezar una conversaci├│n nueva?',
+-      message: 'Se borrar├ín los mensajes de esta conversaci├│n.',
+-      confirmText: 'Empezar de nuevo',
+-      cancelText: 'Cancelar',
+-      destructive: true,
+-    });
+-    if (!ok) return;
+-    stop();
+-    clear();
+-    stickToBottom.current = true;
+-  }, [sending, stop, clear]);
+-
+   const toggleSpeak = useCallback(
+     (message: AssistantMessage) => {
+       if (speakingId === message.id || loadingId === message.id) stop();
+@@ -375,8 +357,9 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+         return <EmergencyReply message={item.message} onOpenEmergency={() => router.push('/emergency')} onNotifyCaregiver={() => void notifyCaregiver()} />;
+       case 'assistant':
+       default: {
+-        const animate = !animatedAssistantIds.current.has(item.message.id);
+-        if (animate) animatedAssistantIds.current.add(item.message.id);
++        const isRecent = Date.now() - Date.parse(item.message.createdAt) < 15_000;
++        const animate = isRecent && !animatedAssistantIds.current.has(item.message.id);
++        animatedAssistantIds.current.add(item.message.id);
+         return (
+           <AssistantBubble
+             message={item.message}
+@@ -392,25 +375,27 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+ 
+   const listHeader = (
+     <View style={{ gap: theme.spacing.md }}>
+-      <View style={styles.welcomeRow}>
+-        <AssistantAvatar size={theme.easyMode ? 60 : 54} />
+-        <View
+-          style={[
+-            styles.bubble,
+-            styles.assistantBubble,
+-            { backgroundColor: c.primaryTint, borderColor: c.primarySoft, borderRadius: theme.radius.lg },
+-          ]}
+-        >
+-          <AppText variant="body" color="text">
+-            {WELCOME}
+-          </AppText>
+-          {shortName ? (
+-            <AppText variant="body" color="text" style={{ marginTop: theme.spacing.xs }}>
+-              {`┬┐Qu├® quieres saber sobre ${shortName}?`}
++      {messages.length === 0 ? (
++        <View style={styles.welcomeRow}>
++          <AssistantAvatar size={theme.easyMode ? 60 : 54} />
++          <View
++            style={[
++              styles.bubble,
++              styles.assistantBubble,
++              { backgroundColor: c.primaryTint, borderColor: c.primarySoft, borderRadius: theme.radius.lg },
++            ]}
++          >
++            <AppText variant="body" color="text">
++              {WELCOME}
+             </AppText>
+-          ) : null}
++            {shortName ? (
++              <AppText variant="body" color="text" style={{ marginTop: theme.spacing.xs }}>
++                {`┬┐Qu├® quieres saber sobre ${shortName}?`}
++              </AppText>
++            ) : null}
++          </View>
+         </View>
+-      </View>
++      ) : null}
+       {messages.length === 0 ? (
+         <>
+           <InfoBanner
+@@ -442,16 +427,6 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+     <AssistantHeader
+       title="Asistente de MediClaro"
+       showBack={mode === 'stack'}
+-      right={
+-        messages.length > 0 ? (
+-          <IconButton
+-            icon="create-outline"
+-            accessibilityLabel="Nueva conversaci├│n"
+-            onPress={() => void onNewConversation()}
+-            testID="assistant-new"
+-          />
+-        ) : null
+-      }
+     />
+   );
+ 
+@@ -559,32 +534,58 @@ export function AssistantScreen({ mode }: { mode: AssistantMode }) {
+                 />
+               </View>
+             </View>
+-            <View style={styles.voiceRow}>
+-              <Pressable
+-                onPressIn={() => void beginVoiceMessage()}
+-                onPressOut={() => void finishVoiceMessage()}
+-                disabled={sending || processingVoice}
+-                accessibilityRole="button"
+-                accessibilityLabel="Mant├®n pulsado para hablar con Luc├¡a"
+-                accessibilityHint="Mant├®n pulsado mientras hablas y suelta para enviar"
+-                accessibilityState={{ disabled: sending || processingVoice, busy: processingVoice }}
+-                testID="assistant-hold-to-talk"
+-                style={({ pressed }) => [
+-                  styles.micButton,
++            {!keyboardVisible ? (
++              <View
++                style={[
++                  styles.voiceDock,
+                   {
+-                    backgroundColor: recordingVoice ? c.danger : c.primary,
+-                    borderColor: recordingVoice ? c.dangerPressed : c.primaryPressed,
+-                    opacity: sending || processingVoice ? 0.45 : pressed ? 0.84 : 1,
+-                    transform: [{ scale: recordingVoice ? 1.06 : pressed ? 0.97 : 1 }],
++                    borderRadius: theme.radius.xl,
++                    borderColor: recordingVoice ? c.dangerSoft : c.primarySoft,
++                    backgroundColor: recordingVoice ? c.dangerTint : c.primaryTint,
++                    paddingHorizontal: compact ? theme.spacing.sm : theme.spacing.md,
++                    paddingVertical: compact ? theme.spacing.xs : theme.spacing.sm,
+                   },
+                 ]}
+               >
+-                <Icon name={recordingVoice ? 'mic' : processingVoice ? 'hourglass-outline' : 'mic-outline'} size={30} color={c.onPrimary} />
+-              </Pressable>
+-              <AppText variant="caption" color={recordingVoice ? 'dangerText' : 'textSecondary'} align="center">
+-                {recordingVoice ? 'HablandoÔÇª suelta para enviar' : processingVoice ? 'Entendiendo tu mensajeÔÇª' : 'Mant├®n pulsado para hablar'}
+-              </AppText>
+-            </View>
++                <View style={styles.voiceDockTitle}>
++                  <Icon name="chatbubble-ellipses-outline" size={18} color={c.primary} />
++                  <AppText variant="bodyStrong" color="heading">Hablar con Luc├¡a</AppText>
++                </View>
++                <Pressable
++                  onPressIn={() => void beginVoiceMessage()}
++                  onPressOut={() => void finishVoiceMessage()}
++                  disabled={sending || processingVoice}
++                  accessibilityRole="button"
++                  accessibilityLabel="Mant├®n pulsado para hablar con Luc├¡a"
++                  accessibilityHint="Mant├®n pulsado mientras hablas y suelta para enviar"
++                  accessibilityState={{ disabled: sending || processingVoice, busy: processingVoice }}
++                  testID="assistant-hold-to-talk"
++                  style={({ pressed }) => [
++                    styles.micButton,
++                    {
++                      width: compact ? 64 : 72,
++                      height: compact ? 64 : 72,
++                      borderRadius: compact ? 32 : 36,
++                      backgroundColor: recordingVoice ? c.danger : c.primary,
++                      borderColor: recordingVoice ? c.dangerPressed : c.primaryPressed,
++                      opacity: sending || processingVoice ? 0.45 : pressed ? 0.88 : 1,
++                      transform: [{ scale: recordingVoice ? 1.06 : pressed ? 0.97 : 1 }],
++                    },
++                    theme.shadow.button,
++                  ]}
++                >
++                  <Icon name={recordingVoice ? 'mic' : processingVoice ? 'hourglass-outline' : 'mic-outline'} size={32} color={c.onPrimary} />
++                </Pressable>
++                <AppText variant="captionStrong" color={recordingVoice ? 'dangerText' : 'text'} align="center">
++                  {recordingVoice ? 'Te escuchoÔÇª suelta para enviar' : processingVoice ? 'Entendiendo tu mensajeÔÇª' : 'Mant├®n pulsado y suelta para enviar'}
++                </AppText>
++                {!compact && !recordingVoice && !processingVoice ? (
++                  <AppText variant="small" color="textSecondary" align="center">
++                    Luc├¡a responder├í autom├íticamente por voz natural.
++                  </AppText>
++                ) : null}
++              </View>
++            ) : null}
+             {draft.length >= COUNTER_FROM ? (
+               <AppText
+                 variant="small"
+@@ -630,7 +631,7 @@ function AssistantBubble({
+     const timer = setInterval(() => {
+       setVisible((current) => {
+         if (current >= total) { clearInterval(timer); return total; }
+-        const next = Math.min(total, current + 2);
++        const next = Math.min(total, current + 1);
+         return next;
+       });
+     }, 55);
+@@ -835,6 +836,7 @@ const styles = StyleSheet.create({
+   inputBox: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+   input: { flex: 1, minHeight: 48, paddingTop: 12, paddingBottom: 12 },
+   sendWrap: { paddingVertical: 6, paddingRight: 6 },
+-  voiceRow: { alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 4 },
+-  micButton: { width: 68, height: 68, borderRadius: 34, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
++  voiceDock: { alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1 },
++  voiceDockTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
++  micButton: { borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
+ });
+diff --git a/src/screens/identify/VoiceScreen.tsx b/src/screens/identify/VoiceScreen.tsx
+index 248bdc7..a78baee 100644
+--- a/src/screens/identify/VoiceScreen.tsx
++++ b/src/screens/identify/VoiceScreen.tsx
+@@ -12,7 +12,6 @@ import {
+   AppText,
+   Card,
+   Icon,
+-  IconButton,
+   InfoBanner,
+   MedicationImage,
+   Screen,
+@@ -21,15 +20,13 @@ import {
+   Waveform,
+   type IconName,
+ } from '../../components';
+-import { useAppTheme, useAsync, usePreferences, useGeminiSectionSpeech } from '../../hooks';
++import { useAppTheme, useAsync, usePreferences, useGeminiContinuousSpeech } from '../../hooks';
+ import { MedicationService } from '../../services';
+ import {
+   SPEED_RATES,
+   buildReadingSections,
+-  buildSpeechPlan,
+   firstParam,
+   speedFromRate,
+-  type ReadingTone,
+   type SpeedOption,
+ } from './helpers';
+ import { FavoriteButton, ScreenError } from './parts';
+@@ -54,40 +51,35 @@ export default function VoiceScreen() {
+   const saved = useSavedMedication(d);
+ 
+   const sections = useMemo(() => (d ? buildReadingSections(d) : []), [d]);
+-  const plan = useMemo(() => buildSpeechPlan(sections), [sections]);
+-  // La lectura de medicamentos usa siempre Sulafat. No depende de una preferencia antigua guardada.
+-  const speech = useGeminiSectionSpeech(plan.sections, prefs.speechRate, 'Sulafat');
++  const audioParts = useMemo(
++    () => sections.map((s) => `${s.title}. ${s.text}`.replace(/\s+/g, ' ').trim()).filter(Boolean),
++    [sections],
++  );
++  // Toda la explicaci├│n se prepara y reproduce como un ├║nico audio continuo con Sulafat.
++  const speech = useGeminiContinuousSpeech(audioParts, prefs.speechRate, 'Sulafat');
+ 
+-  const total = sections.length;
+-  const current = plan.ownerOf[speech.index] ?? 0;
+   const playing = speech.status === 'speaking';
+   const loading = speech.status === 'loading';
+-  const active = playing || loading || speech.status === 'paused';
+   const finished = speech.status === 'finished';
+ 
+-  // Empieza a leer en cuanto la ficha est├í lista (la persona puls├│ "Leer en voz alta").
++  // Empieza autom├íticamente cuando la ficha ya est├í disponible.
+   const autoStarted = useRef(false);
+   const { play } = speech;
+   useEffect(() => {
+-    if (autoStarted.current || plan.sections.length === 0) return;
++    if (autoStarted.current || audioParts.length === 0) return;
+     autoStarted.current = true;
+     play();
+-  }, [plan.sections.length, play]);
+-
+-  // Al cambiar la velocidad, la parte actual se vuelve a leer con la nueva velocidad.
+-  const lastRate = useRef(prefs.speechRate);
+-  const { restartWithNewRate } = speech;
+-  useEffect(() => {
+-    if (lastRate.current === prefs.speechRate) return;
+-    lastRate.current = prefs.speechRate;
+-    restartWithNewRate();
+-  }, [prefs.speechRate, restartWithNewRate]);
++  }, [audioParts.length, play]);
+ 
+   const changeSpeed = (value: SpeedOption) => {
+     setSpeechRate(SPEED_RATES[value]).catch(() => undefined);
+   };
+ 
+-  const goToSection = useCallback((i: number) => speech.goTo(plan.startOf[i] ?? 0), [speech, plan.startOf]);
++  const formatTime = (seconds: number) => {
++    const safe = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
++    const minutes = Math.floor(safe / 60);
++    return `${minutes}:${String(safe % 60).padStart(2, '0')}`;
++  };
+ 
+   const loadImage = useCallback(() => MedicationService.getMedicationImage(id), [id]);
+   const name = d?.name ?? nameParam ?? 'Medicamento';
+@@ -106,7 +98,7 @@ export default function VoiceScreen() {
+     );
+   }
+ 
+-  const playLabel = loading ? 'Cancelar preparaci├│n de audio' : playing
++  const playLabel = loading ? 'Preparando la explicaci├│n completa' : playing
+     ? 'Pausar la lectura'
+     : speech.status === 'paused'
+       ? 'Continuar la lectura'
+@@ -115,16 +107,16 @@ export default function VoiceScreen() {
+         : 'Escuchar la lectura';
+   const playIcon: IconName = playing ? 'pause' : finished ? 'refresh' : 'play';
+ 
+-  const statusText = loading ? 'Preparando voz naturalÔÇª' :
++  const statusText = loading ? 'Preparando la explicaci├│n completa con SulafatÔÇª' :
+     speech.status === 'error'
+-      ? 'No se ha podido reproducir la voz natural. Comprueba tu conexi├│n y pulsa el bot├│n para reintentar.'
++      ? 'No se ha podido reproducir Sulafat. Comprueba tu conexi├│n y pulsa reproducir para reintentar.'
+       : finished
+-        ? 'Lectura terminada'
++        ? 'Explicaci├│n terminada'
+         : speech.status === 'paused'
+-          ? 'En pausa'
++          ? 'Explicaci├│n en pausa'
+           : playing
+-            ? `Leyendo: ${sections[current]?.title ?? ''}`
+-            : 'Pulsa el bot├│n para escuchar';
++            ? 'Reproduciendo la explicaci├│n completa'
++            : 'Pulsa reproducir para escuchar toda la explicaci├│n';
+ 
+   return (
+     <Screen header={header}>
+@@ -161,75 +153,88 @@ export default function VoiceScreen() {
+         </View>
+       ) : (
+         <>
+-          <View style={[styles.player, { marginTop: theme.spacing.xl }]}>
+-            <View style={styles.wave}>
+-              <Waveform active={playing} bars={9} height={48} color={c.primary} />
++          <Card style={[styles.audioCard, { marginTop: theme.spacing.xl, gap: theme.spacing.md }]}>
++            <View style={styles.waveRow}>
++              <Waveform active={playing} bars={17} height={52} color={c.primary} />
+             </View>
+-            <IconButton
+-              icon="play-skip-back"
+-              color={c.primary}
+-              size={28}
+-              onPress={() => goToSection(current - 1)}
+-              disabled={current <= 0}
+-              accessibilityLabel="Parte anterior"
+-              testID="voice-prev"
+-            />
+-            <Pressable
+-              onPress={() => (playing || loading ? speech.pause() : speech.play())}
+-              accessibilityRole="button"
+-              accessibilityLabel={playLabel}
+-              testID="voice-play"
+-              style={({ pressed }) => [
+-                styles.playButton,
+-                { backgroundColor: pressed ? c.primaryPressed : c.primary, borderColor: c.primarySoft },
+-                theme.shadow.button,
+-              ]}
+-            >
+-              <View style={playIcon === 'play' ? styles.playNudge : null}>
+-                <Icon name={playIcon} size={40} color={c.onPrimary} />
+-              </View>
+-            </Pressable>
+-            <IconButton
+-              icon="play-skip-forward"
+-              color={c.primary}
+-              size={28}
+-              onPress={() => goToSection(current + 1)}
+-              disabled={current >= total - 1}
+-              accessibilityLabel="Parte siguiente"
+-              testID="voice-next"
+-            />
+-            <View style={styles.wave}>
+-              <Waveform active={playing} bars={9} height={48} color={c.primary} />
++
++            <View style={styles.player}>
++              <Pressable
++                onPress={() => speech.replay()}
++                accessibilityRole="button"
++                accessibilityLabel="Repetir explicaci├│n desde el principio"
++                testID="voice-replay"
++                style={({ pressed }) => [
++                  styles.sideControl,
++                  {
++                    borderColor: c.primarySoft,
++                    backgroundColor: pressed ? c.primaryTint : c.surface,
++                  },
++                ]}
++              >
++                <Icon name="refresh" size={26} color={c.primary} />
++                <AppText variant="small" color="primary">Repetir</AppText>
++              </Pressable>
++
++              <Pressable
++                onPress={() => (playing ? speech.pause() : speech.play())}
++                disabled={loading}
++                accessibilityRole="button"
++                accessibilityLabel={playLabel}
++                accessibilityState={{ disabled: loading, busy: loading }}
++                testID="voice-play"
++                style={({ pressed }) => [
++                  styles.playButton,
++                  {
++                    backgroundColor: loading ? c.surfaceMuted : pressed ? c.primaryPressed : c.primary,
++                    borderColor: loading ? c.border : c.primarySoft,
++                    opacity: loading ? 0.7 : 1,
++                  },
++                  theme.shadow.button,
++                ]}
++              >
++                <View style={playIcon === 'play' ? styles.playNudge : null}>
++                  <Icon name={loading ? 'hourglass-outline' : playIcon} size={42} color={loading ? c.textSecondary : c.onPrimary} />
++                </View>
++              </Pressable>
++
++              <Pressable
++                onPress={() => (playing ? speech.pause() : speech.play())}
++                disabled={loading}
++                accessibilityRole="button"
++                accessibilityLabel={playing ? 'Pausar explicaci├│n' : 'Continuar explicaci├│n'}
++                style={({ pressed }) => [
++                  styles.sideControl,
++                  {
++                    borderColor: c.primarySoft,
++                    backgroundColor: pressed ? c.primaryTint : c.surface,
++                    opacity: loading ? 0.5 : 1,
++                  },
++                ]}
++              >
++                <Icon name={playing ? 'pause-circle-outline' : 'play-circle-outline'} size={26} color={c.primary} />
++                <AppText variant="small" color="primary">{playing ? 'Pausar' : 'Continuar'}</AppText>
++              </Pressable>
+             </View>
+-          </View>
+ 
+-          <View style={{ marginTop: theme.spacing.md, gap: theme.spacing.xs }} accessible accessibilityLabel={`${finished ? 'Lectura terminada' : `Parte ${current + 1} de ${total}`}. ${statusText}`}>
+-            <View style={styles.progressText}>
+-              <AppText variant="captionStrong" color="heading">
+-                {finished ? `Parte ${total} de ${total}` : `Parte ${current + 1} de ${total}`}
+-              </AppText>
+-              {speech.status === 'error' ? null : (
+-                <AppText variant="caption" color="textSecondary" style={styles.statusText} numberOfLines={2}>
++            <View style={{ gap: theme.spacing.xs }}>
++              <View style={styles.progressText}>
++                <AppText variant="captionStrong" color="heading">
++                  {formatTime(speech.currentTime)}
++                </AppText>
++                <AppText variant="caption" color="textSecondary" style={styles.statusText}>
+                   {statusText}
+                 </AppText>
+-              )}
+-            </View>
+-            <View style={[styles.segments, { gap: theme.spacing.xxs }]}>
+-              {sections.map((s, i) => {
+-                const done = finished || i < current;
+-                const now = !finished && i === current;
+-                return (
+-                  <View
+-                    key={s.id}
+-                    style={[
+-                      styles.segment,
+-                      { backgroundColor: done ? c.primary : now ? (active ? c.primary : c.primarySoft) : c.surfaceMuted, opacity: now && active && !playing ? 0.6 : 1 },
+-                    ]}
+-                  />
+-                );
+-              })}
++                <AppText variant="captionStrong" color="heading">
++                  {formatTime(speech.duration)}
++                </AppText>
++              </View>
++              <View style={[styles.progressTrack, { backgroundColor: c.surfaceMuted }]}>
++                <View style={[styles.progressFill, { backgroundColor: c.primary, width: `${Math.round(speech.progress * 100)}%` }]} />
++              </View>
+             </View>
+-          </View>
++          </Card>
++
+           {speech.status === 'error' ? (
+             <InfoBanner tone="warning" icon="volume-mute" message={statusText} style={{ marginTop: theme.spacing.sm }} />
+           ) : null}
+@@ -243,19 +248,25 @@ export default function VoiceScreen() {
+             />
+           </View>
+ 
+-          <Card style={{ marginTop: theme.spacing.lg, gap: theme.spacing.xxs }}>
+-            <AppText variant="heading" accessibilityRole="header" style={{ marginBottom: theme.spacing.xxs }}>
+-              ┬┐Qu├® se est├í leyendo?
++          <Card style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
++            <AppText variant="heading" accessibilityRole="header">
++              Contenido de la explicaci├│n
++            </AppText>
++            <AppText variant="caption" color="textSecondary">
++              Se reproduce seguido, como un ├║nico audio, sin cortes entre apartados.
+             </AppText>
+             {sections.map((s, i) => (
+-              <SectionRow
+-                key={s.id}
+-                index={i}
+-                title={s.title}
+-                tone={s.tone}
+-                current={active && i === current}
+-                onPress={() => goToSection(i)}
+-              />
++              <View key={s.id} style={styles.contentRow}>
++                <View style={[styles.number, { backgroundColor: c.primary }]}>
++                  <AppText variant="captionStrong" color="onPrimary" allowFontScaling={false}>
++                    {String(i + 1)}
++                  </AppText>
++                </View>
++                <AppText variant="body" color="text" style={styles.flex}>
++                  {s.title}
++                </AppText>
++                <Icon name="checkmark-circle-outline" size={22} color={c.successStrong} />
++              </View>
+             ))}
+           </Card>
+         </>
+@@ -264,63 +275,20 @@ export default function VoiceScreen() {
+   );
+ }
+ 
+-function SectionRow({
+-  index,
+-  title,
+-  tone,
+-  current,
+-  onPress,
+-}: {
+-  index: number;
+-  title: string;
+-  tone: ReadingTone;
+-  current: boolean;
+-  onPress: () => void;
+-}) {
+-  const theme = useAppTheme();
+-  const c = theme.colors;
+-  const fill = { success: c.successStrong, primary: c.primary, warning: c.warning, danger: c.danger }[tone];
+-  return (
+-    <Pressable
+-      onPress={onPress}
+-      accessibilityRole="button"
+-      accessibilityLabel={`Parte ${index + 1}: ${title}`}
+-      accessibilityHint="Lee esta parte"
+-      accessibilityState={{ selected: current }}
+-      style={({ pressed }) => [
+-        styles.row,
+-        {
+-          minHeight: theme.touchTargets.min + 4,
+-          borderRadius: theme.radius.sm,
+-          backgroundColor: current ? c.primaryTint : pressed ? c.surfaceAlt : 'transparent',
+-        },
+-      ]}
+-    >
+-      <View style={[styles.number, { backgroundColor: fill }]}>
+-        <AppText variant="captionStrong" color="onPrimary" allowFontScaling={false}>
+-          {String(index + 1)}
+-        </AppText>
+-      </View>
+-      <AppText variant={current ? 'bodyStrong' : 'body'} color={current ? 'primary' : 'text'} style={styles.flex}>
+-        {title}
+-      </AppText>
+-      {current ? <Icon name="volume-high" size={22} color={c.primary} /> : null}
+-    </Pressable>
+-  );
+-}
+-
+ const styles = StyleSheet.create({
+   flex: { flex: 1 },
+   grow: { flexGrow: 1 },
+   medRow: { flexDirection: 'row', alignItems: 'center' },
+-  player: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+-  wave: { flexShrink: 1, overflow: 'hidden', alignItems: 'center' },
+-  playButton: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 5 },
++  audioCard: { overflow: 'hidden' },
++  waveRow: { alignItems: 'center', overflow: 'hidden' },
++  player: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', gap: 10 },
++  sideControl: { width: 78, minHeight: 66, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 6 },
++  playButton: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 5 },
+   playNudge: { marginLeft: 5 },
+-  progressText: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+-  statusText: { flexShrink: 1, textAlign: 'right' },
+-  segments: { flexDirection: 'row' },
+-  segment: { flex: 1, height: 8, borderRadius: 4 },
+-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 8, paddingVertical: 6 },
++  progressText: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
++  statusText: { flex: 1, textAlign: 'center' },
++  progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden' },
++  progressFill: { height: '100%', borderRadius: 4 },
++  contentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingVertical: 4 },
+   number: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+ });
+diff --git a/src/services/SpeechService.ts b/src/services/SpeechService.ts
+index cb8e344..c8b5569 100644
+--- a/src/services/SpeechService.ts
++++ b/src/services/SpeechService.ts
+@@ -17,6 +17,8 @@ interface TtsResponse {
+   mimeType?: string;
+   voice?: GeminiVoice;
+   model?: string;
++  segments?: number;
++  continuous?: boolean;
+ }
+ 
+ let counter = 0;
+@@ -25,6 +27,78 @@ function safeVoice(voice: GeminiVoice): GeminiVoice {
+   return voice === 'Achird' || voice === 'Aoede' ? voice : 'Sulafat';
+ }
+ 
++function saveAudio(audioBase64: string): { uri: string; cleanup: () => void } {
++  counter += 1;
++  const file = new File(Paths.cache, `mediclaro-gemini-${Date.now()}-${counter}.wav`);
++  file.write(audioBase64, { encoding: 'base64' });
++  return {
++    uri: file.uri,
++    cleanup: () => {
++      try {
++        if (file.exists) file.delete();
++      } catch {
++        // La cach├® tambi├®n puede ser purgada por el sistema.
++      }
++    },
++  };
++}
++
++function splitForTts(text: string, max = 2800): string[] {
++  const clean = text.replace(/\s+/g, ' ').trim();
++  if (!clean) return [];
++  if (clean.length <= max) return [clean];
++
++  const out: string[] = [];
++  const sentences = clean.match(/[^.!?;:]+[.!?;:]?\s*/g) ?? [clean];
++  let current = '';
++
++  const pushWords = (value: string) => {
++    const words = value.trim().split(/\s+/).filter(Boolean);
++    let chunk = '';
++    for (const word of words) {
++      const candidate = chunk ? `${chunk} ${word}` : word;
++      if (candidate.length <= max) chunk = candidate;
++      else {
++        if (chunk) out.push(chunk);
++        chunk = word;
++      }
++    }
++    if (chunk) out.push(chunk);
++  };
++
++  for (const raw of sentences) {
++    const sentence = raw.trim();
++    if (!sentence) continue;
++    if (sentence.length > max) {
++      if (current) { out.push(current); current = ''; }
++      pushWords(sentence);
++      continue;
++    }
++    const candidate = current ? `${current} ${sentence}` : sentence;
++    if (candidate.length <= max) current = candidate;
++    else {
++      if (current) out.push(current);
++      current = sentence;
++    }
++  }
++  if (current) out.push(current);
++  return out;
++}
++
++function packContinuousSegments(parts: string[]): string[] {
++  const atomic = parts.flatMap((part) => splitForTts(part));
++  const packed: string[] = [];
++  let current = '';
++  for (const part of atomic) {
++    if (!current) { current = part; continue; }
++    const candidate = `${current} ${part}`;
++    if (candidate.length <= 3000) current = candidate;
++    else { packed.push(current); current = part; }
++  }
++  if (current) packed.push(current);
++  return packed;
++}
++
+ export const SpeechService = {
+   async synthesize(text: string, voice: GeminiVoice, purpose: SpeechPurpose): Promise<{ uri: string; cleanup: () => void }> {
+     const clean = text.replace(/\s+/g, ' ').trim().slice(0, 3200);
+@@ -51,19 +125,32 @@ export const SpeechService = {
+       );
+     }
+     if (!response?.audioBase64) throw new Error('Audio vac├¡o');
++    return saveAudio(response.audioBase64);
++  },
++
++  async synthesizeContinuous(
++    parts: string[],
++    voice: GeminiVoice = 'Sulafat',
++    purpose: Exclude<SpeechPurpose, 'preview'> = 'reading',
++  ): Promise<{ uri: string; cleanup: () => void }> {
++    const segments = packContinuousSegments(parts);
++    if (!segments.length) throw new Error('Texto vac├¡o');
++    const total = segments.reduce((n, s) => n + s.length, 0);
++    if (total > 28_000) throw new Error('La explicaci├│n es demasiado larga para una sola reproducci├│n.');
+ 
+-    counter += 1;
+-    const file = new File(Paths.cache, `mediclaro-gemini-${Date.now()}-${counter}.wav`);
+-    file.write(response.audioBase64, { encoding: 'base64' });
+-    return {
+-      uri: file.uri,
+-      cleanup: () => {
+-        try {
+-          if (file.exists) file.delete();
+-        } catch {
+-          // La cach├® tambi├®n puede ser purgada por el sistema.
+-        }
+-      },
+-    };
++    const response = segments.length === 1
++      ? await invokeFunction<TtsResponse>(
++          'tts',
++          { text: segments[0], voice: safeVoice(voice), purpose },
++          { timeoutMs: 90_000 },
++        )
++      : await invokeFunction<TtsResponse>(
++          'tts',
++          { segments, voice: safeVoice(voice), purpose },
++          { timeoutMs: 150_000 },
++        );
++
++    if (!response?.audioBase64) throw new Error('Audio vac├¡o');
++    return saveAudio(response.audioBase64);
+   },
+ };
+diff --git a/supabase/functions/tts/index.ts b/supabase/functions/tts/index.ts
+index 924378c..3ef2685 100644
+--- a/supabase/functions/tts/index.ts
++++ b/supabase/functions/tts/index.ts
+@@ -1,6 +1,7 @@
+ /**
+- * Gemini 3.8 Flash TTS ÔÇö voz natural de MediClaro.
+- * La clave de Gemini permanece en servidor. Solo se admiten Sulafat y Achird.
++ * Gemini TTS ÔÇö voz natural de MediClaro.
++ * La lectura de medicamentos admite varios segmentos pero devuelve UN solo WAV,
++ * para que no haya cortes ni palabras partidas al cambiar de tarjeta.
+  */
+ import { fail, handler, json } from '../_shared/common.ts';
+ import { requirePremium } from '../_shared/entitlements.ts';
+@@ -8,7 +9,9 @@ import { requirePremium } from '../_shared/entitlements.ts';
+ const KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
+ const MODEL = Deno.env.get('GEMINI_TTS_MODEL') ?? 'gemini-3.8-flash-tts';
+ const ALLOWED_VOICES = new Set(['Sulafat', 'Achird', 'Aoede']);
+-const MAX_TEXT = 3200;
++const MAX_SEGMENT = 3200;
++const MAX_SEGMENTS = 16;
++const MAX_TOTAL = 28_000;
+ 
+ function styleFor(purpose: string): string {
+   if (purpose === 'assistant') {
+@@ -17,23 +20,33 @@ function styleFor(purpose: string): string {
+   if (purpose === 'preview') {
+     return 'Warm, natural and friendly. Clear diction, relaxed pace, human cadence.';
+   }
+-  return 'Warm, calm and exceptionally clear. Accessible reading for an older adult, unhurried cadence, natural pauses and precise pronunciation of medication names.';
++  return 'Warm, calm and exceptionally clear. Accessible reading for an older adult, unhurried cadence, natural pauses and precise pronunciation of medication names. Continue naturally between sections without clipping the last or first word.';
+ }
+ 
+ function extractAudio(payload: any): { data: string; mime: string } | null {
+-  if (typeof payload?.output_audio?.data === 'string' && payload.output_audio.data)
++  if (typeof payload?.output_audio?.data === 'string' && payload.output_audio.data) {
+     return { data: payload.output_audio.data, mime: payload.output_audio.mime_type ?? 'audio/wav' };
++  }
+   const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+   for (let i = steps.length - 1; i >= 0; i -= 1) {
+     const content = Array.isArray(steps[i]?.content) ? steps[i].content : [];
+     for (let j = content.length - 1; j >= 0; j -= 1) {
+-      if (content[j]?.type === 'audio' && typeof content[j]?.data === 'string')
++      if (content[j]?.type === 'audio' && typeof content[j]?.data === 'string') {
+         return { data: content[j].data, mime: content[j].mime_type ?? 'audio/wav' };
++      }
+     }
+   }
+   return null;
+ }
+ 
++function bytesToBase64(bytes: Uint8Array): string {
++  let binary = '';
++  for (let i = 0; i < bytes.length; i += 0x8000) {
++    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
++  }
++  return btoa(binary);
++}
++
+ function pcm24kToWavBase64(pcmBase64: string): string {
+   const pcm = Uint8Array.from(atob(pcmBase64), c => c.charCodeAt(0));
+   const buffer = new ArrayBuffer(44 + pcm.length);
+@@ -44,23 +57,45 @@ function pcm24kToWavBase64(pcmBase64: string): string {
+   view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+   view.setUint32(24, 24000, true); view.setUint32(28, 48000, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+   put(36, 'data'); view.setUint32(40, pcm.length, true); bytes.set(pcm, 44);
+-  let binary = '';
+-  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+-  return btoa(binary);
++  return bytesToBase64(bytes);
+ }
+ 
+-Deno.serve(handler({ bucket: 'tts', maxPerMinute: 12, maxBodyBytes: 12_000 }, async (_req, user, body) => {
+-  const purpose = body?.purpose === 'assistant' || body?.purpose === 'preview' ? body.purpose : 'reading';
+-  // La previsualizaci├│n de Sulafat/Achird debe poder escucharse antes de comprar.
+-  // Lectura y Asistente IA contin├║an protegidos por Premium.
+-  if (purpose !== 'preview') await requirePremium(user.id);
+-  if (!KEY) return fail('La voz natural no est├í configurada.', 503, 'TTS_DOWN');
+-  const text = typeof body?.text === 'string' ? body.text.replace(/\s+/g, ' ').trim() : '';
+-  if (!text) return fail('Falta el texto');
+-  if (text.length > MAX_TEXT) return fail('Texto demasiado largo', 413);
++function wavToPcm(wavBase64: string): Uint8Array | null {
++  const bytes = Uint8Array.from(atob(wavBase64), c => c.charCodeAt(0));
++  if (bytes.length < 44) return null;
++  const ascii = (offset: number, n: number) => String.fromCharCode(...bytes.subarray(offset, offset + n));
++  if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WAVE') return null;
++  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
++  let offset = 12;
++  while (offset + 8 <= bytes.length) {
++    const id = ascii(offset, 4);
++    const size = view.getUint32(offset + 4, true);
++    const start = offset + 8;
++    if (id === 'fmt ' && size >= 16) {
++      const format = view.getUint16(start, true);
++      const channels = view.getUint16(start + 2, true);
++      const sampleRate = view.getUint32(start + 4, true);
++      const bits = view.getUint16(start + 14, true);
++      if (format !== 1 || channels !== 1 || sampleRate !== 24000 || bits !== 16) return null;
++    }
++    if (id === 'data') return bytes.slice(start, Math.min(start + size, bytes.length));
++    offset = start + size + (size % 2);
++  }
++  return null;
++}
+ 
+-  const voice = typeof body?.voice === 'string' && ALLOWED_VOICES.has(body.voice) ? body.voice : 'Sulafat';
++function mergeWavBase64(parts: string[]): string | null {
++  const pcmParts = parts.map(wavToPcm);
++  if (pcmParts.some((p) => !p)) return null;
++  const valid = pcmParts as Uint8Array[];
++  const total = valid.reduce((n, p) => n + p.length, 0);
++  const merged = new Uint8Array(total);
++  let offset = 0;
++  for (const p of valid) { merged.set(p, offset); offset += p.length; }
++  return pcm24kToWavBase64(bytesToBase64(merged));
++}
+ 
++async function synthesizeSegment(text: string, voice: string, purpose: string): Promise<{ wav: string; model: string } | null> {
+   const requestModel = (model: string) => {
+     const legacy = model.startsWith('gemini-2.5') || model.startsWith('gemini-3.1');
+     const content: any = { type: 'text', text };
+@@ -74,37 +109,78 @@ Deno.serve(handler({ bucket: 'tts', maxPerMinute: 12, maxBodyBytes: 12_000 }, as
+         response_format: legacy ? { type: 'audio' } : { type: 'audio', mime_type: 'audio/wav', sample_rate: 24000 },
+         generation_config: { speech_config: [{ voice }] },
+       }),
++      signal: AbortSignal.timeout(45_000),
+     });
+   };
+ 
+-  const candidates = Array.from(new Set([
+-    MODEL,
+-    'gemini-3.8-flash-lite-tts',
+-    'gemini-2.5-flash-preview-tts',
+-  ]));
+-  let lastStatus = 503;
+-  let lastError = '';
++  const candidates = Array.from(new Set([MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-2.5-flash-preview-tts']));
+   for (const model of candidates) {
+     for (let attempt = 0; attempt < 2; attempt += 1) {
+-      const r = await requestModel(model);
+-      lastStatus = r.status;
+-      if (r.ok) {
+-        const payload = await r.json();
+-        const audio = extractAudio(payload);
+-        if (audio) {
+-          const rawPcm = /l16|pcm/i.test(audio.mime);
+-          const audioBase64 = rawPcm ? pcm24kToWavBase64(audio.data) : audio.data;
+-          return json({ audioBase64, mimeType: 'audio/wav', voice, model });
++      try {
++        const r = await requestModel(model);
++        if (r.ok) {
++          const payload = await r.json();
++          const audio = extractAudio(payload);
++          if (audio) {
++            return {
++              wav: /l16|pcm/i.test(audio.mime) ? pcm24kToWavBase64(audio.data) : audio.data,
++              model,
++            };
++          }
++        } else {
++          await r.text();
+         }
+-        lastError = 'sin audio';
+-      } else {
+-        lastError = await r.text();
++        const retryable = r.status === 404 || r.status === 408 || r.status === 429 || r.status >= 500;
++        if (!retryable) break;
++        if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
++      } catch {
++        if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+       }
+-      const retryable = r.status === 404 || r.status === 408 || r.status === 429 || r.status >= 500;
+-      if (!retryable) break;
+-      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+     }
+   }
+-  console.error('Gemini TTS exhausted fallbacks', lastStatus, lastError.slice(0, 500));
+-  return fail('La voz natural no est├í disponible ahora mismo.', 503, 'TTS_DOWN');
+-}));
++  return null;
++}
++
++Deno.serve(handler({ bucket: 'tts', maxPerMinute: 12, maxBodyBytes: 40_000 }, async (_req, user, body) => {
++  const purpose = body?.purpose === 'assistant' || body?.purpose === 'preview' ? body.purpose : 'reading';
++  if (purpose !== 'preview') await requirePremium(user.id);
++  if (!KEY) return fail('La voz natural no est├í configurada.', 503, 'TTS_DOWN');
++
++  const rawSegments = Array.isArray(body?.segments) ? body.segments : [body?.text];
++  const segments = rawSegments
++    .filter((v: unknown) => typeof v === 'string')
++    .map((v: string) => v.replace(/\s+/g, ' ').trim())
++    .filter(Boolean);
++  if (!segments.length) return fail('Falta el texto');
++  if (segments.length > MAX_SEGMENTS || segments.some((s: string) => s.length > MAX_SEGMENT)) {
++    return fail('Lectura demasiado larga', 413, 'TTS_TOO_LONG');
++  }
++  if (segments.reduce((n: number, s: string) => n + s.length, 0) > MAX_TOTAL) {
++    return fail('Lectura demasiado larga', 413, 'TTS_TOO_LONG');
++  }
++
++  const voice = typeof body?.voice === 'string' && ALLOWED_VOICES.has(body.voice) ? body.voice : 'Sulafat';
++  const wavs: string[] = [];
++  const models: string[] = [];
++  for (const segment of segments) {
++    const result = await synthesizeSegment(segment, voice, purpose);
++    if (!result) return fail('La voz natural no est├í disponible ahora mismo.', 503, 'TTS_DOWN');
++    wavs.push(result.wav);
++    models.push(result.model);
++  }
++
++  if (wavs.length === 1) {
++    return json({ audioBase64: wavs[0], mimeType: 'audio/wav', voice, model: models[0] });
++  }
++
++  const merged = mergeWavBase64(wavs);
++  if (!merged) return fail('No se ha podido preparar la reproducci├│n completa.', 503, 'TTS_MERGE_FAILED');
++  return json({
++    audioBase64: merged,
++    mimeType: 'audio/wav',
++    voice,
++    model: Array.from(new Set(models)).join(','),
++    segments: segments.length,
++    continuous: true,
++  });
++}));
+\ No newline at end of file

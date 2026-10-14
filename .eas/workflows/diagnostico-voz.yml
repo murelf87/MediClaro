@@ -1,0 +1,43 @@
+name: Diagnóstico de la voz (servidor)
+
+# 1) ¿Qué actualización recibe la app instalada (build preview, runtime 1.0.1, canal preview)?
+# 2) La función pública tts-preview (la de «Probar» en Accesibilidad), varias veces seguidas: si Google limita las
+#    peticiones por minuto, aparece TTS_UPSTREAM_429. Solo valores PÚBLICOS. Ningún secreto. Se lanza a mano.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  voz:
+    name: Probar actualización y voz natural
+    steps:
+      - name: Actualización que recibe la app instalada
+        run: |
+          curl -sS -m 30 -D /tmp/h.txt -o /tmp/m.txt \
+            -H "expo-platform: ios" -H "expo-runtime-version: 1.0.1" -H "expo-channel-name: preview" \
+            -H "expo-protocol-version: 1" -H "accept: multipart/mixed,application/expo+json,application/json" \
+            "https://u.expo.dev/fefacac9-9dc6-42fe-972e-15b3b62f4286" || true
+          head -n 1 /tmp/h.txt
+          grep -o '"id":"[^"]*"' /tmp/m.txt | head -n 1
+          grep -o '"createdAt":"[^"]*"' /tmp/m.txt | head -n 1
+      - name: Llamar a tts-preview 4 veces seguidas
+        run: |
+          node -e '
+          const url = "https://ldonnvkysjalpmystoeq.supabase.co/functions/v1/tts-preview";
+          const key = "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf";
+          const text = "Hola. Soy la voz de MediClaro. Te acompañaré con una lectura clara, natural y tranquila.";
+          (async () => {
+            for (const voice of ["Sulafat", "Achird", "Sulafat", "Achird"]) {
+              const t0 = Date.now();
+              try {
+                const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", apikey: key }, body: JSON.stringify({ text, voice, purpose: "preview" }) });
+                const body = await r.json().catch(() => ({}));
+                const secs = ((Date.now() - t0) / 1000).toFixed(1);
+                if (body.audioBase64) console.log(`${voice}: BIEN · HTTP ${r.status} · ${secs} s · modelo ${body.model}`);
+                else console.log(`${voice}: FALLA · HTTP ${r.status} · ${secs} s · ${JSON.stringify(body)}`);
+              } catch (e) {
+                console.log(`${voice}: SIN RESPUESTA · ${e.message}`);
+              }
+            }
+          })();
+          '
