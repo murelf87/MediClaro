@@ -28,6 +28,8 @@ import { AppHeader, AppText, Avatar, Icon, InfoBanner, PrimaryButton, Screen, Te
 import { ChatBubble, ChatCallEntry, ChatComposer, ChatDayDivider, ChatPerson, QuickReplies } from '../../components/CareChat';
 import { useAppTheme, useEntitlement } from '../../hooks';
 import { useCareChat, useChatReader, type ChatItem } from '../../hooks/useCareChat';
+import { useCarePresence } from '../../hooks/useCarePresence';
+import { useCareLinkAvatar } from '../../hooks/useCareLinkAvatar';
 import { CARE_CHAT_MAX_LENGTH, canWriteNow, chatOpen } from '../../services/CareChatService';
 import { useNow } from '../../hooks/usePillPlan';
 import { CareLiveLocation } from '../../components/CareLiveLocation';
@@ -64,6 +66,9 @@ export default function CareChatScreen() {
   const patientSide = conversation?.myRole !== 'caregiver';
   const other = conversation?.otherName ?? (patientSide ? 'Tu cuidador/a' : 'Tu familiar');
   const otherFirst = firstName(other);
+  // «En línea»: la otra persona tiene este chat abierto ahora mismo.
+  const otherAvatar = useCareLinkAvatar(linkId);
+  const otherOnline = useCarePresence(linkId, chat.myId ?? null, conversation?.otherId || null);
   // La conversación la enciende la persona cuidada: su cuidador/a escribe solo durante la hora siguiente a su último
   // mensaje. Se calcula en el teléfono con la fecha que da el servidor (y se vuelve a mirar cada medio minuto).
   const now = useNow(30_000).getTime();
@@ -159,6 +164,8 @@ export default function CareChatScreen() {
           name={other}
           caption={patientSide ? 'Tu cuidador/a' : premium && !open ? 'Chat apagado' : 'Familiar al que cuidas'}
           off={!patientSide && premium && !open}
+          online={otherOnline}
+          uri={otherAvatar}
         />
       }
       right={
@@ -223,7 +230,7 @@ export default function CareChatScreen() {
   const empty = !chat.loading && !chat.items.length && !blocked;
   const emptyState = (
     <View style={[styles.empty, { backgroundColor: c.surface, borderColor: c.border, borderRadius: theme.radius.xl }]} testID="care-chat-empty">
-      <Avatar name={other} size={64} />
+      <Avatar name={other} uri={otherAvatar} size={64} />
       <AppText variant="heading" color="heading" align="center">{`Escribe a ${otherFirst}`}</AppText>
       <AppText variant="body" color="textSecondary" align="center">
         Lo que escribas aquí le llegará a su móvil con la hora. Cuando lo lea, verás «Visto».

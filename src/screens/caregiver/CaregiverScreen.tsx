@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Share, StyleSheet, TextInput, View, useWindowDimensions, type ScrollView } from 'react-native';
+import { AppState, Linking, Pressable, Share, StyleSheet, TextInput, View, useWindowDimensions, type ScrollView } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { AppHeader, AppText, Avatar, Badge, Card, Icon, InfoBanner, PrimaryButton, SecondaryButton, SettingRow, Screen, TextButton } from '../../components';
 import { useSession, useAppTheme, useEntitlement, useOwnerPreview } from '../../hooks';
@@ -40,6 +40,7 @@ export default function CaregiverScreen(){
  const [scanning,setScanning]=useState(false);
  const [data,setData]=useState<CareSnapshot|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [name,setName]=useState(''),[code,setCode]=useState(''),[patientCode,setPatientCode]=useState('');
+ const [alsoCaregiverOpen,setAlsoCaregiverOpen]=useState(false);
  const [selected,setSelected]=useState<string|null>(null),[draft,setDraft]=useState('');
  const [notice,setNotice]=useState('');
  // «Probar la emergencia completa»: simulacro local (nadie recibe nada); se muestra igual que un aviso real.
@@ -138,7 +139,7 @@ export default function CaregiverScreen(){
   const rawCode=Array.isArray(params.code)?params.code[0]:params.code;
   const rawInvite=Array.isArray(params.invite)?params.invite[0]:params.invite;
   const parsed=(rawCode?parseCarePairCode(rawCode):null)??(rawInvite?parseCarePairCode(rawInvite):null)??(rawInvite?parseCareInvite(rawInvite):null);
-  if(parsed)setCode(parsed);
+  if(parsed){setCode(parsed);setAlsoCaregiverOpen(true);}
  },[params.code,params.invite]);
  useEffect(()=>{
   if(!uid||!entitlement.isPremium){setPatientCode('');return;}
@@ -224,6 +225,38 @@ export default function CaregiverScreen(){
    )}
   </View>;
  };
+ // Formulario «Vincularme como cuidador/a»: lo usa el perfil normal y, en su tarjeta propia, quien tiene Premium.
+ const caregiverForm=<>
+    <View style={styles.rowCenter}>
+     <View style={[styles.alertIcon,{backgroundColor:c.primaryTint}]}><Icon name="link" size={24} color={c.primary} /></View>
+     <View style={styles.flex}>
+      <AppText variant="subheading" color="heading" accessibilityRole="header">{caregiverProfile&&patientLabel?'Vincular a otro familiar':'Vincularme como cuidador/a'}</AppText>
+      <AppText variant="caption" color="textSecondary">Es gratis. Solo hace falta el código de 6 números (o el QR) de la persona a la que vas a cuidar.</AppText>
+     </View>
+    </View>
+    <View style={[styles.linkArt,{backgroundColor:c.primaryTint,borderRadius:theme.radius.lg}]} accessible accessibilityLabel="Dibujo: su código de 6 números o su QR, tu solicitud y su aceptación">
+     <View style={styles.codeRow}>{['4','8','2','9','1','3'].map((d,i)=><View key={i} style={[styles.codeBoxSmall,{borderColor:c.primarySoft,backgroundColor:c.surface}]}><AppText variant="bodyStrong" color="heading">{d}</AppText></View>)}</View>
+     <View style={styles.linkFlow}>
+      <View style={[styles.flowIcon,{backgroundColor:c.surface}]}><Icon name="qr-code" size={22} color={c.primary} /></View>
+      <Icon name="arrow-forward" size={20} color={c.textMuted} />
+      <View style={[styles.flowIcon,{backgroundColor:c.surface}]}><Icon name="paper-plane" size={22} color={c.primary} /></View>
+      <Icon name="arrow-forward" size={20} color={c.textMuted} />
+      <View style={[styles.flowIcon,{backgroundColor:c.successSoft}]}><Icon name="checkmark-circle" size={22} color={c.successStrong} /></View>
+     </View>
+    </View>
+    <View style={{gap:10}}>
+     {['Escribe el código de 6 números del paciente o escanea su QR.','El paciente recibe tu solicitud y decide si acepta.','Solo después de aceptar recibirás sus avisos y mensajes.'].map((text,i)=><View key={text} style={styles.rowCenter}>
+      <View style={[styles.step,{backgroundColor:c.primary}]}><AppText variant="label" style={{color:'#FFFFFF'}}>{String(i+1)}</AppText></View>
+      <AppText style={styles.flex}>{text}</AppText>
+     </View>)}
+    </View>
+    {input(name,setName,'Tu nombre para la solicitud',80)}
+    <TextInput accessibilityLabel="Código de 6 números" placeholder="Código de 6 números" value={code} onChangeText={v=>setCode(v.replace(/\D/g,'').slice(0,6))} keyboardType="number-pad" maxLength={6} style={[styles.input,{color:theme.colors.text,borderColor:theme.colors.textSecondary,textAlign:'center'},code?{fontSize:24,letterSpacing:6}:{fontSize:18,letterSpacing:0}]} />
+    <SecondaryButton label="Escanear QR del paciente" icon="qr-code-outline" onPress={()=>setScanning(true)} disabled={busy} testID="caregiver-scan-qr" />
+    {scanning?<CareInviteScanner onCode={value=>{const six=parseCarePairCode(value);if(six)setCode(six);setScanning(false);setNotice(six?'QR leído. Revisa el código y envía la solicitud.':'Este QR pertenece al sistema anterior. Usa el código de 6 números del paciente.');}} onCancel={()=>setScanning(false)}/>:null}
+    <PrimaryButton label="Enviar solicitud al paciente" icon="paper-plane" disabled={busy||!name.trim()||!parseCarePairCode(code)} onPress={()=>void run(async()=>{const result=await CaregiverService.requestByCode(code,name.trim());setNotice(result.status==='accepted'?'Ya estás vinculado/a como cuidador/a de '+result.patientName+'.':'Solicitud enviada a '+result.patientName+'. Esperando su aceptación.');})} testID="caregiver-confirm-link" />
+    <AppText variant="caption" color="textSecondary">Al enviarla, el paciente recibirá una solicitud y tendrá que aceptarla. Hasta entonces no se compartirán avisos ni datos.</AppText>
+ </>;
  return <Screen header={<AppHeader title="Cuidador y avisos" />} keyboard scrollRef={scrollRef} contentStyle={{gap:compact?12:16,width:'100%'}} scrollProps={{contentInsetAdjustmentBehavior:'automatic'}} testID="caregiver-screen">
   {/* Cabecera: quién cuida de quién, de un vistazo */}
   <View style={[styles.hero,{backgroundColor:c.primary,borderRadius:theme.radius.xl}]} testID="caregiver-hero">
@@ -341,36 +374,8 @@ export default function CaregiverScreen(){
   {/* Vinculación */}
   <View onLayout={e=>{linkingY.current=e.nativeEvent.layout.y;}}>
   <Card style={{gap:12}} testID="caregiver-linking">
-   {caregiverOnboarding?<>
-    <View style={styles.rowCenter}>
-     <View style={[styles.alertIcon,{backgroundColor:c.primaryTint}]}><Icon name="link" size={24} color={c.primary} /></View>
-     <View style={styles.flex}>
-      <AppText variant="subheading" color="heading" accessibilityRole="header">{caregiverProfile&&patientLabel?'Vincular a otro familiar':'Vincularme como cuidador/a'}</AppText>
-      <AppText variant="caption" color="textSecondary">Es gratis. Solo hace falta el código de 6 números (o el QR) de la persona a la que vas a cuidar.</AppText>
-     </View>
-    </View>
-    <View style={[styles.linkArt,{backgroundColor:c.primaryTint,borderRadius:theme.radius.lg}]} accessible accessibilityLabel="Dibujo: su código de 6 números o su QR, tu solicitud y su aceptación">
-     <View style={styles.codeRow}>{['4','8','2','9','1','3'].map((d,i)=><View key={i} style={[styles.codeBoxSmall,{borderColor:c.primarySoft,backgroundColor:c.surface}]}><AppText variant="bodyStrong" color="heading">{d}</AppText></View>)}</View>
-     <View style={styles.linkFlow}>
-      <View style={[styles.flowIcon,{backgroundColor:c.surface}]}><Icon name="qr-code" size={22} color={c.primary} /></View>
-      <Icon name="arrow-forward" size={20} color={c.textMuted} />
-      <View style={[styles.flowIcon,{backgroundColor:c.surface}]}><Icon name="paper-plane" size={22} color={c.primary} /></View>
-      <Icon name="arrow-forward" size={20} color={c.textMuted} />
-      <View style={[styles.flowIcon,{backgroundColor:c.successSoft}]}><Icon name="checkmark-circle" size={22} color={c.successStrong} /></View>
-     </View>
-    </View>
-    <View style={{gap:10}}>
-     {['Escribe el código de 6 números del paciente o escanea su QR.','El paciente recibe tu solicitud y decide si acepta.','Solo después de aceptar recibirás sus avisos y mensajes.'].map((text,i)=><View key={text} style={styles.rowCenter}>
-      <View style={[styles.step,{backgroundColor:c.primary}]}><AppText variant="label" style={{color:'#FFFFFF'}}>{String(i+1)}</AppText></View>
-      <AppText style={styles.flex}>{text}</AppText>
-     </View>)}
-    </View>
-    {input(name,setName,'Tu nombre para la solicitud',80)}
-    <TextInput accessibilityLabel="Código de 6 números" placeholder="Código de 6 números" value={code} onChangeText={v=>setCode(v.replace(/\D/g,'').slice(0,6))} keyboardType="number-pad" maxLength={6} style={[styles.input,{color:theme.colors.text,borderColor:theme.colors.textSecondary,textAlign:'center'},code?{fontSize:24,letterSpacing:6}:{fontSize:18,letterSpacing:0}]} />
-    <SecondaryButton label="Escanear QR del paciente" icon="qr-code-outline" onPress={()=>setScanning(true)} disabled={busy} testID="caregiver-scan-qr" />
-    {scanning?<CareInviteScanner onCode={value=>{const six=parseCarePairCode(value);if(six)setCode(six);setScanning(false);setNotice(six?'QR leído. Revisa el código y envía la solicitud.':'Este QR pertenece al sistema anterior. Usa el código de 6 números del paciente.');}} onCancel={()=>setScanning(false)}/>:null}
-    <PrimaryButton label="Enviar solicitud al paciente" icon="paper-plane" disabled={busy||!name.trim()||!parseCarePairCode(code)} onPress={()=>void run(async()=>{const result=await CaregiverService.requestByCode(code,name.trim());setNotice(result.status==='accepted'?'Ya estás vinculado/a como cuidador/a de '+result.patientName+'.':'Solicitud enviada a '+result.patientName+'. Esperando su aceptación.');})} testID="caregiver-confirm-link" />
-    <AppText variant="caption" color="textSecondary">Al enviarla, el paciente recibirá una solicitud y tendrá que aceptarla. Hasta entonces no se compartirán avisos ni datos.</AppText>
+   {!entitlement.isPremium?<>
+    {caregiverForm}
    </>:<>
     <View style={styles.rowCenter}>
      <View style={[styles.alertIcon,{backgroundColor:c.primaryTint}]}><Icon name="link" size={24} color={c.primary} /></View>
@@ -396,6 +401,19 @@ export default function CaregiverScreen(){
    </View>:null}
   </Card>
   </View>
+
+  {/* Premium también puede cuidar de otra persona (Fallos_mediclaro.pdf): tarjeta propia, plegada para no saturar */}
+  {entitlement.isPremium?<Card style={{gap:12,borderWidth:1.5,borderColor:alsoCaregiverOpen?c.primarySoft:c.border}} testID="caregiver-also-care">
+   <Pressable onPress={()=>setAlsoCaregiverOpen(v=>!v)} accessibilityRole="button" accessibilityState={{expanded:alsoCaregiverOpen}} accessibilityLabel={acceptedPatients.length?'Cuidar de otro familiar':'Cuidar de otra persona'} style={styles.rowCenter} testID="caregiver-also-care-toggle">
+    <View style={[styles.alertIcon,{backgroundColor:c.dangerSoft}]}><Icon name="heart" size={24} color={c.danger} /></View>
+    <View style={styles.flex}>
+     <AppText variant="subheading" color="heading" accessibilityRole="header">{acceptedPatients.length?'Cuidar de otro familiar':'Cuidar de otra persona'}</AppText>
+     <AppText variant="caption" color="textSecondary">{acceptedPatients.length?`Ya cuidas de ${acceptedPatients.map(l=>l.patientName.split(' ')[0]).join(', ')}. Puedes vincular a alguien más.`:'Con tu Premium también puedes ser cuidador/a de un familiar. Es gratis y tu cuenta sigue igual.'}</AppText>
+    </View>
+    <View style={[styles.chevron,{backgroundColor:c.primaryTint}]}><Icon name={alsoCaregiverOpen?'chevron-up':'chevron-down'} size={20} color={c.primary} /></View>
+   </Pressable>
+   {alsoCaregiverOpen?<View style={[styles.alsoBody,{borderTopColor:c.divider}]}>{caregiverForm}</View>:null}
+  </Card>:null}
 
   {/* Practicar sin riesgo */}
   <Card style={{gap:10}} testID="caregiver-drill">
@@ -460,6 +478,8 @@ const styles=StyleSheet.create({
  codeRow:{flexDirection:'row',justifyContent:'center',gap:6},
  codeBox:{width:44,height:56,borderWidth:1.5,alignItems:'center',justifyContent:'center'},
  linkRow:{borderWidth:1,padding:12,gap:10},
+ chevron:{width:36,height:36,borderRadius:18,alignItems:'center',justifyContent:'center'},
+ alsoBody:{gap:12,borderTopWidth:StyleSheet.hairlineWidth,paddingTop:12},
  upper:{textTransform:'uppercase',letterSpacing:0.6},
  thin:{fontWeight:'400'},
 });

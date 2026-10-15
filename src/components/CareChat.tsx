@@ -330,17 +330,39 @@ export function QuickReplies({ items, onPick, testID }: { items: string[]; onPic
 }
 
 /** Persona con la que se habla (cabecera del chat): foto o iniciales, nombre y relación. */
-export function ChatPerson({ name, caption, size = 40, off = false }: { name: string; caption: string; size?: number; off?: boolean }) {
+export function ChatPerson({ name, caption, size = 40, off = false, online = false, uri }: {
+  name: string; caption: string; size?: number; off?: boolean;
+  /** La otra persona tiene el chat abierto ahora mismo (punto verde, como en WhatsApp). */
+  online?: boolean;
+  /** Foto de perfil de la otra persona (si la tiene). */
+  uri?: string | null;
+}) {
   const theme = useAppTheme();
+  const c = theme.colors;
+  const dot = Math.max(12, Math.round(size * 0.3));
+  const showOnline = online && !off;
   return (
-    <View style={styles.person} accessible accessibilityRole="header" accessibilityLabel={`Chat con ${name}. ${caption}`}>
-      <Avatar name={name} size={size} tone={off ? 'neutral' : 'primary'} />
+    <View style={styles.person} accessible accessibilityRole="header" accessibilityLabel={`Chat con ${name}. ${showOnline ? 'En línea. ' : ''}${caption}`}>
+      <View>
+        <Avatar name={name} uri={uri} size={size} tone={off ? 'neutral' : 'primary'} />
+        {online ? (
+          <View
+            style={[styles.onlineDot, { width: dot, height: dot, borderRadius: dot / 2, backgroundColor: c.successStrong, borderColor: c.surface }]}
+            testID="care-chat-online-dot"
+          />
+        ) : null}
+      </View>
       <View style={styles.personText}>
         <AppText variant="subheading" color="heading" numberOfLines={1}>{name}</AppText>
         <View style={styles.personCaption}>
-          {off ? <View style={[styles.offDot, { backgroundColor: theme.colors.danger }]} /> : null}
-          <AppText variant="small" style={off ? { color: theme.colors.dangerText, fontWeight: '700' } : undefined} color={off ? undefined : 'textSecondary'} numberOfLines={1}>
-            {caption}
+          {off ? <View style={[styles.offDot, { backgroundColor: c.danger }]} /> : null}
+          <AppText
+            variant="small"
+            style={off ? { color: c.dangerText, fontWeight: '700' } : showOnline ? { color: c.successStrong, fontWeight: '700' } : undefined}
+            color={off || showOnline ? undefined : 'textSecondary'}
+            numberOfLines={1}
+          >
+            {showOnline ? 'En línea' : caption}
           </AppText>
         </View>
       </View>
@@ -361,6 +383,7 @@ export function UnreadBadge({ count, testID }: { count: number; testID?: string 
 
 const styles = StyleSheet.create({
   personCaption: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  onlineDot: { position: 'absolute', right: -1, bottom: -1, borderWidth: 2.5 },
   offDot: { width: 8, height: 8, borderRadius: 4 },
   row: { width: '100%' },
   bubble: { gap: 4 },
