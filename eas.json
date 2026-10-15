@@ -23,7 +23,7 @@
         "EXPO_PUBLIC_DEMO_ACCESS": "on",
         "EXPO_PUBLIC_PAYMENTS_MODE": "store,stripe",
         "EXPO_PUBLIC_SUPABASE_URL": "https://ldonnvkysjalpmystoeq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxkb25udmt5c2phbHBteXN0b2VxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MjM2MzAsImV4cCI6MjEwNjA5OTYzMH0.HhO8_SFAwO1KR7PT5nfaS2UCnlIw-B7EyOZB2OK79ZI"
       },
       "environment": "preview",
       "channel": "preview"
@@ -34,7 +34,7 @@
         "EXPO_PUBLIC_DEMO_ACCESS": "off",
         "EXPO_PUBLIC_PAYMENTS_MODE": "store",
         "EXPO_PUBLIC_SUPABASE_URL": "https://ldonnvkysjalpmystoeq.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_tW0nl1oGYmnIW9BrFTpJSw_-xuEIuZf",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxkb25udmt5c2phbHBteXN0b2VxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MjM2MzAsImV4cCI6MjEwNjA5OTYzMH0.HhO8_SFAwO1KR7PT5nfaS2UCnlIw-B7EyOZB2OK79ZI",
         "EXPO_PUBLIC_APP_STORE_ID": "6817669616",
         "EXPO_PUBLIC_OTP_TTL_SECONDS": "300",
         "EXPO_PUBLIC_PRIVACY_URL": "https://murelf87.github.io/MediClaro/privacidad.html",

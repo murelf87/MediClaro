@@ -151,8 +151,8 @@
       "./plugins/withoutBackgroundFetch"
     ],
     "extra": {
-      "supabaseUrl": "https://TU-PROYECTO.supabase.co",
-      "supabaseAnonKey": "TU_ANON_KEY",
+      "supabaseUrl": "https://ldonnvkysjalpmystoeq.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxkb25udmt5c2phbHBteXN0b2VxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1MjM2MzAsImV4cCI6MjEwNjA5OTYzMH0.HhO8_SFAwO1KR7PT5nfaS2UCnlIw-B7EyOZB2OK79ZI",
       "router": {},
       "eas": {
         "projectId": "fefacac9-9dc6-42fe-972e-15b3b62f4286"
