@@ -26,6 +26,7 @@ import { DEMO_ACCESS_ENABLED, PUBLIC_HEALTH_RESOURCES } from '../../config/app';
 import { callPhone, openMaps } from '../../utils/device';
 import { showAlert } from '../../utils/dialogs';
 import { formatTime } from '../../utils/format';
+import { waitForDialOutcome } from '../../utils/dialOutcome';
 
 // ─── Rutas del flujo (mapa de rutas del proyecto) ─────────────────────────────
 
@@ -221,6 +222,9 @@ export function useOfficialCall() {
           await showAlert('No se ha podido abrir el teléfono', 'Marca el 112 desde tu teléfono.');
           return false;
         }
+        // Si la persona pulsa «Cancelar» en el aviso del iPhone, se queda donde estaba.
+        const placed = await waitForDialOutcome();
+        if (!placed) return false;
         if (status === 'signedIn') {
           if (opts.fresh) EmergencySession.start('unsure');
           else EmergencySession.ensureStarted();

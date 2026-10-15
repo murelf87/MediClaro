@@ -1,7 +1,8 @@
 /**
  * /emergency/confirm · ¿Es una emergencia? (referencia e02_confirm).
- * Tres caminos (puedo hablar · no puedo hablar · no estoy seguro) y el 112 siempre
- * disponible como opción distinta, que solo se llama si la persona lo pulsa.
+ * Dos caminos (puedo hablar · no puedo hablar) y el 112 siempre disponible como opción
+ * distinta, que solo se llama si la persona lo pulsa. «No estoy seguro» se quitó: abría el
+ * mismo asistente que «Sí, puedo hablar» (aviso del 14/10).
  */
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -64,14 +65,6 @@ export default function EmergencyConfirmScreen() {
           subtitle="Prepararemos tu información para que la vea o escuche quien te atienda"
           onPress={() => choose('cannot_speak')}
           testID="emergency-option-cannot-speak"
-        />
-        <OptionCard
-          icon="help"
-          color={theme.colors.primary}
-          title="No estoy seguro"
-          subtitle="Te haremos unas preguntas rápidas"
-          onPress={() => choose('unsure')}
-          testID="emergency-option-unsure"
         />
       </View>
     </Screen>
