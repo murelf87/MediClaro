@@ -19,6 +19,8 @@ export const GOOGLE_PLAY_URL: string = `https://play.google.com/store/apps/detai
 export const APP_SHARE_URL: string = (process.env.EXPO_PUBLIC_APP_SHARE_URL ?? '').trim();
 
 /** Correo de soporte que verá el usuario en Ayuda. */
+/** Vídeo «Así funciona MediClaro» (vacío = se abre la web). */
+export const HOW_IT_WORKS_VIDEO_URL: string = (process.env.EXPO_PUBLIC_HOW_IT_WORKS_VIDEO_URL ?? '').trim();
 export const SUPPORT_EMAIL: string = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? '';
 /** Teléfono de atención (opcional). Vacío = no se muestra. Nunca se inventa. */
 export const SUPPORT_PHONE: string = (process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '').trim();

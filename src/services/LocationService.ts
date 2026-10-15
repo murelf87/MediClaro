@@ -3,10 +3,10 @@
  * Captura ubicación del dispositivo y la envía a Supabase cada pocos segundos.
  */
 import * as Location from 'expo-location';
-import { careAction } from './CaregiverService';
+import { voipAction } from './VoipActions';
 
-// Re-export careAction para que LocationService sea auto-suficiente
-export { careAction } from './CaregiverService';
+// Re-export voipAction para que LocationService sea auto-suficiente
+export { voipAction } from './VoipActions';
 
 export interface UserLocation {
   latitude: number;
@@ -118,7 +118,7 @@ export async function startLocationTracking(): Promise<boolean> {
           };
 
           // Enviar ubicación a Supabase
-          await careAction('update_location', userLocation);
+          await voipAction('update_location', userLocation);
         } catch (error) {
           console.error('Error updating location:', error);
         }

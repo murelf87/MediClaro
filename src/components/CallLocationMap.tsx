@@ -14,7 +14,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { careAction } from '../services/CaregiverService';
+import { voipAction } from '../services/VoipActions';
 import { calculateDistance } from '../services/LocationService';
 
 interface CallLocationMapProps {
@@ -52,7 +52,7 @@ export const CallLocationMap: React.FC<CallLocationMapProps> = ({
   // Obtener ubicación en tiempo real cada 5 segundos
   const fetchLocation = useCallback(async () => {
     try {
-      const response = await careAction('get_call_location', { callId });
+      const response = await voipAction('get_call_location', { callId });
       if (response?.latitude && response?.longitude) {
         setOtherLocation(response);
         setError(null);
@@ -79,7 +79,7 @@ export const CallLocationMap: React.FC<CallLocationMapProps> = ({
   // Obtener mi ubicación actual
   const fetchMyLocation = useCallback(async () => {
     try {
-      const response = await careAction('get_my_location', {});
+      const response = await voipAction('get_my_location', {});
       if (response?.latitude && response?.longitude) {
         setMyLocation(response);
       }

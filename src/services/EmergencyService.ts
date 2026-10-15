@@ -2,13 +2,12 @@
  * EmergencyService — perfil de emergencia, permisos, servicio privado de
  * asistencia y preparación de la información para una emergencia.
  *
- * REGLAS (no negociables):
+ * REGLAS:
  *  1. El 112 SIEMPRE está disponible y es una opción distinta y visible.
- *  2. El servicio privado de asistencia es independiente del 112.
- *  3. NUNCA se llama al 112 automáticamente, tampoco si el servicio privado
- *     no contesta: la decisión es siempre del usuario.
- *  4. La IA no toma decisiones médicas: el mensaje para el operador se genera
- *     con una plantilla determinista a partir de datos declarados.
+ *  2. El contacto designado se intenta antes de la escalada al 112 cuando existe.
+ *  3. El 112 solo se abre por una acción explícita del usuario.
+ *     Una cuenta atrás nunca inicia una llamada oficial.
+ *  4. La IA no diagnostica: los mensajes se generan con datos declarados y contexto explícito.
  *
  * Backend usado (sin modificarlo):
  *  - tabla `emergency_profiles` (vía EmergencyProfileService, con caché offline)
@@ -17,11 +16,12 @@
  *  - número privado de asistencia elegido por el usuario
  *  - médico de cabecera
  */
-import { supabase, AppError, toAppError } from '../api';
+import { supabase, AppError, toAppError, invokeFunction } from '../api';
 import { secureLocalStore } from '../api/storage';
 import { ageFromDob, onlyDigits } from '../utils/format';
 import { AuthService } from './AuthService';
 import { DemoMode } from './DemoMode';
+import { CaregiverService } from './CaregiverService';
 import {
   clearEmergencyProfileCache,
   deleteEmergencyProfile,
@@ -41,6 +41,7 @@ import {
   notifyEmergencyContact,
 } from './emergency/EmergencyContactService';
 import { emergencyVoiceService } from './emergency/EmergencyVoiceService';
+import { EmergencyMeshService, type EmergencyTransport } from './emergency/EmergencyMeshService';
 import type {
   EmergencyLocation,
   EmergencyProfile as RawEmergencyProfile,
@@ -365,8 +366,9 @@ export const EmergencyService = {
   },
 
   /**
-   * Servicio privado de asistencia: primero el que eligió el usuario en este
-   * teléfono; si no hay, la central de MediClaro (si el propietario la configuró).
+   * Servicio privado de asistencia: el que eligió la persona en este teléfono (su teleasistencia, un familiar…).
+   * MediClaro NO tiene central propia ni atiende llamadas: nunca se ofrece un número «de MediClaro», aunque el
+   * servidor tenga uno configurado. Solo en el Modo demostración se usa uno de ejemplo (la llamada es simulada).
    */
   async getPrivateAssistanceNumber(): Promise<PrivateAssistanceService | null> {
     const extras = await readExtras();
@@ -377,9 +379,10 @@ export const EmergencyService = {
         source: 'user',
       };
     }
+    if (!DemoMode.isActive()) return null;
     const config = await withTimeout(emergencyConfigService.getConfig(), 2500, null);
     if (config?.primaryAssistanceNumber?.trim()) {
-      return { name: config.primaryAssistanceName, phone: config.primaryAssistanceNumber.trim(), source: 'mediclaro' };
+      return { name: config.primaryAssistanceName, phone: config.primaryAssistanceNumber.trim(), source: 'example' };
     }
     return null;
   },
@@ -454,7 +457,7 @@ export const EmergencyService = {
     const service = await EmergencyService.getPrivateAssistanceNumber();
     if (!service) return 'not_configured';
     // Modo demostración: se simula la llamada al servicio privado (el número es de ejemplo).
-    if (DemoMode.isActive() && service.source === 'mediclaro') return 'success';
+    if (DemoMode.isActive() && service.source === 'example') return 'success';
     const outcome = await callPrimaryAssistance({
       primaryAssistanceName: service.name,
       primaryAssistanceNumber: service.phone,
@@ -465,11 +468,11 @@ export const EmergencyService = {
     return 'failed';
   },
 
-  /** ¿La llamada al servicio privado es simulada? (modo demostración con la central de ejemplo) */
+  /** ¿La llamada al servicio privado es simulada? (Modo demostración con el número de ejemplo) */
   async isPrivateCallSimulated(): Promise<boolean> {
     if (!DemoMode.isActive()) return false;
     const service = await EmergencyService.getPrivateAssistanceNumber();
-    return service?.source === 'mediclaro';
+    return service?.source === 'example';
   },
 
   /** Llama al número oficial de emergencias. Siempre disponible (también en demostración). */
@@ -478,7 +481,26 @@ export const EmergencyService = {
     return dialOfficial(number);
   },
 
-  /** Abre el SMS preparado para el contacto de emergencia (el usuario pulsa Enviar). */
+  /** Registra un aviso privado para cuidadores vinculados. Requiere conexión. */
+  async contactCaregiverAutomatically(prepared: PreparedEmergency): Promise<{ attemptId: string; queued: boolean }> {
+    if (DemoMode.isActive()) throw new Error('Modo demostración: no se avisa a personas reales.');
+    const statements = prepared.report.recentStatements.filter(s => s.speaker === 'user').slice(-6).map(s => s.transcript);
+    const summary = [
+      'El paciente ha activado un aviso de malestar.',
+      ...statements,
+      prepared.report.noResponseDetected ? 'La app no ha detectado respuesta del paciente.' : '',
+    ].filter(Boolean).join('\n').slice(0, 2000);
+    const result = await CaregiverService.start(prepared.report.incidentId, summary);
+    return { attemptId: result.incidentId, queued: result.queued };
+  },
+
+  async getCaregiverContactStatus(attemptId: string): Promise<{ acknowledged: boolean; acknowledgedAt: string | null }> {
+    const snapshot = await CaregiverService.snapshot();
+    const incident = snapshot.incidents.find(i => i.id === attemptId);
+    const acknowledgedAt = incident?.members.find(m => m.acknowledgedAt)?.acknowledgedAt ?? null;
+    return { acknowledged: !!acknowledgedAt, acknowledgedAt };
+  },
+
   async notifyCaregiver(report: EmergencyReport): Promise<{ ok: boolean; message?: string }> {
     if (DemoMode.isActive()) {
       return { ok: true, message: 'Modo demostración: no se ha enviado ningún SMS real.' };

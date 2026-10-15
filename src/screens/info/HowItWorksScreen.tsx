@@ -35,7 +35,7 @@ export default function HowItWorksScreen() {
             { icon: '💊', text: 'Conoce para qué sirve y cómo tomarlo' },
             { icon: '👨‍👩‍👧', text: 'Comparte con tu cuidador/a' },
           ].map(({ icon, text }) => (
-            <View key={text} style={[styles.step, { backgroundColor: theme.colors.surfaceSecondary, borderRadius: theme.radius.md, padding: theme.spacing.md }]}>
+            <View key={text} style={[styles.step, { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing.md }]}>
               <AppText variant="body" style={{ fontSize: 24 }}>{icon}</AppText>
               <AppText variant="body" style={{ flex: 1, marginLeft: theme.spacing.sm }}>{text}</AppText>
             </View>
