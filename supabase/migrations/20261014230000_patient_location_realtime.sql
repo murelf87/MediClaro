@@ -29,7 +29,10 @@ CREATE POLICY "Caregivers can view linked patient location" ON care_patient_loca
   USING (
     user_id IN (
       SELECT patient_id FROM care_links
-      WHERE caregiver_id = auth.uid() AND status = 'active'
+      WHERE caregiver_id = auth.uid()
+        AND accepted_at IS NOT NULL
+        AND revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > NOW())
     )
   );
 
@@ -38,7 +41,10 @@ CREATE POLICY "Patients can view linked caregiver location during calls" ON care
   USING (
     user_id IN (
       SELECT caregiver_id FROM care_links
-      WHERE patient_id = auth.uid() AND status = 'active'
+      WHERE patient_id = auth.uid()
+        AND accepted_at IS NOT NULL
+        AND revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > NOW())
     )
   );
 
@@ -139,7 +145,7 @@ CREATE POLICY "Users can view location sharing in their calls" ON care_call_loca
     user_id = auth.uid() OR
     call_id IN (
       SELECT id FROM care_calls
-      WHERE caller_id = auth.uid() OR receiver_id = auth.uid()
+      WHERE caller_id = auth.uid() OR recipient_id = auth.uid()
     )
   );
 

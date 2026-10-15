@@ -23,3 +23,6 @@ supabase/.temp/
 /qa-ui-rc/
 /.tmp-ui-work.txt
 /dist-rc-owner/
+
+# Google Play Service Account Key (never commit)
+mediclaro-play-key.json

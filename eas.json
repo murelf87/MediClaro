@@ -64,6 +64,7 @@
         "ascAppId": "6817669616"
       },
       "android": {
+        "serviceAccountKeyPath": "./mediclaro-play-key.json",
         "track": "internal",
         "releaseStatus": "draft"
       }
